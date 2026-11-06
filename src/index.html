@@ -125,8 +125,18 @@
             .map-grid {
                 display: grid;
                 grid-template-columns: repeat(5, 1fr);
-                gap: 6px;
+                grid-auto-rows: 1fr;
+                gap: 10px;
                 margin-bottom: 12px;
+                aspect-ratio: 1;
+                width: 100%;
+            }
+
+            .map-cell {
+                position: relative;
+                overflow: hidden;
+                min-height: 0;
+                min-width: 0;
             }
 
             .map-node {
@@ -242,6 +252,7 @@
 
         <script src='rng-service.js'></script>
         <script src='game-data.js'></script>
+        <script src='dungeon-generator.js'></script>
         <script src='player-model.js'></script>
         <script src='game-engine.js'></script>
         <script src='game-ui.js'></script>

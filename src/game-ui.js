@@ -227,6 +227,7 @@ function renderClassSelectScreen() {
 function renderMapScreen() {
     const floorData = GAME_DATA.floors[game.floor];
     const roomTypes = {
+        start: { icon: "🚪", name: "Вход" },
         battle: { icon: "⚔️", name: "Бой" },
         elite: { icon: "💀", name: "Элита" },
         event: { icon: "❓", name: "Событие" },
@@ -235,42 +236,248 @@ function renderMapScreen() {
         boss: { icon: "👑", name: "БОСС" },
     };
 
-    const grid = el("div", { className: "map-grid" });
-    game.mapRooms.forEach(r => {
-        let cls = "map-node";
-        if (r.id === game.room) cls += " active";
-        else if (r.completed) cls += " done";
+    const px = game.playerPos.x;
+    const py = game.playerPos.y;
+    const currentKey = `${px},${py}`;
+    const currentRoom = game.dungeonRooms[currentKey] || {
+        doors: { up: false, down: false, left: false, right: false },
+        type: "start",
+        cleared: true,
+    };
 
-        const info = roomTypes[r.type] || { icon: "❓", name: r.type };
+    const GAP = 10;
+    const CORRIDOR_W = 16;
 
-        grid.appendChild(el("div", {
-            className: cls,
-            onClick: () => {
-                if (r.id === game.room) {
-                    game.enterRoom(r.id);
-                    render();
-                }
-            },
-        }, [
-            el("div", { style: { fontSize: "18px", lineHeight: "1.2" }, text: info.icon }),
-            el("div", { style: { fontSize: "11px", marginTop: "2px" }, text: info.name }),
-        ]));
+    const gridWrapper = el("div", {
+        style: {
+            position: "relative",
+            marginBottom: "12px",
+        },
     });
 
-    const curRoomObj = game.mapRooms.find(r => r.id === game.room);
-    const curType = roomTypes[curRoomObj?.type || "battle"] || { icon: "⚔️", name: "Бой" };
+    const grid = el("div", {
+        className: "map-grid",
+    });
+    gridWrapper.appendChild(grid);
+
+    const corridorLayer = el("div", {
+        style: {
+            position: "absolute",
+            inset: "0",
+            pointerEvents: "none",
+            zIndex: "0",
+        },
+    });
+    gridWrapper.insertBefore(corridorLayer, grid);
+
+    grid.style.position = "relative";
+    grid.style.zIndex = "1";
+
+    const cells = [];
+
+    for (let dy = -2; dy <= 2; dy++) {
+        for (let dx = -2; dx <= 2; dx++) {
+            const rx = px + dx;
+            const ry = py + dy;
+            const rKey = `${rx},${ry}`;
+            const room = game.dungeonRooms[rKey];
+            const isCenter = dx === 0 && dy === 0;
+
+            let isWalkable = false;
+            if (room && (Math.abs(dx) + Math.abs(dy) === 1)) {
+                if (dx === 1 && currentRoom.doors.right && room.doors.left) isWalkable = true;
+                if (dx === -1 && currentRoom.doors.left && room.doors.right) isWalkable = true;
+                if (dy === 1 && currentRoom.doors.down && room.doors.up) isWalkable = true;
+                if (dy === -1 && currentRoom.doors.up && room.doors.down) isWalkable = true;
+            }
+
+            let cell;
+            if (!room) {
+                cell = el("div", {
+                    className: "map-cell",
+                    style: {
+                        background: "#141414",
+                        border: "1px solid #1f1f1f",
+                        borderRadius: "6px",
+                        opacity: "0.15",
+                    },
+                });
+            } else if (!room.visible && !room.explored) {
+                cell = el("div", {
+                    className: "map-cell",
+                    style: {
+                        background: "#181818",
+                        border: "1px dashed #333333",
+                        borderRadius: "6px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "#666666",
+                        fontSize: "20px",
+                    },
+                    text: "❔",
+                });
+            } else {
+                const info = roomTypes[room.type] || { icon: "❓", name: room.type };
+
+                let nodeClass = "map-node map-cell";
+                let bg = "#252525";
+                let border = "1px solid #444444";
+                let shadow = "none";
+
+                if (isCenter) {
+                    nodeClass += " active";
+                    bg = "#1a365d";
+                    border = "2px solid #3182ce";
+                    shadow = "0 0 8px rgba(49, 130, 206, 0.4)";
+                } else if (isWalkable) {
+                    bg = room.cleared ? "#162816" : "#1b331b";
+                    border = "2px solid #81c784";
+                    shadow = "0 0 8px rgba(129, 199, 132, 0.45)";
+                } else if (room.cleared) {
+                    nodeClass += " done";
+                    bg = "#1f1f1f";
+                    border = "1px solid #333333";
+                }
+
+                cell = el("div", {
+                    className: nodeClass,
+                    style: {
+                        background: bg,
+                        border: border,
+                        borderRadius: "6px",
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        cursor: isWalkable ? "pointer" : "default",
+                        boxShadow: shadow,
+                    },
+                    onClick: () => {
+                        if (isWalkable) {
+                            game.moveToRoom(rx, ry);
+                            render();
+                        }
+                    },
+                }, [
+                    el("div", {
+                        style: {
+                            fontSize: "20px",
+                            lineHeight: "1.2",
+                        },
+                        text: info.icon,
+                    }),
+                    el("div", {
+                        style: {
+                            fontSize: "10px",
+                            marginTop: "2px",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                            maxWidth: "100%",
+                            fontWeight: isCenter ? "bold" : "normal",
+                            color: isCenter ? "#90cdf4" : (room.cleared ? "#888888" : "#f0f0f0"),
+                        },
+                        text: room.cleared && !isCenter ? `✓ ${info.name}` : info.name,
+                    }),
+                ]);
+            }
+
+            cells.push({ cell, dx, dy, rx, ry, room });
+            grid.appendChild(cell);
+        }
+    }
+
+    requestAnimationFrame(() => {
+        const gridRect = grid.getBoundingClientRect();
+        cells.forEach(({ cell, dx, dy, rx, ry, room }) => {
+            if (!room) return;
+            const isCenter = dx === 0 && dy === 0;
+            const cellRect = cell.getBoundingClientRect();
+            const cellLeft = cellRect.left - gridRect.left;
+            const cellTop = cellRect.top - gridRect.top;
+            const cellW = cellRect.width;
+            const cellH = cellRect.height;
+
+            const shouldShowRight = dx < 2 && room.doors.right;
+            if (shouldShowRight) {
+                const rightRoom = game.dungeonRooms[`${rx + 1},${ry}`];
+                if (rightRoom && rightRoom.doors.left && (room.visible || room.explored || rightRoom.visible || rightRoom.explored)) {
+                    const isCorridorWalkable = (isCenter && currentRoom.doors.right) || (dx === -1 && dy === 0 && currentRoom.doors.left);
+                    const targetX = isCenter ? rx + 1 : rx;
+                    const targetY = ry;
+                    const corridorEl = el("div", {
+                        style: {
+                            position: "absolute",
+                            left: `${cellLeft + cellW}px`,
+                            top: `${cellTop + (cellH - CORRIDOR_W) / 2}px`,
+                            width: `${GAP}px`,
+                            height: `${CORRIDOR_W}px`,
+                            background: isCorridorWalkable ? "#1b2e1e" : "#1a1a1a",
+                            borderTop: isCorridorWalkable ? "2px solid #81c784" : "1px solid #444444",
+                            borderBottom: isCorridorWalkable ? "2px solid #81c784" : "1px solid #444444",
+                            boxSizing: "border-box",
+                        },
+                    });
+                    if (isCorridorWalkable) {
+                        corridorEl.style.pointerEvents = "auto";
+                        corridorEl.style.cursor = "pointer";
+                        corridorEl.addEventListener("click", () => {
+                            game.moveToRoom(targetX, targetY);
+                            render();
+                        });
+                    }
+                    corridorLayer.appendChild(corridorEl);
+                }
+            }
+
+            const shouldShowDown = dy < 2 && room.doors.down;
+            if (shouldShowDown) {
+                const downRoom = game.dungeonRooms[`${rx},${ry + 1}`];
+                if (downRoom && downRoom.doors.up && (room.visible || room.explored || downRoom.visible || downRoom.explored)) {
+                    const isCorridorWalkable = (isCenter && currentRoom.doors.down) || (dx === 0 && dy === -1 && currentRoom.doors.up);
+                    const targetX = rx;
+                    const targetY = isCenter ? ry + 1 : ry;
+                    const corridorEl = el("div", {
+                        style: {
+                            position: "absolute",
+                            left: `${cellLeft + (cellW - CORRIDOR_W) / 2}px`,
+                            top: `${cellTop + cellH}px`,
+                            width: `${CORRIDOR_W}px`,
+                            height: `${GAP}px`,
+                            background: isCorridorWalkable ? "#1b2e1e" : "#1a1a1a",
+                            borderLeft: isCorridorWalkable ? "2px solid #81c784" : "1px solid #444444",
+                            borderRight: isCorridorWalkable ? "2px solid #81c784" : "1px solid #444444",
+                            boxSizing: "border-box",
+                        },
+                    });
+                    if (isCorridorWalkable) {
+                        corridorEl.style.pointerEvents = "auto";
+                        corridorEl.style.cursor = "pointer";
+                        corridorEl.addEventListener("click", () => {
+                            game.moveToRoom(targetX, targetY);
+                            render();
+                        });
+                    }
+                    corridorLayer.appendChild(corridorEl);
+                }
+            }
+        });
+    });
 
     return el("div", {}, [
         el("h3", { text: `Этаж ${game.floor + 1}: ${floorData.name}` }),
         renderStatsPanel(),
-        grid,
-        el("button", {
-            className: "btn-center btn-primary",
-            text: `Войти в Комнату #${game.room} (${curType.icon} ${curType.name})`,
-            onClick: () => {
-                game.enterRoom(game.room);
-                render();
+        gridWrapper,
+        el("div", {
+            className: "panel text-center",
+            style: {
+                fontSize: "12px",
+                padding: "8px",
+                color: "#aaaaaa",
+                margin: "4px 0",
             },
+            text: "Нажмите на соседнюю комнату для перехода",
         }),
     ]);
 }
@@ -282,7 +489,7 @@ function renderBattleScreen() {
     const atk = p.getTotalAtk();
 
     const wrap = el("div", {}, [
-        el("h3", { text: `Бой — Комната #${game.room} (Раунд ${game.battleTurn})` }),
+        el("h3", { text: `Бой — Этаж ${game.floor + 1} (Раунд ${game.battleTurn})` }),
         renderStatsPanel()
     ]);
 
@@ -626,7 +833,7 @@ function renderEndScreen() {
     return el("div", {}, [
         el("h2", { text: isWin ? "🏆 ПОБЕДА!" : "💀 ВЫ ПОГИБЛИ" }),
         el("div", { className: "panel text-center" }, [
-            el("p", { text: isWin ? "Вы сокрушили Владыку Малкора и прошли Бездну!" : `Вы пали на Этаже ${game.floor + 1} (Комната ${game.room}).` }),
+            el("p", { text: isWin ? "Вы сокрушили Владыку Малкора и прошли Бездну!" : `Вы пали на Этаже ${game.floor + 1}.` }),
             el("p", { style: { marginTop: "8px" }, text: `Заработано Очков Душ: 🔮 +${game.lastEarnedSouls}` }),
             el("p", { text: `Всего Душ в Алтаре: 🔮 ${game.meta.souls}` })
         ]),

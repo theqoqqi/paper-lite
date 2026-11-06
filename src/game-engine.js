@@ -22,7 +22,9 @@ class Game {
         this.battleRewards = { xp: 0, gold: 0, items: [] };
 
         this.selectedPerkChoices = [];
-        this.mapRooms = [];
+        this.dungeonRooms = {};
+        this.playerPos = { x: 0, y: 0 };
+        this.bossRoomId = null;
         this.currentEventId = null;
         this.shopOffers = [];
         this.rerollCost = 5;
@@ -66,7 +68,9 @@ class Game {
             battleTurn: this.battleTurn,
             battleFinished: this.battleFinished,
             battleRewards: this.battleRewards,
-            mapRooms: this.mapRooms,
+            playerPos: this.playerPos,
+            dungeonRooms: this.dungeonRooms,
+            bossRoomId: this.bossRoomId,
             currentEventId: this.currentEventId,
             shopOffers: this.shopOffers,
             rerollCost: this.rerollCost,
@@ -110,7 +114,12 @@ class Game {
             this.battleFinished = Boolean(data.battleFinished);
             this.battleRewards = data.battleRewards || { xp: 0, gold: 0, items: [] };
             this.isProcessingTurn = false;
-            this.mapRooms = data.mapRooms || [];
+            this.playerPos = data.playerPos || { x: 0, y: 0 };
+            this.dungeonRooms = data.dungeonRooms || {};
+            this.bossRoomId = data.bossRoomId || null;
+            if (Object.keys(this.dungeonRooms).length === 0) {
+                this.generateFloorMap();
+            }
             this.currentEventId = data.currentEventId || "altar";
             this.shopOffers = data.shopOffers || [];
             this.rerollCost = data.rerollCost || 5;
@@ -138,7 +147,9 @@ class Game {
                 day: "2-digit",
                 month: "2-digit",
             }) : "";
-            return `${d.player.className} (Ур.${d.player.level}) | Этаж ${d.floor + 1}, Комн. ${d.room} | 💰${d.player.gold}G [${dateStr}]`;
+            const clearedCount = d.dungeonRooms ? Object.values(d.dungeonRooms).filter(r => r.cleared).length : (d.room || 1);
+            const totalCount = d.dungeonRooms ? Object.keys(d.dungeonRooms).length : 10;
+            return `${d.player.className} (Ур.${d.player.level}) | Этаж ${d.floor + 1} (${clearedCount}/${totalCount} комн.) | 💰${d.player.gold}G [${dateStr}]`;
         } catch (e) {
             return null;
         }
@@ -193,43 +204,109 @@ class Game {
     }
 
     generateFloorMap() {
-        this.mapRooms = [];
         if (this.player) this.player.secondWindAvailable = true;
-        for (let i = 1; i <= 10; i++) {
-            let type = "battle";
-            if (i === 1) type = "battle";
-            else if (i === 5) type = "elite";
-            else if (i === 9) type = "shop";
-            else if (i === 10) type = "boss";
-            else {
-                const rand = RNG.range(1, 100);
-                if (rand <= 38) type = "battle";
-                else if (rand <= 54) type = "elite";
-                else if (rand <= 72) type = "event";
-                else if (rand <= 86) type = "shop";
-                else type = "campfire";
+        const generated = DungeonGenerator.generate(this.floor);
+        this.dungeonRooms = generated.rooms;
+        this.playerPos = { ...generated.startPos };
+        this.bossRoomId = generated.bossRoomId;
+    }
+
+    moveToRoom(targetX, targetY) {
+        if (this.state !== "MAP") return false;
+        const currentKey = `${this.playerPos.x},${this.playerPos.y}`;
+        const currentRoom = this.dungeonRooms[currentKey];
+        const targetKey = `${targetX},${targetY}`;
+        const targetRoom = this.dungeonRooms[targetKey];
+
+        if (!currentRoom || !targetRoom) return false;
+
+        const dx = targetX - this.playerPos.x;
+        const dy = targetY - this.playerPos.y;
+        if (Math.abs(dx) + Math.abs(dy) !== 1) return false;
+
+        if (dx === 1 && !currentRoom.doors.right) return false;
+        if (dx === -1 && !currentRoom.doors.left) return false;
+        if (dy === 1 && !currentRoom.doors.down) return false;
+        if (dy === -1 && !currentRoom.doors.up) return false;
+
+        this.playerPos = { x: targetX, y: targetY };
+        targetRoom.explored = true;
+        targetRoom.visible = true;
+        this.room = Object.values(this.dungeonRooms).filter(r => r.explored).length;
+        this.updateFogOfWar();
+        this.enterCurrentRoomContent();
+        this.saveGame("autosave");
+        return true;
+    }
+
+    updateFogOfWar() {
+        const currentKey = `${this.playerPos.x},${this.playerPos.y}`;
+        const currentRoom = this.dungeonRooms[currentKey];
+        if (!currentRoom) return;
+
+        const dirs = [
+            { name: "up", dx: 0, dy: -1 },
+            { name: "down", dx: 0, dy: 1 },
+            { name: "left", dx: -1, dy: 0 },
+            { name: "right", dx: 1, dy: 0 },
+        ];
+
+        for (const dir of dirs) {
+            if (currentRoom.doors[dir.name]) {
+                const adjKey = `${currentRoom.x + dir.dx},${currentRoom.y + dir.dy}`;
+                if (this.dungeonRooms[adjKey]) {
+                    this.dungeonRooms[adjKey].visible = true;
+                }
             }
-            this.mapRooms.push({ id: i, type, completed: i < this.room });
         }
     }
 
-    enterRoom(roomId) {
-        const roomObj = this.mapRooms.find(r => r.id === roomId);
-        if (!roomObj || roomObj.completed || roomObj.id !== this.room) return;
+    enterCurrentRoomContent() {
+        const currentKey = `${this.playerPos.x},${this.playerPos.y}`;
+        const roomObj = this.dungeonRooms[currentKey];
+        if (!roomObj) return;
 
-        if (roomObj.type === "battle") this.setupBattle("normal");
-        else if (roomObj.type === "elite") this.setupBattle("elite");
-        else if (roomObj.type === "boss") this.setupBattle("boss");
-        else if (roomObj.type === "campfire") this.state = "CAMPFIRE";
-        else if (roomObj.type === "event") {
-            this.currentEventId = RNG.choice(GAME_DATA.events).id;
-            this.state = "EVENT";
+        if (roomObj.type === "start") {
+            this.state = "MAP";
+        } else if (roomObj.type === "battle") {
+            if (!roomObj.cleared) {
+                this.setupBattle("normal");
+            } else {
+                this.state = "MAP";
+            }
+        } else if (roomObj.type === "elite") {
+            if (!roomObj.cleared) {
+                this.setupBattle("elite");
+            } else {
+                this.state = "MAP";
+            }
+        } else if (roomObj.type === "boss") {
+            if (!roomObj.cleared) {
+                this.setupBattle("boss");
+            } else {
+                this.state = "MAP";
+            }
+        } else if (roomObj.type === "campfire") {
+            if (!roomObj.cleared) {
+                this.state = "CAMPFIRE";
+            } else {
+                this.state = "MAP";
+            }
+        } else if (roomObj.type === "event") {
+            if (!roomObj.cleared) {
+                this.currentEventId = RNG.choice(GAME_DATA.events).id;
+                this.state = "EVENT";
+            } else {
+                this.state = "MAP";
+            }
         } else if (roomObj.type === "shop") {
-            this.rerollCost = 5;
-            this.setupShop();
+            if (!roomObj.cleared) {
+                this.rerollCost = 5;
+                this.setupShop();
+                roomObj.cleared = true;
+            }
             this.state = "SHOP";
         }
-        this.saveGame("autosave");
     }
 
     // ================= ГЕНЕРАЦИЯ ВРАГОВ И МАСШТАБИРОВАНИЕ СЛОЖНОСТИ =================
@@ -826,8 +903,9 @@ class Game {
             this.battleRewards.items.push(`Зелье: ${droppedPot.name}`);
         }
 
-        const currentRoomObj = this.mapRooms.find(r => r.id === this.room);
-        const hadEliteOrBoss = this.enemies.some(e => e.isElite || e.isBoss) || (currentRoomObj && currentRoomObj.type === "elite");
+        const currentKey = `${this.playerPos.x},${this.playerPos.y}`;
+        const currentRoomObj = this.dungeonRooms[currentKey];
+        const hadEliteOrBoss = this.enemies.some(e => e.isElite || e.isBoss) || (currentRoomObj && (currentRoomObj.type === "elite" || currentRoomObj.type === "boss"));
         if (hadEliteOrBoss) {
             const lootName = this.grantRandomEquipment();
             if (lootName) this.battleRewards.items.push(lootName);
@@ -916,14 +994,16 @@ class Game {
     }
 
     finishRoom() {
-        const roomObj = this.mapRooms.find(r => r.id === this.room);
-        if (roomObj) roomObj.completed = true;
+        const currentKey = `${this.playerPos.x},${this.playerPos.y}`;
+        const roomObj = this.dungeonRooms[currentKey];
+        if (roomObj) {
+            roomObj.cleared = true;
+        }
 
-        if (this.room >= 10) {
+        if (roomObj && roomObj.type === "boss") {
             this.player.heal(this.player.getTotalMaxHp());
             if (this.floor < 3) {
                 this.floor++;
-                this.room = 1;
                 this.generateFloorMap();
                 this.state = "MAP";
             } else {
@@ -931,7 +1011,6 @@ class Game {
                 this.state = "VICTORY";
             }
         } else {
-            this.room++;
             this.state = "MAP";
         }
         this.saveGame("autosave");
