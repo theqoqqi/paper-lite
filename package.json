@@ -1,0 +1,12 @@
+{
+    "name": "paper-lite",
+    "version": "1.0.0",
+    "private": true,
+    "description": "Paper-lite roguelite game",
+    "scripts": {
+        "build": "node build.js"
+    },
+    "devDependencies": {
+        "archiver": "^8.0.0"
+    }
+}
