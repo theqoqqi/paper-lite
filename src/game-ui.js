@@ -8,6 +8,8 @@ function el(tag, options = {}, children = []) {
     if (options.text !== undefined) element.textContent = options.text;
     if (options.id) element.id = options.id;
     if (options.disabled) element.disabled = true;
+    if (options.src) element.src = options.src;
+    if (options.alt) element.alt = options.alt;
     if (options.style) Object.assign(element.style, options.style);
     if (options.onClick) element.addEventListener("click", options.onClick);
 
@@ -844,6 +846,7 @@ function renderCorridorScreen() {
     const res = game.currentCorridorResult || {
         title: "Коридор",
         desc: "Темный коридор подземелья.",
+        image: null,
         outcomeText: "Вы осторожно проходите вперед.",
         tone: "neutral",
         effectDesc: "",
@@ -866,6 +869,19 @@ function renderCorridorScreen() {
     const wrap = el("div", {}, [
         el("h3", { text: `🕯️ ${res.title}` }),
         renderStatsPanel(),
+        res.image ? el("img", {
+            src: res.image,
+            alt: res.title,
+            style: {
+                width: "100%",
+                maxHeight: "140px",
+                objectFit: "cover",
+                borderRadius: "6px",
+                border: "1px solid #333333",
+                marginBottom: "10px",
+                display: "block",
+            },
+        }) : null,
         el("div", {
             className: "panel",
             style: {

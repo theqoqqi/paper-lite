@@ -1293,6 +1293,7 @@ class Game {
             roomId: roomTemplate.id,
             title: roomTemplate.title,
             desc: roomTemplate.desc,
+            image: roomTemplate.image || null,
             outcomeText: outcome.text,
             tone: outcome.tone,
             effectDesc: effectDesc,
