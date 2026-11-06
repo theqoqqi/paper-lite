@@ -31,6 +31,7 @@ class Game {
         this.lastEarnedSouls = 0;
         this.pendingEquipment = null;
         this.eventRewards = null;
+        this.currentCorridorResult = null;
     }
 
     init() {
@@ -78,6 +79,7 @@ class Game {
             battleLog: this.battleLog,
             pendingEquipment: this.pendingEquipment,
             eventRewards: this.eventRewards,
+            currentCorridorResult: this.currentCorridorResult,
         });
     }
 
@@ -127,6 +129,7 @@ class Game {
             this.battleLog = data.battleLog || [];
             this.pendingEquipment = data.pendingEquipment || null;
             this.eventRewards = data.eventRewards || null;
+            this.currentCorridorResult = data.currentCorridorResult || null;
             this.saveMeta();
             return true;
         } catch (e) {
@@ -147,8 +150,8 @@ class Game {
                 day: "2-digit",
                 month: "2-digit",
             }) : "";
-            const clearedCount = d.dungeonRooms ? Object.values(d.dungeonRooms).filter(r => r.cleared).length : (d.room || 1);
-            const totalCount = d.dungeonRooms ? Object.keys(d.dungeonRooms).length : 10;
+            const clearedCount = d.dungeonRooms ? Object.values(d.dungeonRooms).filter(r => r.cleared && r.type !== "corridor").length : (d.room || 1);
+            const totalCount = d.dungeonRooms ? Object.values(d.dungeonRooms).filter(r => r.type !== "corridor").length : 10;
             return `${d.player.className} (Ур.${d.player.level}) | Этаж ${d.floor + 1} (${clearedCount}/${totalCount} комн.) | 💰${d.player.gold}G [${dateStr}]`;
         } catch (e) {
             return null;
@@ -198,6 +201,7 @@ class Game {
         this.room = 1;
         this.pendingEquipment = null;
         this.eventRewards = null;
+        this.currentCorridorResult = null;
         this.generateFloorMap();
         this.state = "MAP";
         this.saveGame("autosave");
@@ -237,7 +241,7 @@ class Game {
         targetRoom.visited = true;
         targetRoom.visible = true;
         targetRoom.revealed = true;
-        this.room = Object.values(this.dungeonRooms).filter(r => r.visited).length;
+        this.room = Object.values(this.dungeonRooms).filter(r => r.visited && r.type !== "corridor").length;
         this.updateFogOfWar();
         this.enterCurrentRoomContent();
         this.saveGame("autosave");
@@ -381,6 +385,12 @@ class Game {
             } else {
                 this.state = "MAP";
             }
+        } else if (roomObj.type === "corridor") {
+            if (!roomObj.cleared) {
+                this.triggerCorridorRoom();
+            } else {
+                this.state = "MAP";
+            }
         } else if (roomObj.type === "shop") {
             if (!roomObj.cleared) {
                 this.rerollCost = 5;
@@ -490,7 +500,7 @@ class Game {
         this.player.tempSpikes = 0;
         this.player.poison = 0;
         this.player.bleed = 0;
-        this.player.concentrateBonus = 0;
+        this.player.concentrateBonus = this.player.concentrateBonus || 0;
         this.player.cooldowns = { defend: 0, pierce: 0, whirlwind: 0, concentrate: 0 };
         this.player.concentrateUsesLeft = 2;
 
@@ -1081,6 +1091,7 @@ class Game {
         if (roomObj) {
             roomObj.cleared = true;
         }
+        this.currentCorridorResult = null;
 
         if (roomObj && roomObj.type === "boss") {
             this.player.heal(this.player.getTotalMaxHp());
@@ -1228,6 +1239,77 @@ class Game {
             this.player.heal(4);
         }
         this.finishRoom();
+    }
+
+    triggerCorridorRoom() {
+        const roomTemplate = RNG.choice(GAME_DATA.corridorRooms);
+        const outcomeId = RNG.choice(roomTemplate.outcomeIds);
+        const outcome = GAME_DATA.corridorOutcomes[outcomeId] || {
+            id: "empty_default",
+            text: "В коридоре тихо и пусто.",
+            kind: "none",
+            tone: "neutral",
+        };
+
+        let effectDesc = "";
+        if (outcome.kind === "gold") {
+            const delta = RNG.range(outcome.min, outcome.max);
+            this.player.gold += delta;
+            effectDesc = `+${delta}G`;
+        } else if (outcome.kind === "heal") {
+            const delta = RNG.range(outcome.min, outcome.max);
+            this.player.heal(delta);
+            effectDesc = `+${delta} HP`;
+        } else if (outcome.kind === "xp") {
+            const delta = RNG.range(outcome.min, outcome.max);
+            this.player.xp += delta;
+            this.player.totalRunXp += delta;
+            effectDesc = `+${delta} XP`;
+        } else if (outcome.kind === "en") {
+            const delta = outcome.value;
+            this.player.en = Math.min(this.player.getTotalMaxEn(), this.player.en + delta);
+            effectDesc = `+${delta} EN`;
+        } else if (outcome.kind === "concentrate") {
+            const delta = outcome.value;
+            this.player.concentrateBonus = (this.player.concentrateBonus || 0) + delta;
+            effectDesc = `+${delta} к урону (на след. удар)`;
+        } else if (outcome.kind === "trap_hp") {
+            const delta = RNG.range(outcome.min, outcome.max);
+            this.player.hp -= delta;
+            effectDesc = `-${delta} HP`;
+        } else if (outcome.kind === "trap_en") {
+            const delta = outcome.value;
+            this.player.en = Math.max(0, this.player.en - delta);
+            effectDesc = `-${delta} EN`;
+        }
+
+        const currentKey = `${this.playerPos.x},${this.playerPos.y}`;
+        const roomObj = this.dungeonRooms[currentKey];
+        if (roomObj) {
+            roomObj.cleared = true;
+        }
+
+        this.currentCorridorResult = {
+            roomId: roomTemplate.id,
+            title: roomTemplate.title,
+            desc: roomTemplate.desc,
+            outcomeText: outcome.text,
+            tone: outcome.tone,
+            effectDesc: effectDesc,
+        };
+
+        this.state = "CORRIDOR";
+        this.saveGame("autosave");
+    }
+
+    leaveCorridorRoom() {
+        if (this.player.hp <= 0) {
+            this.calculateSouls();
+            this.state = "GAMEOVER";
+            return;
+        }
+        this.currentCorridorResult = null;
+        this.checkLevelUpOrFinishRoom();
     }
 
     // ================= МАГАЗИН С БЕСКОНЕЧНЫМИ УЛУЧШЕНИЯМИ И АРТЕФАКТАМИ =================

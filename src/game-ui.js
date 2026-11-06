@@ -71,6 +71,7 @@ function render() {
     else if (game.state === "EVENT") container.appendChild(renderEventScreen());
     else if (game.state === "EVENT_REWARDS") container.appendChild(renderEventRewardsScreen());
     else if (game.state === "CAMPFIRE") container.appendChild(renderCampfireScreen());
+    else if (game.state === "CORRIDOR") container.appendChild(renderCorridorScreen());
     else if (game.state === "SHOP") container.appendChild(renderShopScreen());
     else if (game.state === "GAMEOVER" || game.state === "VICTORY") container.appendChild(renderEndScreen());
 }
@@ -80,7 +81,7 @@ function renderGlobalNav() {
     nav.replaceChildren();
 
     const row = el("div", { className: "flex-row" });
-    if (game.player && ["MAP", "BATTLE", "SHOP", "EVENT", "CAMPFIRE", "EVENT_REWARDS"].includes(game.state)) {
+    if (game.player && ["MAP", "BATTLE", "SHOP", "EVENT", "CAMPFIRE", "EVENT_REWARDS", "CORRIDOR"].includes(game.state)) {
         row.appendChild(el("button", {
             className: "btn-center",
             style: { background: "#2b3a4a" },
@@ -234,6 +235,7 @@ function renderMapScreen() {
         shop: { icon: "⚖️", name: "Лавка" },
         campfire: { icon: "🔥", name: "Костёр" },
         boss: { icon: "👑", name: "БОСС" },
+        corridor: { icon: "🕯️", name: "Коридор" },
     };
 
     const px = game.playerPos.x;
@@ -356,16 +358,17 @@ function renderMapScreen() {
                     bg = "#1a365d";
                     border = "2px solid #3182ce";
                     shadow = "0 0 8px rgba(49, 130, 206, 0.4)";
+                    opacity = "0.8";
                 } else if (isWalkable) {
                     bg = room.visited ? "#162816" : "#1b331b";
                     border = "2px solid #81c784";
                     shadow = "0 0 8px rgba(129, 199, 132, 0.45)";
-                    if (room.visited) opacity = "0.6";
+                    if (room.visited) opacity = "0.25";
                 } else if (room.visited) {
                     nodeClass += " done";
                     bg = "#1f1f1f";
                     border = "1px solid #333333";
-                    opacity = "0.45";
+                    opacity = "0.25";
                 }
 
                 cell = el("div", {
@@ -435,6 +438,8 @@ function renderMapScreen() {
                     const isCorridorWalkable = (isCenter && currentRoom.doors.right) || (dx === -1 && dy === 0 && currentRoom.doors.left);
                     const targetX = isCenter ? rx + 1 : rx;
                     const targetY = ry;
+                    const targetRoom = isCenter ? rightRoom : room;
+                    const isHighlighted = isCorridorWalkable && !(targetRoom && targetRoom.visited);
                     const corridorEl = el("div", {
                         style: {
                             position: "absolute",
@@ -442,9 +447,9 @@ function renderMapScreen() {
                             top: `${cellTop + (cellH - CORRIDOR_W) / 2}px`,
                             width: `${GAP}px`,
                             height: `${CORRIDOR_W}px`,
-                            background: isCorridorWalkable ? "#1b2e1e" : "#1a1a1a",
-                            borderTop: isCorridorWalkable ? "2px solid #81c784" : "1px solid #444444",
-                            borderBottom: isCorridorWalkable ? "2px solid #81c784" : "1px solid #444444",
+                            background: isHighlighted ? "#1b2e1e" : "#1a1a1a",
+                            borderTop: isHighlighted ? "2px solid #81c784" : "1px solid #444444",
+                            borderBottom: isHighlighted ? "2px solid #81c784" : "1px solid #444444",
                             boxSizing: "border-box",
                         },
                     });
@@ -467,6 +472,8 @@ function renderMapScreen() {
                     const isCorridorWalkable = (isCenter && currentRoom.doors.down) || (dx === 0 && dy === -1 && currentRoom.doors.up);
                     const targetX = rx;
                     const targetY = isCenter ? ry + 1 : ry;
+                    const targetRoom = isCenter ? downRoom : room;
+                    const isHighlighted = isCorridorWalkable && !(targetRoom && targetRoom.visited);
                     const corridorEl = el("div", {
                         style: {
                             position: "absolute",
@@ -474,9 +481,9 @@ function renderMapScreen() {
                             top: `${cellTop + cellH}px`,
                             width: `${CORRIDOR_W}px`,
                             height: `${GAP}px`,
-                            background: isCorridorWalkable ? "#1b2e1e" : "#1a1a1a",
-                            borderLeft: isCorridorWalkable ? "2px solid #81c784" : "1px solid #444444",
-                            borderRight: isCorridorWalkable ? "2px solid #81c784" : "1px solid #444444",
+                            background: isHighlighted ? "#1b2e1e" : "#1a1a1a",
+                            borderLeft: isHighlighted ? "2px solid #81c784" : "1px solid #444444",
+                            borderRight: isHighlighted ? "2px solid #81c784" : "1px solid #444444",
                             boxSizing: "border-box",
                         },
                     });
@@ -831,6 +838,79 @@ function renderCampfireScreen() {
             }
         })
     ]);
+}
+
+function renderCorridorScreen() {
+    const res = game.currentCorridorResult || {
+        title: "Коридор",
+        desc: "Темный коридор подземелья.",
+        outcomeText: "Вы осторожно проходите вперед.",
+        tone: "neutral",
+        effectDesc: "",
+    };
+
+    let toneBg = "#1f1f1f";
+    let toneBorder = "#444444";
+    let toneColor = "#e0e0e0";
+
+    if (res.tone === "positive") {
+        toneBg = "#162816";
+        toneBorder = "#4caf50";
+        toneColor = "#81c784";
+    } else if (res.tone === "negative") {
+        toneBg = "#2d1616";
+        toneBorder = "#e53e3e";
+        toneColor = "#fc8181";
+    }
+
+    const wrap = el("div", {}, [
+        el("h3", { text: `🕯️ ${res.title}` }),
+        renderStatsPanel(),
+        el("div", {
+            className: "panel",
+            style: {
+                color: "#cccccc",
+                fontStyle: "italic",
+                marginBottom: "10px",
+            },
+            text: res.desc,
+        }),
+        el("div", {
+            className: "panel",
+            style: {
+                background: toneBg,
+                borderColor: toneBorder,
+                marginBottom: "12px",
+            },
+        }, [
+            el("div", {
+                style: {
+                    fontSize: "14px",
+                    lineHeight: "1.4",
+                    marginBottom: res.effectDesc ? "8px" : "0",
+                },
+                text: res.outcomeText,
+            }),
+            res.effectDesc ? el("div", {
+                style: {
+                    fontWeight: "bold",
+                    color: toneColor,
+                    fontSize: "14px",
+                },
+                text: res.effectDesc,
+            }) : null,
+        ]),
+        el("button", {
+            className: game.player && game.player.hp <= 0 ? "btn-center btn-danger" : "btn-center btn-primary",
+            text: game.player && game.player.hp <= 0 ? "💀 Погибнуть" : "🚪 Продолжить путь",
+            onClick: () => {
+                game.leaveCorridorRoom();
+                render();
+            },
+        }),
+    ]);
+
+    return wrap;
 }
 
 function renderShopScreen() {

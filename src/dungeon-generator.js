@@ -21,7 +21,9 @@ class DungeonGenerator {
             revealed: true,
         };
 
-        const targetCount = 10 + floor * 2;
+        const majorCount = 10 + floor * 2;
+        const corridorCount = 3 + floor;
+        const targetCount = majorCount + corridorCount;
         const startDir = RNG.choice(dirs);
         const firstKey = `${startDir.dx},${startDir.dy}`;
         const firstRoom = {
@@ -136,6 +138,10 @@ class DungeonGenerator {
         const elitesCount = floor >= 1 ? 2 : 1;
         for (let i = 0; i < elitesCount && pool.length > 0; i++) {
             pool.pop().type = "elite";
+        }
+
+        for (let i = 0; i < corridorCount && pool.length > 0; i++) {
+            pool.pop().type = "corridor";
         }
 
         while (pool.length > 0) {
