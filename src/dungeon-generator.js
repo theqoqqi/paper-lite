@@ -15,9 +15,10 @@ class DungeonGenerator {
             y: 0,
             type: "start",
             doors: { up: false, down: false, left: false, right: false },
-            explored: true,
+            visited: true,
             cleared: true,
             visible: true,
+            revealed: true,
         };
 
         const targetCount = 10 + floor * 2;
@@ -29,9 +30,10 @@ class DungeonGenerator {
             y: startDir.dy,
             type: "battle",
             doors: { up: false, down: false, left: false, right: false },
-            explored: false,
+            visited: false,
             cleared: false,
             visible: true,
+            revealed: false,
         };
 
         rooms[startKey].doors[startDir.name] = true;
@@ -58,9 +60,10 @@ class DungeonGenerator {
                         y: ny,
                         type: "battle",
                         doors: { up: false, down: false, left: false, right: false },
-                        explored: false,
+                        visited: false,
                         cleared: false,
                         visible: false,
+                        revealed: false,
                     };
 
                     current.doors[dir.name] = true;

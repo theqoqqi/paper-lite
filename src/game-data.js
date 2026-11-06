@@ -5,27 +5,27 @@
 const GAME_DATA = {
     classes: {
         wanderer: {
-            id: "wanderer", name: "Странник", hp: 18, atk: 3, def: 0, en: 3, crit: 15, cost: 0,
+            id: "wanderer", name: "Странник", hp: 18, atk: 3, def: 0, en: 4, crit: 15, cost: 0,
             desc: "Сбалансированный боец. На старте получает +10 Золота и Зелье Исцеления."
         },
         crusader: {
-            id: "crusader", name: "Крестоносец", hp: 24, atk: 2, def: 1, en: 2, crit: 10, cost: 25,
+            id: "crusader", name: "Крестоносец", hp: 24, atk: 2, def: 1, en: 3, crit: 10, cost: 25,
             desc: "Глухая защита даёт на +4 больше Щита и возвращает врагам +3 урона Шипами."
         },
         assassin: {
-            id: "assassin", name: "Ассасин Тени", hp: 14, atk: 4, def: 0, en: 4, crit: 25, cost: 40,
+            id: "assassin", name: "Ассасин Тени", hp: 14, atk: 4, def: 0, en: 5, crit: 25, cost: 40,
             desc: "Повышенный шанс крита (25%). В 1-й раунд боя все удары гарантированно Критические и пробивают DEF."
         },
         reaper: {
-            id: "reaper", name: "Кровавый Жнец", hp: 25, atk: 3, def: 0, en: 3, crit: 15, cost: 55,
+            id: "reaper", name: "Кровавый Жнец", hp: 25, atk: 3, def: 0, en: 4, crit: 15, cost: 55,
             desc: "Убийство любого врага лечит +3 HP. При нехватке Энергии может платить кровью (3 HP за 1 EN)."
         },
         arcanist: {
-            id: "arcanist", name: "Арканист", hp: 15, atk: 2, def: 0, en: 5, crit: 15, cost: 70,
+            id: "arcanist", name: "Арканист", hp: 15, atk: 2, def: 0, en: 6, crit: 15, cost: 70,
             desc: "Регенерирует +1 EN каждый раунд. Вихрь превращается в Огненный Залп (выше урон и пробитие DEF)."
         },
         engineer: {
-            id: "engineer", name: "Инженер Кузни", hp: 18, atk: 3, def: 1, en: 3, crit: 15, cost: 85,
+            id: "engineer", name: "Инженер Кузни", hp: 18, atk: 3, def: 1, en: 4, crit: 15, cost: 85,
             desc: "На старте боя получает +5 Щита. В конце каждого раунда его Авто-турель наносит 3 чистого урона случайному врагу."
         }
     },

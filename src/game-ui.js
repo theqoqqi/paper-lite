@@ -292,7 +292,7 @@ function renderMapScreen() {
             }
 
             let cell;
-            if (!room) {
+            if (!room || (!room.visible && !room.visited)) {
                 cell = el("div", {
                     className: "map-cell",
                     style: {
@@ -302,42 +302,16 @@ function renderMapScreen() {
                         opacity: "0.15",
                     },
                 });
-            } else if (!room.visible && !room.explored) {
-                cell = el("div", {
-                    className: "map-cell",
-                    style: {
-                        background: "#181818",
-                        border: "1px dashed #333333",
-                        borderRadius: "6px",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        color: "#666666",
-                        fontSize: "20px",
-                    },
-                    text: "❔",
-                });
-            } else {
-                const info = roomTypes[room.type] || { icon: "❓", name: room.type };
-
+            } else if (!room.visited && !room.revealed) {
                 let nodeClass = "map-node map-cell";
-                let bg = "#252525";
-                let border = "1px solid #444444";
+                let bg = "#181818";
+                let border = "1px dashed #444444";
                 let shadow = "none";
 
-                if (isCenter) {
-                    nodeClass += " active";
-                    bg = "#1a365d";
-                    border = "2px solid #3182ce";
-                    shadow = "0 0 8px rgba(49, 130, 206, 0.4)";
-                } else if (isWalkable) {
-                    bg = room.cleared ? "#162816" : "#1b331b";
+                if (isWalkable) {
                     border = "2px solid #81c784";
+                    bg = "#1b281b";
                     shadow = "0 0 8px rgba(129, 199, 132, 0.45)";
-                } else if (room.cleared) {
-                    nodeClass += " done";
-                    bg = "#1f1f1f";
-                    border = "1px solid #333333";
                 }
 
                 cell = el("div", {
@@ -346,6 +320,61 @@ function renderMapScreen() {
                         background: bg,
                         border: border,
                         borderRadius: "6px",
+                        display: "flex",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        cursor: isWalkable ? "pointer" : "default",
+                        boxShadow: shadow,
+                    },
+                    onClick: () => {
+                        if (isWalkable) {
+                            game.moveToRoom(rx, ry);
+                            render();
+                        }
+                    },
+                }, [
+                    el("div", {
+                        style: {
+                            fontSize: "24px",
+                            lineHeight: "1",
+                            color: isWalkable ? "#81c784" : "#666666",
+                        },
+                        text: "❔",
+                    }),
+                ]);
+            } else {
+                const info = roomTypes[room.type] || { icon: "❓", name: room.type };
+
+                let nodeClass = "map-node map-cell";
+                let bg = "#252525";
+                let border = "1px solid #444444";
+                let shadow = "none";
+                let opacity = "1";
+
+                if (isCenter) {
+                    nodeClass += " active";
+                    bg = "#1a365d";
+                    border = "2px solid #3182ce";
+                    shadow = "0 0 8px rgba(49, 130, 206, 0.4)";
+                } else if (isWalkable) {
+                    bg = room.visited ? "#162816" : "#1b331b";
+                    border = "2px solid #81c784";
+                    shadow = "0 0 8px rgba(129, 199, 132, 0.45)";
+                    if (room.visited) opacity = "0.6";
+                } else if (room.visited) {
+                    nodeClass += " done";
+                    bg = "#1f1f1f";
+                    border = "1px solid #333333";
+                    opacity = "0.45";
+                }
+
+                cell = el("div", {
+                    className: nodeClass,
+                    style: {
+                        background: bg,
+                        border: border,
+                        borderRadius: "6px",
+                        opacity: opacity,
                         display: "flex",
                         flexDirection: "column",
                         justifyContent: "center",
@@ -376,9 +405,9 @@ function renderMapScreen() {
                             whiteSpace: "nowrap",
                             maxWidth: "100%",
                             fontWeight: isCenter ? "bold" : "normal",
-                            color: isCenter ? "#90cdf4" : (room.cleared ? "#888888" : "#f0f0f0"),
+                            color: isCenter ? "#90cdf4" : (room.visited ? "#888888" : "#f0f0f0"),
                         },
-                        text: room.cleared && !isCenter ? `✓ ${info.name}` : info.name,
+                        text: info.name,
                     }),
                 ]);
             }
@@ -402,7 +431,7 @@ function renderMapScreen() {
             const shouldShowRight = dx < 2 && room.doors.right;
             if (shouldShowRight) {
                 const rightRoom = game.dungeonRooms[`${rx + 1},${ry}`];
-                if (rightRoom && rightRoom.doors.left && (room.visible || room.explored || rightRoom.visible || rightRoom.explored)) {
+                if (rightRoom && rightRoom.doors.left && (room.visited || rightRoom.visited)) {
                     const isCorridorWalkable = (isCenter && currentRoom.doors.right) || (dx === -1 && dy === 0 && currentRoom.doors.left);
                     const targetX = isCenter ? rx + 1 : rx;
                     const targetY = ry;
@@ -434,7 +463,7 @@ function renderMapScreen() {
             const shouldShowDown = dy < 2 && room.doors.down;
             if (shouldShowDown) {
                 const downRoom = game.dungeonRooms[`${rx},${ry + 1}`];
-                if (downRoom && downRoom.doors.up && (room.visible || room.explored || downRoom.visible || downRoom.explored)) {
+                if (downRoom && downRoom.doors.up && (room.visited || downRoom.visited)) {
                     const isCorridorWalkable = (isCenter && currentRoom.doors.down) || (dx === 0 && dy === -1 && currentRoom.doors.up);
                     const targetX = rx;
                     const targetY = isCenter ? ry + 1 : ry;
@@ -465,10 +494,32 @@ function renderMapScreen() {
         });
     });
 
+    const scoutStatus = game.getScoutStatus();
+    let scoutBtnText = "🔍 Разведать окружение (1 ⚡ EN)";
+    if (scoutStatus.reason === "all_revealed") {
+        scoutBtnText = "🔍 Все соседние комнаты разведаны";
+    } else if (scoutStatus.reason === "no_en") {
+        scoutBtnText = "🔍 Разведка (недостаточно ⚡ EN)";
+    } else if (scoutStatus.costType === "hp") {
+        scoutBtnText = "🔍 Разведать окружение (3 ❤️ HP)";
+    }
+
     return el("div", {}, [
         el("h3", { text: `Этаж ${game.floor + 1}: ${floorData.name}` }),
         renderStatsPanel(),
         gridWrapper,
+        el("button", {
+            className: "btn-center btn-primary",
+            style: {
+                marginBottom: "6px",
+            },
+            disabled: !scoutStatus.canScout,
+            text: scoutBtnText,
+            onClick: () => {
+                game.scoutSurroundings();
+                render();
+            },
+        }),
         el("div", {
             className: "panel text-center",
             style: {

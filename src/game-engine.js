@@ -229,12 +229,93 @@ class Game {
         if (dy === 1 && !currentRoom.doors.down) return false;
         if (dy === -1 && !currentRoom.doors.up) return false;
 
+        const isNewRoom = !targetRoom.visited;
         this.playerPos = { x: targetX, y: targetY };
-        targetRoom.explored = true;
+        if (isNewRoom) {
+            this.player.en = Math.min(this.player.getTotalMaxEn(), this.player.en + 1);
+        }
+        targetRoom.visited = true;
         targetRoom.visible = true;
-        this.room = Object.values(this.dungeonRooms).filter(r => r.explored).length;
+        targetRoom.revealed = true;
+        this.room = Object.values(this.dungeonRooms).filter(r => r.visited).length;
         this.updateFogOfWar();
         this.enterCurrentRoomContent();
+        this.saveGame("autosave");
+        return true;
+    }
+
+    getScoutStatus() {
+        const px = this.playerPos.x;
+        const py = this.playerPos.y;
+        const currentRoom = this.dungeonRooms[`${px},${py}`];
+        if (!currentRoom) return { canScout: false, reason: "no_room" };
+
+        const dirs = [
+            { name: "up", dx: 0, dy: -1 },
+            { name: "down", dx: 0, dy: 1 },
+            { name: "left", dx: -1, dy: 0 },
+            { name: "right", dx: 1, dy: 0 },
+        ];
+
+        let unrevealedCount = 0;
+        for (const dir of dirs) {
+            if (currentRoom.doors[dir.name]) {
+                const adjKey = `${px + dir.dx},${py + dir.dy}`;
+                const adjRoom = this.dungeonRooms[adjKey];
+                if (adjRoom && !adjRoom.revealed && !adjRoom.visited) {
+                    unrevealedCount++;
+                }
+            }
+        }
+
+        if (unrevealedCount === 0) {
+            return { canScout: false, reason: "all_revealed" };
+        }
+
+        if (this.player.en >= 1) {
+            return { canScout: true, costType: "en", cost: 1, count: unrevealedCount };
+        }
+
+        if (this.player.classId === "reaper" && this.player.hp > 3) {
+            return { canScout: true, costType: "hp", cost: 3, count: unrevealedCount };
+        }
+
+        return { canScout: false, reason: "no_en", count: unrevealedCount };
+    }
+
+    scoutSurroundings() {
+        if (this.state !== "MAP") return false;
+        const status = this.getScoutStatus();
+        if (!status.canScout) return false;
+
+        if (status.costType === "en") {
+            this.player.en -= 1;
+        } else if (status.costType === "hp") {
+            this.player.hp -= 3;
+        }
+
+        const px = this.playerPos.x;
+        const py = this.playerPos.y;
+        const currentRoom = this.dungeonRooms[`${px},${py}`];
+
+        const dirs = [
+            { name: "up", dx: 0, dy: -1 },
+            { name: "down", dx: 0, dy: 1 },
+            { name: "left", dx: -1, dy: 0 },
+            { name: "right", dx: 1, dy: 0 },
+        ];
+
+        for (const dir of dirs) {
+            if (currentRoom.doors[dir.name]) {
+                const adjKey = `${px + dir.dx},${py + dir.dy}`;
+                const adjRoom = this.dungeonRooms[adjKey];
+                if (adjRoom) {
+                    adjRoom.revealed = true;
+                    adjRoom.visible = true;
+                }
+            }
+        }
+
         this.saveGame("autosave");
         return true;
     }
@@ -287,6 +368,7 @@ class Game {
                 this.state = "MAP";
             }
         } else if (roomObj.type === "campfire") {
+            this.player.en = this.player.getTotalMaxEn();
             if (!roomObj.cleared) {
                 this.state = "CAMPFIRE";
             } else {
@@ -386,7 +468,7 @@ class Game {
 
         this.selectedTargetIndex = 0;
         this.battleTurn = 1;
-        this.player.en = this.player.getTotalMaxEn();
+        this.player.en = Math.min(this.player.getTotalMaxEn(), this.player.en);
         if (this.player.hasArtifact("art2")) {
             this.player.en += 2;
         }
@@ -1002,6 +1084,7 @@ class Game {
 
         if (roomObj && roomObj.type === "boss") {
             this.player.heal(this.player.getTotalMaxHp());
+            this.player.en = this.player.getTotalMaxEn();
             if (this.floor < 3) {
                 this.floor++;
                 this.generateFloorMap();
