@@ -81,7 +81,7 @@ class Player {
     equipWeapon(newWeapon) {
         let refund = 0;
         if (this.inventory.weapon && this.inventory.weapon.cost) {
-            refund = Math.floor(this.inventory.weapon.cost * 0.25);
+            refund = Math.max(1, Math.floor(this.inventory.weapon.cost * 0.25));
             this.gold += refund;
         }
         this.inventory.weapon = { ...newWeapon };
@@ -92,7 +92,7 @@ class Player {
         let refund = 0;
         const oldMax = this.getTotalMaxHp();
         if (this.inventory.armor && this.inventory.armor.cost) {
-            refund = Math.floor(this.inventory.armor.cost * 0.25);
+            refund = Math.max(1, Math.floor(this.inventory.armor.cost * 0.25));
             this.gold += refund;
         }
         this.inventory.armor = { ...newArmor };

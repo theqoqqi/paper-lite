@@ -69,6 +69,7 @@ function render() {
     else if (game.state === "BATTLE") container.appendChild(renderBattleScreen());
     else if (game.state === "LEVELUP") container.appendChild(renderLevelUpScreen());
     else if (game.state === "EVENT") container.appendChild(renderEventScreen());
+    else if (game.state === "EVENT_REWARDS") container.appendChild(renderEventRewardsScreen());
     else if (game.state === "CAMPFIRE") container.appendChild(renderCampfireScreen());
     else if (game.state === "SHOP") container.appendChild(renderShopScreen());
     else if (game.state === "GAMEOVER" || game.state === "VICTORY") container.appendChild(renderEndScreen());
@@ -79,7 +80,7 @@ function renderGlobalNav() {
     nav.replaceChildren();
 
     const row = el("div", { className: "flex-row" });
-    if (game.player && ["MAP", "BATTLE", "SHOP", "EVENT", "CAMPFIRE"].includes(game.state)) {
+    if (game.player && ["MAP", "BATTLE", "SHOP", "EVENT", "CAMPFIRE", "EVENT_REWARDS"].includes(game.state)) {
         row.appendChild(el("button", {
             className: "btn-center",
             style: { background: "#2b3a4a" },
@@ -225,13 +226,13 @@ function renderClassSelectScreen() {
 
 function renderMapScreen() {
     const floorData = GAME_DATA.floors[game.floor];
-    const typeLabels = {
-        battle: "⚔️ Бой",
-        elite: "💀 Элита",
-        event: "❓ Событие",
-        shop: "⚖️ Лавка",
-        campfire: "🔥 Костёр",
-        boss: "👑 БОСС"
+    const roomTypes = {
+        battle: { icon: "⚔️", name: "Бой" },
+        elite: { icon: "💀", name: "Элита" },
+        event: { icon: "❓", name: "Событие" },
+        shop: { icon: "⚖️", name: "Лавка" },
+        campfire: { icon: "🔥", name: "Костёр" },
+        boss: { icon: "👑", name: "БОСС" },
     };
 
     const grid = el("div", { className: "map-grid" });
@@ -240,6 +241,8 @@ function renderMapScreen() {
         if (r.id === game.room) cls += " active";
         else if (r.completed) cls += " done";
 
+        const info = roomTypes[r.type] || { icon: "❓", name: r.type };
+
         grid.appendChild(el("div", {
             className: cls,
             onClick: () => {
@@ -247,14 +250,15 @@ function renderMapScreen() {
                     game.enterRoom(r.id);
                     render();
                 }
-            }
+            },
         }, [
-            el("div", { text: `#${r.id}` }),
-            el("small", { text: typeLabels[r.type] || r.type })
+            el("div", { style: { fontSize: "18px", lineHeight: "1.2" }, text: info.icon }),
+            el("div", { style: { fontSize: "11px", marginTop: "2px" }, text: info.name }),
         ]));
     });
 
     const curRoomObj = game.mapRooms.find(r => r.id === game.room);
+    const curType = roomTypes[curRoomObj?.type || "battle"] || { icon: "⚔️", name: "Бой" };
 
     return el("div", {}, [
         el("h3", { text: `Этаж ${game.floor + 1}: ${floorData.name}` }),
@@ -262,12 +266,12 @@ function renderMapScreen() {
         grid,
         el("button", {
             className: "btn-center btn-primary",
-            text: `Войти в Комнату #${game.room} (${typeLabels[curRoomObj.type]})`,
+            text: `Войти в Комнату #${game.room} (${curType.icon} ${curType.name})`,
             onClick: () => {
                 game.enterRoom(game.room);
                 render();
-            }
-        })
+            },
+        }),
     ]);
 }
 
@@ -303,10 +307,15 @@ function renderBattleScreen() {
             });
         }
 
+        if (game.pendingEquipment) {
+            rewardBox.appendChild(renderEquipmentComparison(game.pendingEquipment, render));
+        }
+
         rewardBox.appendChild(el("button", {
             className: "btn-center btn-primary",
+            disabled: Boolean(game.pendingEquipment),
             style: { marginTop: "10px" },
-            text: "Продолжить ➡️",
+            text: game.pendingEquipment ? "Сначала сделайте выбор" : "Продолжить ➡️",
             onClick: () => {
                 game.proceedAfterBattle();
                 render();
@@ -485,6 +494,57 @@ function renderEventScreen() {
     return wrap;
 }
 
+function renderEventRewardsScreen() {
+    const rewards = game.eventRewards || { gold: 0, items: [] };
+    const wrap = el("div", {}, [
+        el("h3", { text: "❓ Награда за событие" }),
+        renderStatsPanel(),
+        el("div", {
+            className: "panel",
+            style: { borderColor: "#4caf50", background: "#1b2e1b" },
+        }, [
+            el("h3", { style: { color: "#81c784" }, text: "🎁 НАЙДЕНЫ ТРОФЕИ!" }),
+            rewards.gold > 0 ? el("p", {
+                className: "text-center",
+                style: { marginBottom: "8px" },
+                text: `Получено: +${rewards.gold} Золота`,
+            }) : null,
+        ]),
+    ]);
+
+    const box = wrap.lastElementChild;
+    if (rewards.items.length > 0) {
+        box.appendChild(el("div", {
+            style: { marginBottom: "6px", fontWeight: "bold" },
+            text: "Найденные предметы:",
+        }));
+        rewards.items.forEach(it => {
+            box.appendChild(el("div", {
+                style: { color: "#ffd54f", fontSize: "13px" },
+                text: `• ${it}`,
+            }));
+        });
+    }
+
+    if (game.pendingEquipment) {
+        box.appendChild(renderEquipmentComparison(game.pendingEquipment, render));
+    }
+
+    box.appendChild(el("button", {
+        className: "btn-center btn-primary",
+        disabled: Boolean(game.pendingEquipment),
+        style: { marginTop: "10px" },
+        text: game.pendingEquipment ? "Сначала сделайте выбор экипировки ☝️" : "Продолжить путь ➡️",
+        onClick: () => {
+            game.eventRewards = null;
+            game.checkLevelUpOrFinishRoom();
+            render();
+        },
+    }));
+
+    return wrap;
+}
+
 function renderCampfireScreen() {
     const mult = game.player.perks.includes("p28") ? 0.7 : 0.45;
     const healAmt = Math.ceil(game.player.getTotalMaxHp() * mult);
@@ -586,6 +646,57 @@ function renderEndScreen() {
                 render();
             }
         })
+    ]);
+}
+
+function renderEquipmentComparison(pendingEquip, onResolved) {
+    if (!pendingEquip) return null;
+    const { type, item } = pendingEquip;
+    const current = type === "weapon" ? game.player.inventory.weapon : game.player.inventory.armor;
+    const currentName = current ? `${current.name} (${current.desc})` : (type === "weapon" ? "Кулаки" : "Лохмотья");
+    const oldRefund = (current && current.cost) ? Math.max(1, Math.floor(current.cost * 0.25)) : 0;
+    const salvageGain = (item && item.cost) ? Math.max(1, Math.floor(item.cost * 0.25)) : 0;
+    const typeLabel = type === "weapon" ? "Оружие" : "Броня";
+
+    return el("div", {
+        className: "panel",
+        style: {
+            borderColor: "#ff9800",
+            background: "#2a2218",
+            marginTop: "8px",
+        },
+    }, [
+        el("div", {
+            style: { fontWeight: "bold", color: "#ffb74d", marginBottom: "6px" },
+            text: `⚖️ Выбор экипировки: найдено [${typeLabel}]`,
+        }),
+        el("div", {
+            style: { fontSize: "12px", marginBottom: "4px" },
+            text: `Надето: ${currentName}`,
+        }),
+        el("div", {
+            style: { fontSize: "12px", color: "#81c784", marginBottom: "8px" },
+            text: `Найдено: [${item.rarity}] ${item.name} (${item.desc})`,
+        }),
+        el("div", { className: "flex-row" }, [
+            el("button", {
+                className: "btn-primary",
+                style: { padding: "8px", fontSize: "12px" },
+                text: `Надеть (+${oldRefund}G со старого)`,
+                onClick: () => {
+                    game.resolveEquipChoice();
+                    if (onResolved) onResolved();
+                },
+            }),
+            el("button", {
+                style: { padding: "8px", fontSize: "12px", background: "#4a3220" },
+                text: `Разобрать (+${salvageGain}G)`,
+                onClick: () => {
+                    game.resolveSalvageChoice();
+                    if (onResolved) onResolved();
+                },
+            }),
+        ]),
     ]);
 }
 

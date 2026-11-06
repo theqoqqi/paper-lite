@@ -27,6 +27,8 @@ class Game {
         this.shopOffers = [];
         this.rerollCost = 5;
         this.lastEarnedSouls = 0;
+        this.pendingEquipment = null;
+        this.eventRewards = null;
     }
 
     init() {
@@ -69,7 +71,9 @@ class Game {
             shopOffers: this.shopOffers,
             rerollCost: this.rerollCost,
             selectedPerkChoices: this.selectedPerkChoices,
-            battleLog: this.battleLog
+            battleLog: this.battleLog,
+            pendingEquipment: this.pendingEquipment,
+            eventRewards: this.eventRewards,
         });
     }
 
@@ -91,7 +95,7 @@ class Game {
             if (!data || !data.player) return false;
 
             this.meta = Object.assign(JSON.parse(JSON.stringify(this.defaultMeta)), data.meta || {});
-            this.player = Object.assign(new Player("wanderer"), data.player);
+            this.player = Object.assign(new Player(data.player.classId || "wanderer"), data.player);
             if (!this.player.inventory.artifacts) this.player.inventory.artifacts = [];
             if (!this.player.cooldowns) {
                 this.player.cooldowns = { defend: 0, pierce: 0, whirlwind: 0, concentrate: 0 };
@@ -112,6 +116,8 @@ class Game {
             this.rerollCost = data.rerollCost || 5;
             this.selectedPerkChoices = data.selectedPerkChoices || [];
             this.battleLog = data.battleLog || [];
+            this.pendingEquipment = data.pendingEquipment || null;
+            this.eventRewards = data.eventRewards || null;
             this.saveMeta();
             return true;
         } catch (e) {
@@ -179,6 +185,8 @@ class Game {
         this.player = new Player(classKey, this.meta);
         this.floor = 0;
         this.room = 1;
+        this.pendingEquipment = null;
+        this.eventRewards = null;
         this.generateFloorMap();
         this.state = "MAP";
         this.saveGame("autosave");
@@ -830,7 +838,7 @@ class Game {
     }
 
     proceedAfterBattle() {
-        if (!this.battleFinished) return;
+        if (!this.battleFinished || this.pendingEquipment) return;
         this.checkLevelUpOrFinishRoom();
     }
 
@@ -847,19 +855,27 @@ class Game {
         this.finishRoom();
     }
 
-    grantRandomEquipment() {
+    grantRandomEquipment(origin = "battle") {
         const tier = this.floor >= 2 ? 2 : 1;
         const roll = RNG.range(1, 3);
         if (roll === 1) {
             const pool = GAME_DATA.items.weapons.filter(w => w.tier === tier);
             const item = RNG.choice(pool);
-            const refund = this.player.equipWeapon(item);
-            return `Оружие: ${item.name}${refund > 0 ? ` (старое продано за +${refund}G)` : ""}`;
+            this.pendingEquipment = {
+                type: "weapon",
+                item: { ...item },
+                origin: origin,
+            };
+            return `Оружие: ${item.name} (${item.desc})`;
         } else if (roll === 2) {
             const pool = GAME_DATA.items.armors.filter(a => a.tier === tier);
             const item = RNG.choice(pool);
-            const refund = this.player.equipArmor(item);
-            return `Броня: ${item.name}${refund > 0 ? ` (старая продана за +${refund}G)` : ""}`;
+            this.pendingEquipment = {
+                type: "armor",
+                item: { ...item },
+                origin: origin,
+            };
+            return `Броня: ${item.name} (${item.desc})`;
         } else {
             const unowned = GAME_DATA.items.artifacts.filter(a => !this.player.hasArtifact(a.id));
             if (unowned.length > 0) {
@@ -871,6 +887,32 @@ class Game {
                 return `Сундук золота (+15G)`;
             }
         }
+    }
+
+    resolveEquipChoice() {
+        if (!this.pendingEquipment) return null;
+        const { type, item } = this.pendingEquipment;
+        let refund = 0;
+        if (type === "weapon") {
+            refund = this.player.equipWeapon(item);
+        } else if (type === "armor") {
+            refund = this.player.equipArmor(item);
+        }
+        const result = { name: item.name, refund: refund };
+        this.pendingEquipment = null;
+        this.saveGame("autosave");
+        return result;
+    }
+
+    resolveSalvageChoice() {
+        if (!this.pendingEquipment) return null;
+        const { item } = this.pendingEquipment;
+        const goldGain = (item && item.cost) ? Math.max(1, Math.floor(item.cost * 0.25)) : 0;
+        this.player.gold += goldGain;
+        const result = { name: item.name, goldGain: goldGain };
+        this.pendingEquipment = null;
+        this.saveGame("autosave");
+        return result;
     }
 
     finishRoom() {
@@ -951,7 +993,14 @@ class Game {
                 return;
             } else {
                 this.player.gold += 15;
-                this.grantRandomEquipment();
+                const loot = this.grantRandomEquipment("event");
+                this.eventRewards = {
+                    gold: 15,
+                    items: loot ? [loot] : [],
+                };
+                this.state = "EVENT_REWARDS";
+                this.saveGame("autosave");
+                return;
             }
         } else if (optionId === "lib_xp") {
             this.player.xp += 12;
