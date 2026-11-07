@@ -482,9 +482,13 @@ class Game {
         if (this.player.hasArtifact("art2")) {
             this.player.en += 2;
         }
+        if (this.player.perks.includes("p33")) {
+            this.player.en += this.enemies.length;
+        }
 
         this.player.shield = 0;
         if (this.player.perks.includes("p6")) this.player.addShield(6);
+        if (this.player.hasArtifact("art13")) this.player.addShield(8);
         if (this.player.classId === "engineer") this.player.addShield(5);
         if (this.player.inventory.armor && this.player.inventory.armor.startShield) {
             this.player.addShield(this.player.inventory.armor.startShield);
@@ -500,6 +504,7 @@ class Game {
         this.player.tempSpikes = 0;
         this.player.poison = 0;
         this.player.bleed = 0;
+        this.player.forceCritNext = false;
         this.player.concentrateBonus = this.player.concentrateBonus || 0;
         this.player.cooldowns = { defend: 0, pierce: 0, whirlwind: 0, concentrate: 0 };
         this.player.concentrateUsesLeft = 2;
@@ -588,6 +593,34 @@ class Game {
             this.player.heal(8 + alchBonus);
             this.player.concentrateBonus += 4;
             if (this.state === "BATTLE") this.battleLog.unshift(`🧪 Кровь Дракона (+${8 + alchBonus} HP, +4 к след. атаке).`);
+        } else if (pot.id === "pot7") {
+            this.player.addShield(6);
+            this.player.tempSpikes += 4;
+            this.battleLog.unshift(`🧪 Эликсир Железной Кожи (+6 Щита, +4 Шипов).`);
+        } else if (pot.id === "pot8") {
+            this.player.heal(6 + alchBonus);
+            this.player.poison = 0;
+            this.player.bleed = 0;
+            if (this.state === "BATTLE") {
+                this.player.addShield(5);
+                this.battleLog.unshift(`🧪 Очищающий Бальзам (+${6 + alchBonus} HP, очищение, +5 Щита).`);
+            }
+        } else if (pot.id === "pot9") {
+            this.enemies.forEach(en => {
+                if (en.currentHp > 0) {
+                    en.shield = 0;
+                    en.def = Math.max(0, en.def - 2);
+                }
+            });
+            this.battleLog.unshift(`🧪 Бутыль с Кислотой (снятие Щитов и -2 DEF всем врагам)!`);
+        } else if (pot.id === "pot10") {
+            this.player.en = Math.min(this.player.getTotalMaxEn(), this.player.en + 2);
+            this.player.forceCritNext = true;
+            this.battleLog.unshift(`🧪 Флакон Концентрации (+2 EN, гарантированный КРИТ на след. удар)!`);
+        }
+
+        if (this.state === "BATTLE" && this.player.perks.includes("p36")) {
+            this.player.en = Math.min(this.player.getTotalMaxEn(), this.player.en + 1);
         }
 
         this.player.inventory.potions.splice(potIndex, 1);
@@ -620,20 +653,25 @@ class Game {
         this.player.tempSpikes = 0;
 
         const forceAssassinCrit = (this.player.classId === "assassin" && this.battleTurn === 1);
+        const forceCrit = forceAssassinCrit || Boolean(this.player.forceCritNext);
         const ignoreAllDef = forceAssassinCrit;
         let atkVal = this.player.getTotalAtk();
+        if (this.player.hasArtifact("art18")) atkVal += 3;
         if (this.battleTurn === 1 && this.player.perks.includes("p13")) atkVal += 5;
 
         const cdReduction = this.player.perks.includes("p24") ? 1 : 0;
 
         if (actionType === "fast") {
             if (!target || target.currentHp <= 0) return;
-            const isCrit = this.player.rollCrit(10, forceAssassinCrit);
+            this.player.forceCritNext = false;
+            const isCrit = this.player.rollCrit(10, forceCrit);
             let dmg = atkVal + RNG.range(1, 4);
             if (isCrit) {
-                dmg = Math.round(dmg * 1.65);
+                const critMult = this.player.perks.includes("p35") ? 3.0 : 1.65;
+                dmg = Math.round(dmg * critMult);
                 this.player.en = Math.min(this.player.getTotalMaxEn(), this.player.en + 1);
                 if (this.player.perks.includes("p11")) this.player.heal(3);
+                if (this.player.perks.includes("p32")) target.def = Math.max(0, target.def - 1);
             }
             this.applyWeaponEffects(target);
             if (this.player.perks.includes("p7")) target.poison += 1;
@@ -647,20 +685,27 @@ class Game {
             if (this.player.classId === "crusader") this.player.tempSpikes += 3;
             if (this.player.perks.includes("p14")) this.player.tempSpikes += 3;
             this.player.addShield(shieldGain);
-            this.player.en = Math.min(this.player.getTotalMaxEn(), this.player.en + 1);
-            this.player.bleed = Math.max(0, this.player.bleed - 1);
+            let enGain = 1 + (this.player.perks.includes("p31") ? 1 : 0);
+            this.player.en = Math.min(this.player.getTotalMaxEn(), this.player.en + enGain);
+            if (this.player.perks.includes("p31")) {
+                this.player.bleed = 0;
+            } else {
+                this.player.bleed = Math.max(0, this.player.bleed - 1);
+            }
             this.player.cooldowns.defend = 2;
-            this.battleLog.unshift(`🛡️ Глухая защита (+${shieldGain} Щит, +1 EN).`);
+            this.battleLog.unshift(`🛡️ Глухая защита (+${shieldGain} Щит, +${enGain} EN).`);
 
         } else if (actionType === "heavy") {
             if (!target || target.currentHp <= 0) return;
             if (!this.spendEn(1)) return;
+            this.player.forceCritNext = false;
             if (this.player.perks.includes("p15")) target.shield = 0;
-            const isCrit = this.player.rollCrit(0, forceAssassinCrit);
+            const isCrit = this.player.rollCrit(0, forceCrit);
             let dmg = Math.round(atkVal * 1.4) + RNG.range(2, 6);
             if (isCrit) {
                 dmg = Math.round(dmg * 1.65);
                 if (this.player.perks.includes("p11")) this.player.heal(3);
+                if (this.player.perks.includes("p32")) target.def = Math.max(0, target.def - 1);
             }
             this.applyWeaponEffects(target);
             if (this.player.perks.includes("p8")) target.bleed += 2;
@@ -885,10 +930,12 @@ class Game {
         if (pat.val > 0) {
             if (en.poisonOnHit) this.player.poison += en.poisonOnHit;
             if (en.bleedOnHit) this.player.bleed += en.bleedOnHit;
+            if (this.player.hasArtifact("art15") && en.currentHp > 0) en.poison += 2;
         }
 
         if (pat.val > 0 && this.player.getTotalSpikes() > 0 && en.currentHp > 0) {
-            const spk = this.player.getTotalSpikes();
+            let spk = this.player.getTotalSpikes();
+            if (this.player.perks.includes("p34") && en.bleed > 0) spk *= 2;
             en.currentHp = Math.max(0, en.currentHp - spk);
             this.battleLog.unshift(`🌵 Ваши Шипы ранят ${en.name} на ${spk} HP!`);
             if (en.currentHp <= 0) this.onEnemyKilled(en);
@@ -929,6 +976,9 @@ class Game {
             }
         }
         enemy.currentHp = Math.max(0, enemy.currentHp - actual);
+        if (actual > 0 && this.player.hasArtifact("art17")) {
+            this.player.heal(1);
+        }
         if (enemy.currentHp <= 0) {
             this.onEnemyKilled(enemy);
         }
@@ -964,6 +1014,14 @@ class Game {
             this.player.heal(3);
             this.player.en = Math.min(this.player.getTotalMaxEn(), this.player.en + 1);
         }
+        if (this.player.perks.includes("p30") && enemy.poison > 0) {
+            this.enemies.forEach(en => {
+                if (en !== enemy && en.currentHp > 0) {
+                    this.dealDamageToEnemy(en, 5, true);
+                }
+            });
+            this.battleLog.unshift(`💥 Токсичный взрыв наносит 5 чистого урона всем врагам!`);
+        }
     }
 
     // Когда все враги убиты — открываем панель трофеев прямо на экране боя
@@ -984,6 +1042,11 @@ class Game {
             this.player.xp += 2;
             this.battleRewards.gold += 3;
             this.battleRewards.xp += 2;
+        }
+        if (this.player.hasArtifact("art16")) {
+            this.player.gold += 5;
+            this.battleRewards.gold += 5;
+            this.battleLog.unshift(`🧭 Золотой Компас даёт +5 Золота.`);
         }
         if (this.player.hasArtifact("art9")) {
             this.player.heal(2);
@@ -1219,6 +1282,101 @@ class Game {
             }
         } else if (optionId === "arena_fight") {
             this.player.gold += 10;
+            this.setupBattle("elite");
+            this.saveGame("autosave");
+            return;
+        } else if (optionId === "well_gold") {
+            if (this.player.gold >= 10) {
+                this.player.gold -= 10;
+                this.player.heal(12);
+                this.player.xp += 10;
+                this.player.totalRunXp += 10;
+            }
+        } else if (optionId === "well_blood") {
+            this.player.hp = Math.max(1, this.player.hp - 6);
+            const unowned = GAME_DATA.items.artifacts.filter(a => !this.player.hasArtifact(a.id));
+            if (unowned.length > 0) this.player.addArtifact(RNG.choice(unowned));
+        } else if (optionId === "pilgrim_help") {
+            this.player.hp = Math.max(1, this.player.hp - 5);
+            this.player.weaponUpgradeLvl += 1;
+            this.player.xp += 8;
+            this.player.totalRunXp += 8;
+        } else if (optionId === "pilgrim_rob") {
+            this.player.gold += 15;
+            if (this.player.inventory.potions.length < this.player.potionSlots) {
+                this.player.inventory.potions.push({ ...RNG.choice(GAME_DATA.items.potions) });
+            }
+        } else if (optionId === "cauldron_drink") {
+            if (RNG.chance(50)) {
+                this.player.baseMaxHp += 8;
+                this.player.heal(8);
+            } else {
+                this.player.hp = Math.max(1, this.player.hp - 6);
+            }
+        } else if (optionId === "cauldron_potion") {
+            if (this.player.inventory.potions.length < this.player.potionSlots) {
+                this.player.inventory.potions.push({ ...RNG.choice(GAME_DATA.items.potions) });
+            }
+        } else if (optionId === "cauldron_gold") {
+            this.player.gold += 12;
+        } else if (optionId === "monolith_perk") {
+            this.player.hp = Math.max(1, this.player.hp - 7);
+            const available = GAME_DATA.perks.filter(p => !this.player.perks.includes(p.id));
+            if (available.length > 0) this.player.perks.push(RNG.choice(available).id);
+        } else if (optionId === "monolith_pray") {
+            this.player.en = this.player.getTotalMaxEn();
+            this.player.xp += 15;
+            this.player.totalRunXp += 15;
+        } else if (optionId === "sarcophagus_fight") {
+            this.player.gold += 20;
+            const unowned = GAME_DATA.items.artifacts.filter(a => !this.player.hasArtifact(a.id));
+            if (unowned.length > 0) this.player.addArtifact(RNG.choice(unowned));
+            this.setupBattle("elite");
+            this.saveGame("autosave");
+            return;
+        } else if (optionId === "sarcophagus_pray") {
+            if (this.player.gold >= 8) {
+                this.player.gold -= 8;
+                this.player.baseMaxHp += 5;
+                this.player.heal(5);
+            }
+        } else if (optionId === "pawn_dice") {
+            if (this.player.gold >= 10) {
+                this.player.gold -= 10;
+                if (RNG.chance(50)) {
+                    this.player.gold += 22;
+                }
+            }
+        } else if (optionId === "pawn_blood") {
+            this.player.hp = Math.max(1, this.player.hp - 8);
+            this.player.gold += 18;
+        } else if (optionId === "pawn_relic") {
+            if (this.player.gold >= 20) {
+                this.player.gold -= 20;
+                const unowned = GAME_DATA.items.artifacts.filter(a => !this.player.hasArtifact(a.id));
+                if (unowned.length > 0) this.player.addArtifact(RNG.choice(unowned));
+            }
+        } else if (optionId === "rift_dive") {
+            if (RNG.chance(50)) {
+                this.player.armorUpgradeLvl += 1;
+                this.player.heal(3);
+            } else {
+                this.player.hp = Math.max(1, this.player.hp - 8);
+            }
+        } else if (optionId === "rift_absorb") {
+            this.player.xp += 20;
+            this.player.totalRunXp += 20;
+            this.meta.souls += 8;
+            this.saveMeta();
+        } else if (optionId === "nest_loot") {
+            this.player.gold += 12;
+            if (this.player.inventory.potions.length < this.player.potionSlots) {
+                this.player.inventory.potions.push({ ...RNG.choice(GAME_DATA.items.potions) });
+            }
+        } else if (optionId === "nest_hunt") {
+            this.player.gold += 15;
+            const unowned = GAME_DATA.items.artifacts.filter(a => !this.player.hasArtifact(a.id));
+            if (unowned.length > 0) this.player.addArtifact(RNG.choice(unowned));
             this.setupBattle("elite");
             this.saveGame("autosave");
             return;

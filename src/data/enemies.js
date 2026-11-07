@@ -6,35 +6,39 @@ const DATA_MUTATIONS = [
     { id: "regen", prefix: "Регенерирующий", hpBonus: 4, defBonus: 0, atkBonus: 0, regen: 3, xpBonus: 2 },
     { id: "bloodthirsty", prefix: "Кровожадный", hpBonus: 3, defBonus: 0, atkBonus: 1, bleedOnHit: 1, xpBonus: 2 },
     { id: "giant", prefix: "Гигантский", hpBonus: 10, defBonus: 0, atkBonus: 2, xpBonus: 3 },
+    { id: "toxic", prefix: "Токсичный", hpBonus: 4, defBonus: 0, atkBonus: 1, poisonOnHit: 2, xpBonus: 3 },
+    { id: "barbed", prefix: "Колючий", hpBonus: 5, defBonus: 1, atkBonus: 0, spikes: 3, xpBonus: 3 },
+    { id: "frenzied", prefix: "Неистовый", hpBonus: 6, defBonus: 0, atkBonus: 3, bleedOnHit: 1, xpBonus: 3 },
+    { id: "undying", prefix: "Бессмертный", hpBonus: 8, defBonus: 1, atkBonus: 0, regen: 4, xpBonus: 3 },
 ];
 
 const DATA_FLOORS = [
     {
         id: 0,
         name: "Заброшенные Катакомбы",
-        enemies: ["rat", "slime", "spiderling", "skeleton", "goblin", "bat", "zombie", "ghoul"],
-        elite: ["centurion", "spiderQueen"],
+        enemies: ["rat", "slime", "spiderling", "skeleton", "goblin", "bat", "zombie", "ghoul", "cryptScarab", "cultAcolyte"],
+        elite: ["centurion", "spiderQueen", "gargoyle"],
         boss: "kingVort",
     },
     {
         id: 1,
         name: "Грибные Пещеры и Топи",
-        enemies: ["sporeMushroom", "leech", "mosquito", "myconid", "witch", "crawler", "shambler", "bogTroll"],
-        elite: ["hydra", "alchemist"],
+        enemies: ["sporeMushroom", "leech", "mosquito", "myconid", "witch", "crawler", "shambler", "bogTroll", "bogViper", "mireLurker"],
+        elite: ["hydra", "alchemist", "sporeAbomination"],
         boss: "agaric",
     },
     {
         id: 2,
         name: "Кузня Железного Культа",
-        enemies: ["drone", "fireImp", "slagSlime", "cultist", "crossbowman", "lavaElemental", "pyromancer", "ironGolem"],
-        elite: ["inquisitor", "juggernaut"],
+        enemies: ["drone", "fireImp", "slagSlime", "cultist", "crossbowman", "lavaElemental", "pyromancer", "ironGolem", "forgeHound", "magmaSapper"],
+        elite: ["inquisitor", "juggernaut", "furnaceWarden"],
         boss: "vulkan",
     },
     {
         id: 3,
         name: "Цитадель Пустоты",
-        enemies: ["voidHound", "voidShard", "eyeOfTerror", "astralBlade", "mindFlayer", "shadowWeaver", "darkKnight", "riftArchon"],
-        elite: ["valkyrie", "chronosDemon"],
+        enemies: ["voidHound", "voidShard", "eyeOfTerror", "astralBlade", "mindFlayer", "shadowWeaver", "darkKnight", "riftArchon", "abyssalWisp", "voidSentry"],
+        elite: ["valkyrie", "chronosDemon", "voidReaver"],
         boss: "malkor",
     },
 ];
@@ -110,6 +114,28 @@ const DATA_ENEMIES = {
             { type: "attack", val: 8, text: "Бешеный разрыв" },
         ],
     },
+    cryptScarab: {
+        name: "Могильный Скарабей",
+        weight: 1,
+        hp: 12,
+        def: 1,
+        xp: 3,
+        pattern: [
+            { type: "defendAttack", val: 3, shield: 3, text: "Хитиновый панцирь (+3 Щит)" },
+            { type: "attackPoison", val: 3, poison: 1, text: "Укус жвал (+Яд)" },
+        ],
+    },
+    cultAcolyte: {
+        name: "Послушник Склепа",
+        weight: 2,
+        hp: 15,
+        def: 0,
+        xp: 4,
+        pattern: [
+            { type: "attackBleed", val: 4, bleed: 1, text: "Жертвенный кинжал (+Кровь)" },
+            { type: "shieldHeal", val: 3, shield: 3, text: "Тёмная молитва (+3 HP, +3 Щит)" },
+        ],
+    },
 
     // Этаж 2
     sporeMushroom: { name: "Споровый Гриб", weight: 1, hp: 12, def: 0, xp: 3, pattern: [{ type: "attackPoison", val: 3, poison: 2, text: "Выброс спор (+Яд 2)" }] },
@@ -168,6 +194,28 @@ const DATA_ENEMIES = {
             { type: "vampire", val: 7, text: "Удар бревном (+Реген)" },
             { type: "heal", val: 5, text: "Рёв тролля (+5 HP)" },
             { type: "attack", val: 11, text: "Сокрушение черепа" },
+        ],
+    },
+    bogViper: {
+        name: "Болотная Гадюка",
+        weight: 1,
+        hp: 15,
+        def: 0,
+        xp: 4,
+        pattern: [
+            { type: "attackPoison", val: 5, poison: 2, text: "Токсичный выпад (+Яд 2)" },
+            { type: "attack", val: 6, text: "Стремительный бросок" },
+        ],
+    },
+    mireLurker: {
+        name: "Трясинный Ловец",
+        weight: 2,
+        hp: 25,
+        def: 1,
+        xp: 7,
+        pattern: [
+            { type: "drainEn", val: 5, text: "Затягивание в ил (-1 EN)" },
+            { type: "attackBleed", val: 7, bleed: 2, text: "Гнилые клешни (+Кровь 2)" },
         ],
     },
 
@@ -240,6 +288,29 @@ const DATA_ENEMIES = {
             { type: "attack", val: 9, text: "Удар молотом" },
             { type: "shieldHeal", val: 0, shield: 8, text: "Паровой барьер (+8 Щит)" },
             { type: "attack", val: 14, text: "Землетрясение" },
+        ],
+    },
+    forgeHound: {
+        name: "Кузнечная Гончая",
+        weight: 1,
+        hp: 22,
+        def: 1,
+        xp: 6,
+        pattern: [
+            { type: "attackBleed", val: 7, bleed: 2, text: "Раскалённые челюсти (+Кровь 2)" },
+            { type: "attack", val: 8, text: "Огненный рывок" },
+        ],
+    },
+    magmaSapper: {
+        name: "Магматический Подрывник",
+        weight: 2,
+        hp: 30,
+        def: 2,
+        xp: 9,
+        pattern: [
+            { type: "charge", val: 0, text: "Запал термитной шашки!" },
+            { type: "pierce", val: 10, text: "Термитный взрыв (Чистый)" },
+            { type: "defendAttack", val: 6, shield: 6, text: "Огненный заслон (+6 Щит)" },
         ],
     },
 
@@ -332,6 +403,28 @@ const DATA_ENEMIES = {
             { type: "attack", val: 17, text: "Сверхновая!" },
         ],
     },
+    abyssalWisp: {
+        name: "Астральный Сгусток",
+        weight: 1,
+        hp: 24,
+        def: 1,
+        xp: 8,
+        pattern: [
+            { type: "drainEn", val: 7, text: "Эфирное истощение (-1 EN)" },
+            { type: "pierce", val: 8, text: "Вспышка Пустоты (Чистый)" },
+        ],
+    },
+    voidSentry: {
+        name: "Часовой Бездны",
+        weight: 2,
+        hp: 36,
+        def: 2,
+        xp: 12,
+        pattern: [
+            { type: "defendAttack", val: 9, shield: 8, text: "Искажение пространства (+8 Щит)" },
+            { type: "attackPoison", val: 9, poison: 3, text: "Тёмный распад (+Яд 3)" },
+        ],
+    },
 
     // Специальные, Элита и Боссы
     mimic: {
@@ -371,6 +464,19 @@ const DATA_ENEMIES = {
             { type: "drainEn", val: 4, text: "Кокон паутины (-1 EN)" },
             { type: "attackPoison", val: 5, poison: 2, text: "Ядовитые жвалы (+Яд 2)" },
             { type: "vampire", val: 6, text: "Поедание жертвы" },
+        ],
+    },
+    gargoyle: {
+        name: "[ЭЛИТА] Склепная Гаргулья",
+        weight: 3,
+        hp: 36,
+        def: 2,
+        xp: 10,
+        isElite: true,
+        pattern: [
+            { type: "charge", val: 0, text: "Каменная стойка..." },
+            { type: "attack", val: 7, text: "Пике с высоты" },
+            { type: "defendAttack", val: 5, shield: 6, text: "Удар крылом (+6 Щит)" },
         ],
     },
     kingVort: {
@@ -413,6 +519,19 @@ const DATA_ENEMIES = {
             { type: "attack", val: 10, text: "Взрывная смесь" },
         ],
     },
+    sporeAbomination: {
+        name: "[ЭЛИТА] Споровое Отродье",
+        weight: 3,
+        hp: 48,
+        def: 1,
+        xp: 16,
+        isElite: true,
+        pattern: [
+            { type: "attackPoison", val: 6, poison: 3, text: "Заражающие споры (+Яд 3)" },
+            { type: "shieldHeal", val: 5, shield: 7, text: "Мицелиальный нарост (+7 Щит, +5 HP)" },
+            { type: "attack", val: 9, text: "Тяжёлый удар клубнем" },
+        ],
+    },
     agaric: {
         name: "[БОСС] Споровый Колосс Агарик",
         hp: 68,
@@ -450,6 +569,20 @@ const DATA_ENEMIES = {
             { type: "attack", val: 10, text: "Паровой пресс" },
             { type: "defendAttack", val: 8, shield: 8, text: "Бронеплита (+8 Щит)" },
             { type: "attack", val: 14, text: "Полный ход" },
+        ],
+    },
+    furnaceWarden: {
+        name: "[ЭЛИТА] Смотритель Доменной Печи",
+        weight: 3,
+        hp: 62,
+        def: 3,
+        xp: 22,
+        isElite: true,
+        pattern: [
+            { type: "attackBleed", val: 8, bleed: 2, text: "Шлаковый хлест (+Кровь 2)" },
+            { type: "defendAttack", val: 8, shield: 10, text: "Раскалённый щит (+10 Щит)" },
+            { type: "drainEn", val: 9, text: "Выброс жара (-1 EN)" },
+            { type: "attack", val: 13, text: "Кованый молот" },
         ],
     },
     vulkan: {
@@ -490,6 +623,20 @@ const DATA_ENEMIES = {
             { type: "attackPoison", val: 10, poison: 3, text: "Временной разлом (+Яд 3)" },
             { type: "vampire", val: 10, text: "Откат времени" },
             { type: "attack", val: 15, text: "Коллапс эпох" },
+        ],
+    },
+    voidReaver: {
+        name: "[ЭЛИТА] Жнец Пустоты",
+        weight: 3,
+        hp: 68,
+        def: 2,
+        xp: 30,
+        isElite: true,
+        pattern: [
+            { type: "attackBleed", val: 11, bleed: 3, text: "Жатва душ (+Кровь 3)" },
+            { type: "drainEn", val: 9, text: "Поглощение воли (-1 EN)" },
+            { type: "vampire", val: 12, text: "Астральный вампиризм" },
+            { type: "attack", val: 14, text: "Удар Небытия" },
         ],
     },
     malkor: {

@@ -38,6 +38,7 @@ class Player {
         this.cooldowns = { defend: 0, pierce: 0, whirlwind: 0, concentrate: 0 };
         this.concentrateUsesLeft = 2;
         this.secondWindAvailable = true;
+        this.forceCritNext = false;
 
         this.perks = [];
         this.potionSlots = 2 + (meta.potions || 0);
@@ -148,6 +149,7 @@ class Player {
         let val = this.tempSpikes;
         if (this.inventory.armor && this.inventory.armor.spikes) val += this.inventory.armor.spikes;
         if (this.perks.includes("p12")) val += 2;
+        if (this.hasArtifact("art14")) val += 3;
         return val;
     }
 
@@ -187,6 +189,9 @@ class Player {
 
     takeDamage(rawAmount, ignoreDef = false) {
         let amount = rawAmount;
+        if (this.hasArtifact("art18")) {
+            amount = Math.max(1, amount - 1);
+        }
         if (this.perks.includes("p19") && amount >= 8) {
             amount -= 2;
         }
@@ -203,6 +208,9 @@ class Player {
             }
         }
         this.hp = Math.max(0, this.hp - dmg);
+        if (this.perks.includes("p29")) {
+            this.addShield(2);
+        }
 
         if (this.hp <= 0 && this.perks.includes("p26") && this.secondWindAvailable) {
             this.secondWindAvailable = false;
