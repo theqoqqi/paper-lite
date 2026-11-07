@@ -45,7 +45,16 @@ export const DATA_FLOORS = [
 
 export const DATA_ENEMIES = {
     // Этаж 1
-    rat: { name: "Пещерная Крыса", weight: 1, hp: 7, def: 0, xp: 2, pattern: [{ type: "attack", val: 3, text: "Укус" }] },
+    rat: {
+        name: "Пещерная Крыса",
+        weight: 1,
+        hp: 7,
+        def: 0,
+        xp: 2,
+        pattern: [
+            { type: "attack", val: 3, text: "Укус" },
+        ],
+    },
     slime: {
         name: "Кислотный Слизень",
         weight: 1,
@@ -90,7 +99,16 @@ export const DATA_ENEMIES = {
             { type: "attackBleed", val: 5, bleed: 1, text: "Рваный порез (+Кровь)" },
         ],
     },
-    bat: { name: "Кровавый Нетопырь", weight: 2, hp: 10, def: 0, xp: 3, pattern: [{ type: "vampire", val: 4, text: "Вампирский укус" }] },
+    bat: {
+        name: "Кровавый Нетопырь",
+        weight: 2,
+        hp: 10,
+        def: 0,
+        xp: 3,
+        pattern: [
+            { type: "vampire", val: 4, text: "Вампирский укус" },
+        ],
+    },
     zombie: {
         name: "Чумной Зомби",
         weight: 2,
@@ -138,9 +156,36 @@ export const DATA_ENEMIES = {
     },
 
     // Этаж 2
-    sporeMushroom: { name: "Споровый Гриб", weight: 1, hp: 12, def: 0, xp: 3, pattern: [{ type: "attackPoison", val: 3, poison: 2, text: "Выброс спор (+Яд 2)" }] },
-    leech: { name: "Болотный Пиявочник", weight: 1, hp: 13, def: 0, xp: 3, pattern: [{ type: "attackBleed", val: 4, bleed: 2, text: "Присоска (+Кровь 2)" }] },
-    mosquito: { name: "Гигантский Москит", weight: 1, hp: 11, def: 0, xp: 3, pattern: [{ type: "vampire", val: 5, text: "Высасывание крови" }] },
+    sporeMushroom: {
+        name: "Споровый Гриб",
+        weight: 1,
+        hp: 12,
+        def: 0,
+        xp: 3,
+        pattern: [
+            { type: "attackPoison", val: 3, poison: 2, text: "Выброс спор (+Яд 2)" },
+        ],
+    },
+    leech: {
+        name: "Болотный Пиявочник",
+        weight: 1,
+        hp: 13,
+        def: 0,
+        xp: 3,
+        pattern: [
+            { type: "attackBleed", val: 4, bleed: 2, text: "Присоска (+Кровь 2)" },
+        ],
+    },
+    mosquito: {
+        name: "Гигантский Москит",
+        weight: 1,
+        hp: 11,
+        def: 0,
+        xp: 3,
+        pattern: [
+            { type: "vampire", val: 5, text: "Высасывание крови" },
+        ],
+    },
     myconid: {
         name: "Миконид-Страж",
         weight: 2,
@@ -232,7 +277,16 @@ export const DATA_ENEMIES = {
             { type: "attack", val: 10, text: "Взрывной разряд" },
         ],
     },
-    fireImp: { name: "Огненный Бес", weight: 1, hp: 17, def: 0, xp: 5, pattern: [{ type: "attack", val: 7, text: "Огненный шар" }] },
+    fireImp: {
+        name: "Огненный Бес",
+        weight: 1,
+        hp: 17,
+        def: 0,
+        xp: 5,
+        pattern: [
+            { type: "attack", val: 7, text: "Огненный шар" },
+        ],
+    },
     slagSlime: {
         name: "Шлаковый Слизень",
         weight: 1,
@@ -266,7 +320,17 @@ export const DATA_ENEMIES = {
             { type: "shieldHeal", val: 0, shield: 6, text: "Перезарядка за щитом (+6 Щит)" },
         ],
     },
-    lavaElemental: { name: "Лавовый Элементаль", weight: 2, hp: 28, def: 1, xp: 8, spikes: 2, pattern: [{ type: "attack", val: 8, text: "Волна магмы" }] },
+    lavaElemental: {
+        name: "Лавовый Элементаль",
+        weight: 2,
+        hp: 28,
+        def: 1,
+        xp: 8,
+        spikes: 2,
+        pattern: [
+            { type: "attack", val: 8, text: "Волна магмы" },
+        ],
+    },
     pyromancer: {
         name: "Геомант Кузни",
         weight: 2,
@@ -323,8 +387,7 @@ export const DATA_ENEMIES = {
         xp: 7,
         pattern: [
             { type: "attackBleed", val: 8, bleed: 2, text: "Клыки Бездны (+Кровь 2)" },
-            
-        ]
+        ],
     },
     voidShard: {
         name: "Осколок Бездны",
@@ -334,8 +397,7 @@ export const DATA_ENEMIES = {
         xp: 7,
         pattern: [
             { type: "drainEn", val: 6, text: "Пси-импульс (-1 EN)" },
-            
-        ]
+        ],
     },
     eyeOfTerror: {
         name: "Око Ужаса",
@@ -345,7 +407,7 @@ export const DATA_ENEMIES = {
         xp: 7,
         pattern: [
             { type: "attackPoison", val: 7, poison: 3, text: "Луч распада (+Яд 3)" },
-        ]
+        ],
     },
     astralBlade: {
         name: "Астральный Клинок",
@@ -654,4 +716,3 @@ export const DATA_ENEMIES = {
         ],
     },
 };
-

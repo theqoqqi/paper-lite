@@ -120,4 +120,3 @@ export const DATA_META_UPGRADES = [
     { key: "gold", name: "Кошель наследия", desc: "+8 Золота на старте", max: 5, costs: [8, 16, 24, 32, 40] },
     { key: "potions", name: "Пояс алхимика", desc: "+1 Слот зелий и случайное зелье на старте", max: 2, costs: [20, 50] },
 ];
-
