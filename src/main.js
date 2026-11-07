@@ -1,4 +1,4 @@
-import { game } from "./engine/game-engine.js";
+import { game } from "./engine/game.js";
 import {
     renderGlobalNav,
     renderMenuScreen,
