@@ -1,3 +1,5 @@
+import { enemySprites } from "./enemy-sprites.js";
+
 export const DATA_MUTATIONS = [
     { id: "armored", prefix: "Бронированный", hpBonus: 4, defBonus: 1, atkBonus: 0, xpBonus: 2 },
     { id: "furious", prefix: "Яростный", hpBonus: 2, defBonus: 0, atkBonus: 2, xpBonus: 2 },
@@ -47,6 +49,7 @@ export const DATA_ENEMIES = {
     // Этаж 1
     rat: {
         name: "Пещерная Крыса",
+        sprite: enemySprites.rat,
         weight: 1,
         hp: 7,
         def: 0,
@@ -57,6 +60,7 @@ export const DATA_ENEMIES = {
     },
     slime: {
         name: "Кислотный Слизень",
+        sprite: enemySprites.slime,
         weight: 1,
         hp: 9,
         def: 0,
@@ -68,6 +72,7 @@ export const DATA_ENEMIES = {
     },
     spiderling: {
         name: "Паучок Склепа",
+        sprite: enemySprites.spiderling,
         weight: 1,
         hp: 7,
         def: 0,
@@ -79,6 +84,7 @@ export const DATA_ENEMIES = {
     },
     skeleton: {
         name: "Скелет-Мечник",
+        sprite: enemySprites.skeleton,
         weight: 2,
         hp: 13,
         def: 1,
@@ -90,6 +96,7 @@ export const DATA_ENEMIES = {
     },
     goblin: {
         name: "Гоблин-Мародёр",
+        sprite: enemySprites.goblin,
         weight: 2,
         hp: 11,
         def: 0,
@@ -101,6 +108,7 @@ export const DATA_ENEMIES = {
     },
     bat: {
         name: "Кровавый Нетопырь",
+        sprite: enemySprites.bat,
         weight: 2,
         hp: 10,
         def: 0,
@@ -111,6 +119,7 @@ export const DATA_ENEMIES = {
     },
     zombie: {
         name: "Чумной Зомби",
+        sprite: enemySprites.zombie,
         weight: 2,
         hp: 16,
         def: 0,
@@ -122,6 +131,7 @@ export const DATA_ENEMIES = {
     },
     ghoul: {
         name: "Склепный Гуль",
+        sprite: enemySprites.ghoul,
         weight: 3,
         hp: 19,
         def: 1,
@@ -134,6 +144,7 @@ export const DATA_ENEMIES = {
     },
     cryptScarab: {
         name: "Могильный Скарабей",
+        sprite: enemySprites.cryptScarab,
         weight: 1,
         hp: 12,
         def: 1,
@@ -145,6 +156,7 @@ export const DATA_ENEMIES = {
     },
     cultAcolyte: {
         name: "Послушник Склепа",
+        sprite: enemySprites.cultAcolyte,
         weight: 2,
         hp: 15,
         def: 0,
@@ -158,6 +170,7 @@ export const DATA_ENEMIES = {
     // Этаж 2
     sporeMushroom: {
         name: "Споровый Гриб",
+        sprite: enemySprites.sporeMushroom,
         weight: 1,
         hp: 12,
         def: 0,
@@ -168,6 +181,7 @@ export const DATA_ENEMIES = {
     },
     leech: {
         name: "Болотный Пиявочник",
+        sprite: enemySprites.leech,
         weight: 1,
         hp: 13,
         def: 0,
@@ -178,6 +192,7 @@ export const DATA_ENEMIES = {
     },
     mosquito: {
         name: "Гигантский Москит",
+        sprite: enemySprites.mosquito,
         weight: 1,
         hp: 11,
         def: 0,
@@ -188,6 +203,7 @@ export const DATA_ENEMIES = {
     },
     myconid: {
         name: "Миконид-Страж",
+        sprite: enemySprites.myconid,
         weight: 2,
         hp: 20,
         def: 1,
@@ -199,6 +215,7 @@ export const DATA_ENEMIES = {
     },
     witch: {
         name: "Топяная Ведьма",
+        sprite: enemySprites.witch,
         weight: 2,
         hp: 16,
         def: 0,
@@ -210,6 +227,7 @@ export const DATA_ENEMIES = {
     },
     crawler: {
         name: "Панцирный Ползун",
+        sprite: enemySprites.crawler,
         weight: 2,
         hp: 19,
         def: 2,
@@ -220,6 +238,7 @@ export const DATA_ENEMIES = {
     },
     shambler: {
         name: "Гнилой Шаркун",
+        sprite: enemySprites.shambler,
         weight: 2,
         hp: 23,
         def: 1,
@@ -231,6 +250,7 @@ export const DATA_ENEMIES = {
     },
     bogTroll: {
         name: "Тролль Трясины",
+        sprite: enemySprites.bogTroll,
         weight: 3,
         hp: 30,
         def: 1,
@@ -243,6 +263,7 @@ export const DATA_ENEMIES = {
     },
     bogViper: {
         name: "Болотная Гадюка",
+        sprite: enemySprites.bogViper,
         weight: 1,
         hp: 15,
         def: 0,
@@ -254,6 +275,7 @@ export const DATA_ENEMIES = {
     },
     mireLurker: {
         name: "Трясинный Ловец",
+        sprite: enemySprites.mireLurker,
         weight: 2,
         hp: 25,
         def: 1,
@@ -267,6 +289,7 @@ export const DATA_ENEMIES = {
     // Этаж 3
     drone: {
         name: "Заводной Дрон",
+        sprite: enemySprites.drone,
         weight: 1,
         hp: 15,
         def: 2,
@@ -279,6 +302,7 @@ export const DATA_ENEMIES = {
     },
     fireImp: {
         name: "Огненный Бес",
+        sprite: enemySprites.fireImp,
         weight: 1,
         hp: 17,
         def: 0,
@@ -289,6 +313,7 @@ export const DATA_ENEMIES = {
     },
     slagSlime: {
         name: "Шлаковый Слизень",
+        sprite: enemySprites.slagSlime,
         weight: 1,
         hp: 19,
         def: 2,
@@ -300,6 +325,7 @@ export const DATA_ENEMIES = {
     },
     cultist: {
         name: "Культист Пламени",
+        sprite: enemySprites.cultist,
         weight: 2,
         hp: 26,
         def: 1,
@@ -311,6 +337,7 @@ export const DATA_ENEMIES = {
     },
     crossbowman: {
         name: "Стальной Арбалетчик",
+        sprite: enemySprites.crossbowman,
         weight: 2,
         hp: 24,
         def: 2,
@@ -322,6 +349,7 @@ export const DATA_ENEMIES = {
     },
     lavaElemental: {
         name: "Лавовый Элементаль",
+        sprite: enemySprites.lavaElemental,
         weight: 2,
         hp: 28,
         def: 1,
@@ -333,6 +361,7 @@ export const DATA_ENEMIES = {
     },
     pyromancer: {
         name: "Геомант Кузни",
+        sprite: enemySprites.pyromancer,
         weight: 2,
         hp: 24,
         def: 1,
@@ -344,6 +373,7 @@ export const DATA_ENEMIES = {
     },
     ironGolem: {
         name: "Железный Голем",
+        sprite: enemySprites.ironGolem,
         weight: 3,
         hp: 38,
         def: 3,
@@ -356,6 +386,7 @@ export const DATA_ENEMIES = {
     },
     forgeHound: {
         name: "Кузнечная Гончая",
+        sprite: enemySprites.forgeHound,
         weight: 1,
         hp: 22,
         def: 1,
@@ -367,6 +398,7 @@ export const DATA_ENEMIES = {
     },
     magmaSapper: {
         name: "Магматический Подрывник",
+        sprite: enemySprites.magmaSapper,
         weight: 2,
         hp: 30,
         def: 2,
@@ -381,6 +413,7 @@ export const DATA_ENEMIES = {
     // Этаж 4
     voidHound: {
         name: "Гончая Пустоты",
+        sprite: enemySprites.voidHound,
         weight: 1,
         hp: 22,
         def: 1,
@@ -391,6 +424,7 @@ export const DATA_ENEMIES = {
     },
     voidShard: {
         name: "Осколок Бездны",
+        sprite: enemySprites.voidShard,
         weight: 1,
         hp: 18,
         def: 3,
@@ -401,6 +435,7 @@ export const DATA_ENEMIES = {
     },
     eyeOfTerror: {
         name: "Око Ужаса",
+        sprite: enemySprites.eyeOfTerror,
         weight: 1,
         hp: 20,
         def: 1,
@@ -411,6 +446,7 @@ export const DATA_ENEMIES = {
     },
     astralBlade: {
         name: "Астральный Клинок",
+        sprite: enemySprites.astralBlade,
         weight: 2,
         hp: 32,
         def: 2,
@@ -422,6 +458,7 @@ export const DATA_ENEMIES = {
     },
     mindFlayer: {
         name: "Пожиратель Разума",
+        sprite: enemySprites.mindFlayer,
         weight: 2,
         hp: 29,
         def: 1,
@@ -433,6 +470,7 @@ export const DATA_ENEMIES = {
     },
     shadowWeaver: {
         name: "Ткач Теней",
+        sprite: enemySprites.shadowWeaver,
         weight: 2,
         hp: 28,
         def: 1,
@@ -444,6 +482,7 @@ export const DATA_ENEMIES = {
     },
     darkKnight: {
         name: "Тёмный Рыцарь",
+        sprite: enemySprites.darkKnight,
         weight: 3,
         hp: 42,
         def: 3,
@@ -455,6 +494,7 @@ export const DATA_ENEMIES = {
     },
     riftArchon: {
         name: "Архонт Разлома",
+        sprite: enemySprites.riftArchon,
         weight: 3,
         hp: 46,
         def: 2,
@@ -467,6 +507,7 @@ export const DATA_ENEMIES = {
     },
     abyssalWisp: {
         name: "Астральный Сгусток",
+        sprite: enemySprites.abyssalWisp,
         weight: 1,
         hp: 24,
         def: 1,
@@ -478,6 +519,7 @@ export const DATA_ENEMIES = {
     },
     voidSentry: {
         name: "Часовой Бездны",
+        sprite: enemySprites.voidSentry,
         weight: 2,
         hp: 36,
         def: 2,
@@ -503,7 +545,8 @@ export const DATA_ENEMIES = {
     },
 
     centurion: {
-        name: "[ЭЛИТА] Костяной Центурион",
+        name: "Костяной Центурион",
+        sprite: enemySprites.centurion,
         weight: 3,
         hp: 30,
         def: 1,
@@ -516,7 +559,8 @@ export const DATA_ENEMIES = {
         ],
     },
     spiderQueen: {
-        name: "[ЭЛИТА] Паучья Матка",
+        name: "Паучья Матка",
+        sprite: enemySprites.spiderQueen,
         weight: 3,
         hp: 32,
         def: 0,
@@ -529,7 +573,8 @@ export const DATA_ENEMIES = {
         ],
     },
     gargoyle: {
-        name: "[ЭЛИТА] Склепная Гаргулья",
+        name: "Склепная Гаргулья",
+        sprite: enemySprites.gargoyle,
         weight: 3,
         hp: 36,
         def: 2,
@@ -542,7 +587,8 @@ export const DATA_ENEMIES = {
         ],
     },
     kingVort: {
-        name: "[БОСС] Король Склепа Ворт",
+        name: "Король Склепа Ворт",
+        sprite: enemySprites.kingVort,
         hp: 48,
         def: 1,
         xp: 16,
@@ -557,7 +603,8 @@ export const DATA_ENEMIES = {
     },
 
     hydra: {
-        name: "[ЭЛИТА] Гидра Гниловодья",
+        name: "Гидра Гниловодья",
+        sprite: enemySprites.hydra,
         weight: 3,
         hp: 45,
         def: 1,
@@ -569,7 +616,8 @@ export const DATA_ENEMIES = {
         ],
     },
     alchemist: {
-        name: "[ЭЛИТА] Чумной Алхимик",
+        name: "Чумной Алхимик",
+        sprite: enemySprites.alchemist,
         weight: 3,
         hp: 38,
         def: 1,
@@ -582,7 +630,8 @@ export const DATA_ENEMIES = {
         ],
     },
     sporeAbomination: {
-        name: "[ЭЛИТА] Споровое Отродье",
+        name: "Споровое Отродье",
+        sprite: enemySprites.sporeAbomination,
         weight: 3,
         hp: 48,
         def: 1,
@@ -595,7 +644,8 @@ export const DATA_ENEMIES = {
         ],
     },
     agaric: {
-        name: "[БОСС] Споровый Колосс Агарик",
+        name: "Споровый Колосс Агарик",
+        sprite: enemySprites.agaric,
         hp: 68,
         def: 2,
         xp: 24,
@@ -608,7 +658,8 @@ export const DATA_ENEMIES = {
     },
 
     inquisitor: {
-        name: "[ЭЛИТА] Инквизитор Кузни",
+        name: "Инквизитор Кузни",
+        sprite: enemySprites.inquisitor,
         weight: 3,
         hp: 54,
         def: 2,
@@ -621,7 +672,8 @@ export const DATA_ENEMIES = {
         ],
     },
     juggernaut: {
-        name: "[ЭЛИТА] Паровой Джаггернаут",
+        name: "Паровой Джаггернаут",
+        sprite: enemySprites.juggernaut,
         weight: 3,
         hp: 60,
         def: 3,
@@ -634,7 +686,8 @@ export const DATA_ENEMIES = {
         ],
     },
     furnaceWarden: {
-        name: "[ЭЛИТА] Смотритель Доменной Печи",
+        name: "Смотритель Доменной Печи",
+        sprite: enemySprites.furnaceWarden,
         weight: 3,
         hp: 62,
         def: 3,
@@ -648,7 +701,8 @@ export const DATA_ENEMIES = {
         ],
     },
     vulkan: {
-        name: "[БОСС] Архимеханик Вулкан",
+        name: "Архимеханик Вулкан",
+        sprite: enemySprites.vulkan,
         hp: 95,
         def: 2,
         xp: 35,
@@ -662,7 +716,8 @@ export const DATA_ENEMIES = {
     },
 
     valkyrie: {
-        name: "[ЭЛИТА] Валькирия Забвения",
+        name: "Валькирия Забвения",
+        sprite: enemySprites.valkyrie,
         weight: 3,
         hp: 70,
         def: 2,
@@ -675,7 +730,8 @@ export const DATA_ENEMIES = {
         ],
     },
     chronosDemon: {
-        name: "[ЭЛИТА] Демон Хроноса",
+        name: "Демон Хроноса",
+        sprite: enemySprites.chronosDemon,
         weight: 3,
         hp: 66,
         def: 2,
@@ -688,7 +744,8 @@ export const DATA_ENEMIES = {
         ],
     },
     voidReaver: {
-        name: "[ЭЛИТА] Жнец Пустоты",
+        name: "Жнец Пустоты",
+        sprite: enemySprites.voidReaver,
         weight: 3,
         hp: 68,
         def: 2,
@@ -702,7 +759,8 @@ export const DATA_ENEMIES = {
         ],
     },
     malkor: {
-        name: "[ФИНАЛЬНЫЙ БОСС] Владыка Малкор",
+        name: "Владыка Малкор",
+        sprite: enemySprites.malkor,
         hp: 135,
         def: 3,
         xp: 75,

@@ -78,25 +78,75 @@ export function renderBattleScreen(render) {
                     text: ` (+${en.shield})`,
                 }));
             }
-            if (extraStats.length > 0) {
-                statChildren.push(` | ${extraStats.join(" | ")}`);
+            extraStats.forEach((st) => {
+                statChildren.push(el("span", { className: "stat-divider" }));
+                statChildren.push(st);
+            });
+
+            const isBossBanner = Boolean(en.sprite && en.sprite.isBanner);
+            const isEliteSprite = Boolean(en.sprite && en.sprite.width === 128);
+
+            let spriteEl;
+            if (isBossBanner) {
+                spriteEl = el("div", {
+                    className: "enemy-banner",
+                    style: {
+                        backgroundImage: `url("${en.sprite.src}")`,
+                    },
+                });
+            } else if (en.sprite) {
+                spriteEl = el("div", {
+                    className: `enemy-sprite ${isEliteSprite ? "elite" : ""}`,
+                    style: {
+                        backgroundImage: `url("${en.sprite.src}")`,
+                        backgroundPosition: `-${en.sprite.x}px -${en.sprite.y}px`,
+                    },
+                });
+            } else {
+                const fallbackText = en.isBoss ? "👑" : (en.name.includes("Мимик") ? "📦" : (en.isElite ? "💀" : "👾"));
+                spriteEl = el("div", {
+                    className: `enemy-sprite-fallback ${en.isElite ? "elite" : ""}`,
+                    text: fallbackText,
+                });
             }
 
-            const infoEl = el("div", { className: "enemy-info" }, [
-                el("div", {
-                    className: "enemy-name",
-                    style: { color: isSelected ? "#ef5350" : "#ffffff" },
-                    text: en.name,
-                }),
-                el("div", { className: "enemy-stats" }, statChildren),
-                el("div", {
-                    className: "enemy-intent",
-                    text: `${nextPat.text}${previewVal > 0 ? ` (~${previewVal} ур.)` : ""}`,
-                }),
-            ]);
+            const infoChildren = [];
+            if (en.isFinalBoss) {
+                infoChildren.push(el("div", {
+                    className: "enemy-badge boss final-boss",
+                    text: "👑 ФИНАЛЬНЫЙ БОСС",
+                }));
+            } else if (en.isBoss) {
+                infoChildren.push(el("div", {
+                    className: "enemy-badge boss",
+                    text: "👑 БОСС",
+                }));
+            } else if (en.isElite) {
+                infoChildren.push(el("div", {
+                    className: "enemy-badge elite",
+                    text: "💀 ЭЛИТА",
+                }));
+            }
+            infoChildren.push(el("div", {
+                className: "enemy-name",
+                style: { color: isSelected ? "#ef5350" : "#ffffff" },
+                text: en.name,
+            }));
+            infoChildren.push(el("div", { className: "enemy-stats" }, statChildren));
+            infoChildren.push(el("div", {
+                className: "enemy-intent",
+                text: `${nextPat.text}${previewVal > 0 ? ` (~${previewVal} ур.)` : ""}`,
+            }));
+
+            const infoEl = el("div", { className: "enemy-info" }, infoChildren);
+
+            const cardClasses = ["enemy-card"];
+            if (isBossBanner || en.isBoss) cardClasses.push("boss");
+            if (isEliteSprite || en.isElite) cardClasses.push("elite");
+            if (isSelected) cardClasses.push("selected");
 
             enemyBox.appendChild(el("div", {
-                className: `enemy-card ${isSelected ? "selected" : ""}`,
+                className: cardClasses.join(" "),
                 onClick: () => {
                     if (!game.isProcessingTurn) {
                         game.selectedTargetIndex = idx;
@@ -104,6 +154,7 @@ export function renderBattleScreen(render) {
                     }
                 },
             }, [
+                spriteEl,
                 infoEl,
             ]));
         });
