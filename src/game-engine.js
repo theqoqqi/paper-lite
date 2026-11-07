@@ -104,7 +104,7 @@ class Game {
             this.player = Object.assign(new Player(data.player.classId || "wanderer"), data.player);
             if (!this.player.inventory.artifacts) this.player.inventory.artifacts = [];
             if (!this.player.cooldowns) {
-                this.player.cooldowns = { defend: 0, pierce: 0, whirlwind: 0, concentrate: 0 };
+                this.player.cooldowns = { defend: 0, heavy: 0, pierce: 0, whirlwind: 0, concentrate: 0 };
             }
 
             this.floor = data.floor || 0;
@@ -505,9 +505,9 @@ class Game {
         this.player.poison = 0;
         this.player.bleed = 0;
         this.player.forceCritNext = false;
+        this.player.damageReduction50 = false;
         this.player.concentrateBonus = this.player.concentrateBonus || 0;
-        this.player.cooldowns = { defend: 0, pierce: 0, whirlwind: 0, concentrate: 0 };
-        this.player.concentrateUsesLeft = 2;
+        this.player.cooldowns = { defend: 0, heavy: 0, pierce: 0, whirlwind: 0, concentrate: 0 };
 
         this.state = "BATTLE";
     }
@@ -530,7 +530,6 @@ class Game {
     canUseSkill(skillName, enCost = 0) {
         if (this.isProcessingTurn || this.battleFinished) return false;
         if ((this.player.cooldowns[skillName] || 0) > 0) return false;
-        if (skillName === "concentrate" && this.player.concentrateUsesLeft <= 0) return false;
         return this.canAffordEn(enCost);
     }
 
@@ -571,7 +570,7 @@ class Game {
             if (this.state === "BATTLE") this.battleLog.unshift(`🧪 Зелье Исцеления (+${12 + alchBonus} HP, очищение).`);
         } else if (pot.id === "pot2") {
             this.player.en += 3;
-            this.player.cooldowns = { defend: 0, pierce: 0, whirlwind: 0, concentrate: 0 };
+            this.player.cooldowns = { defend: 0, heavy: 0, pierce: 0, whirlwind: 0, concentrate: 0 };
             this.battleLog.unshift(`🧪 Эликсир Энергии (+3 EN, сброс перезарядок!).`);
         } else if (pot.id === "pot3") {
             this.battleLog.unshift(`🧪 Взрывная Колба (11 чистого урона всем)!`);
@@ -644,12 +643,11 @@ class Game {
         const target = this.enemies[this.selectedTargetIndex];
 
         if (actionType === "defend" && !this.canUseSkill("defend", 0)) return;
-        if (actionType === "heavy" && !this.canAffordEn(1)) return;
+        if (actionType === "heavy" && !this.canUseSkill("heavy", 1)) return;
         if (actionType === "pierce" && !this.canUseSkill("pierce", 2)) return;
         if (actionType === "whirlwind" && !this.canUseSkill("whirlwind", 2)) return;
         if (actionType === "concentrate" && !this.canUseSkill("concentrate", 0)) return;
 
-        this.tickCooldowns();
         this.player.tempSpikes = 0;
 
         const forceAssassinCrit = (this.player.classId === "assassin" && this.battleTurn === 1);
@@ -660,6 +658,8 @@ class Game {
         if (this.battleTurn === 1 && this.player.perks.includes("p13")) atkVal += 5;
 
         const cdReduction = this.player.perks.includes("p24") ? 1 : 0;
+
+        let extraTurn = false;
 
         if (actionType === "fast") {
             if (!target || target.currentHp <= 0) return;
@@ -681,56 +681,56 @@ class Game {
             this.player.concentrateBonus = 0;
 
         } else if (actionType === "defend") {
-            let shieldGain = 4 + this.player.getTotalDef() + (this.player.classId === "crusader" ? 4 : 0);
+            let shieldGain = 3 + this.player.getTotalDef() + (this.player.classId === "crusader" ? 3 : 0) + (this.player.perks.includes("p31") ? 3 : 0);
             if (this.player.classId === "crusader") this.player.tempSpikes += 3;
             if (this.player.perks.includes("p14")) this.player.tempSpikes += 3;
             this.player.addShield(shieldGain);
-            let enGain = 1 + (this.player.perks.includes("p31") ? 1 : 0);
-            this.player.en = Math.min(this.player.getTotalMaxEn(), this.player.en + enGain);
-            if (this.player.perks.includes("p31")) {
-                this.player.bleed = 0;
-            } else {
-                this.player.bleed = Math.max(0, this.player.bleed - 1);
-            }
-            this.player.cooldowns.defend = 2;
-            this.battleLog.unshift(`🛡️ Глухая защита (+${shieldGain} Щит, +${enGain} EN).`);
+            this.player.damageReduction50 = true;
+            this.player.bleed = 0;
+            this.player.poison = 0;
+            const defCd = Math.max(1, 3 - (this.player.perks.includes("p31") ? 1 : 0));
+            this.player.cooldowns.defend = defCd;
+            this.battleLog.unshift(`🛡️ Глухая защита (+${shieldGain} Щит, -50% урон, очищение).`);
 
         } else if (actionType === "heavy") {
             if (!target || target.currentHp <= 0) return;
             if (!this.spendEn(1)) return;
-            this.player.forceCritNext = false;
             if (this.player.perks.includes("p15")) target.shield = 0;
-            const isCrit = this.player.rollCrit(0, forceCrit);
-            let dmg = Math.round(atkVal * 1.4) + RNG.range(2, 6);
-            if (isCrit) {
-                dmg = Math.round(dmg * 1.65);
-                if (this.player.perks.includes("p11")) this.player.heal(3);
-                if (this.player.perks.includes("p32")) target.def = Math.max(0, target.def - 1);
+            const execDmg = Math.round(2 + atkVal * 0.5) + (this.player.perks.includes("p1") ? 4 : 0);
+            const hpBefore = target.currentHp;
+            target.currentHp = Math.max(0, target.currentHp - execDmg);
+            if (target.currentHp <= 0) {
+                this.onEnemyKilled(target);
+                this.battleLog.unshift(`💀 Казнь ${target.name}: ${hpBefore} чистого урона — ДОБИТ! Ход не тратится!`);
+                extraTurn = true;
+            } else {
+                this.battleLog.unshift(`💀 Казнь ${target.name}: ${execDmg} чистого урона.`);
             }
-            this.applyWeaponEffects(target);
-            if (this.player.perks.includes("p8")) target.bleed += 2;
-            const dealt = this.dealDamageToEnemy(target, dmg, ignoreAllDef);
-            this.checkEnemySpikes(target);
-            this.battleLog.unshift(`💥 Тяжёлый выпад по ${target.name}${isCrit ? " (КРИТ!)" : ""}: ${dealt} урона.`);
+            this.player.cooldowns.heavy = Math.max(1, 3 - cdReduction);
             this.player.concentrateBonus = 0;
 
         } else if (actionType === "pierce") {
             if (!target || target.currentHp <= 0) return;
             if (!this.spendEn(2)) return;
             if (this.player.perks.includes("p15")) target.shield = 0;
-            let dmg = (atkVal * 2) + 4 + (this.player.perks.includes("p1") ? 4 : 0);
+            const prcRaw = atkVal + RNG.range(3, 7);
+            const prcDef = ignoreAllDef ? 0 : Math.max(0, target.def - (this.player.hasArtifact("art3") ? 1 : 0));
+            const prcActual = Math.max(1, prcRaw - prcDef);
+            if (this.player.perks.includes("p8")) target.bleed += 2;
+            target.currentHp = Math.max(0, target.currentHp - prcActual);
+            if (prcActual > 0 && this.player.hasArtifact("art17")) this.player.heal(1);
+            if (target.currentHp <= 0) this.onEnemyKilled(target);
             this.applyWeaponEffects(target);
-            const dealt = this.dealDamageToEnemy(target, dmg, true);
             this.checkEnemySpikes(target);
-            this.player.cooldowns.pierce = Math.max(1, 2 - cdReduction);
-            this.battleLog.unshift(`🗡️ Пробивающий удар по ${target.name}: ${dealt} чистого урона!`);
+            this.player.cooldowns.pierce = Math.max(1, 3 - cdReduction);
+            this.battleLog.unshift(`🗡️ Пробитие ${target.name} (сквозь щит): ${prcActual} урона!`);
             this.player.concentrateBonus = 0;
 
         } else if (actionType === "whirlwind") {
             if (!this.spendEn(2)) return;
             const isArcanist = this.player.classId === "arcanist";
-            let dmg = atkVal + (isArcanist ? RNG.range(4, 8) : RNG.range(2, 5));
-            this.player.cooldowns.whirlwind = Math.max(1, 2 - cdReduction);
+            let dmg = Math.round(atkVal * 0.75) + (isArcanist ? RNG.range(3, 6) : RNG.range(1, 4));
+            this.player.cooldowns.whirlwind = Math.max(1, 3 - cdReduction);
             this.battleLog.unshift(`🌪️ ${isArcanist ? "Огненный залп" : "Круговой вихрь"} по всем (${dmg} базы)!`);
             this.enemies.forEach(en => {
                 if (en.currentHp > 0) {
@@ -743,15 +743,18 @@ class Game {
 
         } else if (actionType === "concentrate") {
             this.player.en = Math.min(this.player.getTotalMaxEn(), this.player.en + 2);
-            let healAmt = this.player.perks.includes("p9") ? 7 : 3;
+            let healAmt = this.player.perks.includes("p9") ? 7 : 4;
             this.player.heal(healAmt);
+            for (const skillKey of Object.keys(this.player.cooldowns)) {
+                if (this.player.cooldowns[skillKey] > 0) {
+                    this.player.cooldowns[skillKey]--;
+                }
+            }
             if (this.player.hasArtifact("art10")) {
                 this.player.addShield(4);
             }
-            this.player.concentrateBonus = 3;
-            this.player.concentrateUsesLeft--;
-            this.player.cooldowns.concentrate = 3;
-            this.battleLog.unshift(`🧘 Концентрация (+2 EN, +${healAmt} HP, +3 ATK к след. удару).`);
+            this.player.cooldowns.concentrate = 4;
+            this.battleLog.unshift(`🧘 Концентрация (+2 EN, +${healAmt} HP, -1 ход ко всем КД).`);
         }
 
         if (["fast", "heavy", "pierce", "whirlwind"].includes(actionType) && this.player.bleed > 0) {
@@ -766,6 +769,13 @@ class Game {
             return;
         }
 
+        if (extraTurn) {
+            if (onStepRender) onStepRender();
+            this.saveGame("autosave");
+            return;
+        }
+
+        this.tickCooldowns();
         // Запускаем пошаговую очередь ходов врагов с задержкой 450мс
         this.isProcessingTurn = true;
         if (onStepRender) onStepRender();
@@ -820,6 +830,7 @@ class Game {
             if (this.player.classId === "arcanist") {
                 this.player.en = Math.min(this.player.getTotalMaxEn(), this.player.en + 1);
             }
+            this.player.damageReduction50 = false;
             this.battleTurn++;
             if (this.player.perks.includes("p18") && this.battleTurn % 3 === 0) {
                 this.player.en = Math.min(this.player.getTotalMaxEn(), this.player.en + 2);

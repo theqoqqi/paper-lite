@@ -635,55 +635,36 @@ function renderBattleScreen() {
 
         // Кнопки навыков с превью урона/эффекта
         const fastMin = atk + 1, fastMax = atk + 4;
-        const hvyMin = Math.round(atk * 1.4) + 2, hvyMax = Math.round(atk * 1.4) + 6;
-        const prcDmg = (atk * 2) + 4 + (p.perks.includes("p1") ? 4 : 0);
-        const whrMin = atk + (p.classId === "arcanist" ? 4 : 2), whrMax = atk + (p.classId === "arcanist" ? 8 : 5);
-        const defShield = 4 + p.getTotalDef() + (p.classId === "crusader" ? 4 : 0);
+        const execDmg = Math.round(2 + atk * 0.5) + (p.perks.includes("p1") ? 4 : 0);
+        const prcMin = atk + 3, prcMax = atk + 7;
+        const whrMin = Math.round(atk * 0.75) + (p.classId === "arcanist" ? 3 : 1), whrMax = Math.round(atk * 0.75) + (p.classId === "arcanist" ? 6 : 4);
+        const defShield = 3 + p.getTotalDef() + (p.classId === "crusader" ? 3 : 0) + (p.perks.includes("p31") ? 3 : 0);
 
-        const defLabel = cds.defend > 0 ? `🛡️ Защита [КД:${cds.defend}]` : `🛡️ Защита (0) [+${defShield} Щит]`;
-        const prcLabel = cds.pierce > 0 ? `🗡️ Пробив. [КД:${cds.pierce}]` : `🗡️ Пробив. (2) [${prcDmg} чист.]`;
-        const whrLabel = cds.whirlwind > 0 ? `🌪️ Вихрь [КД:${cds.whirlwind}]` : `🌪️ Вихрь (2) [${whrMin}-${whrMax} всем]`;
-        const cncLabel = p.concentrateUsesLeft <= 0
-            ? "🧘 Концентр. [0/2]"
-            : (cds.concentrate > 0 ? `🧘 Концентр. [КД:${cds.concentrate}]` : `🧘 Концентр. (${p.concentrateUsesLeft}/2) [+2 EN]`);
+        const formatCd = cd => (cd === 1 ? "[КД: 1 ход]" : `[КД: ${cd} хода]`);
+        const defSub = cds.defend > 0 ? formatCd(cds.defend) : `[+${defShield} Щит, -50% ур.]`;
+        const heavySub = cds.heavy > 0 ? formatCd(cds.heavy) : `[${execDmg} чист., доп. ход]`;
+        const prcSub = cds.pierce > 0 ? formatCd(cds.pierce) : `[${prcMin}-${prcMax} сквозь щит]`;
+        const whrSub = cds.whirlwind > 0 ? formatCd(cds.whirlwind) : `[${whrMin}-${whrMax} всем]`;
+        const cncSub = cds.concentrate > 0 ? formatCd(cds.concentrate) : "[+2 EN, +HP, -1 КД]";
+
+        const makeActionBtn = (title, sub, disabled, onClick) => el("button", { disabled, onClick }, [
+            el("span", { style: { display: "block", whiteSpace: "nowrap" }, text: title }),
+            el("span", { style: { display: "block", fontSize: "11px", opacity: 0.85, marginTop: "2px" }, text: sub }),
+        ]);
 
         const actionsGrid = el("div", {}, [
             el("div", { className: "flex-row" }, [
-                el("button", {
-                    disabled: game.isProcessingTurn,
-                    text: `⚔️ Быстрый (0) [${fastMin}-${fastMax}]`,
-                    onClick: () => game.playerAction("fast", render)
-                }),
-                el("button", {
-                    disabled: !game.canUseSkill("defend", 0),
-                    text: defLabel,
-                    onClick: () => game.playerAction("defend", render)
-                })
+                makeActionBtn("⚔️ Быстрый (0 EN)", `[${fastMin}-${fastMax} ур.]`, game.isProcessingTurn, () => game.playerAction("fast", render)),
+                makeActionBtn("🛡️ Защита (0 EN)", defSub, !game.canUseSkill("defend", 0), () => game.playerAction("defend", render)),
             ]),
             el("div", { className: "flex-row" }, [
-                el("button", {
-                    disabled: game.isProcessingTurn || !game.canAffordEn(1),
-                    text: `💥 Тяжёлый (1) [${hvyMin}-${hvyMax}]`,
-                    onClick: () => game.playerAction("heavy", render)
-                }),
-                el("button", {
-                    disabled: !game.canUseSkill("pierce", 2),
-                    text: prcLabel,
-                    onClick: () => game.playerAction("pierce", render)
-                })
+                makeActionBtn("🗡️ Пробитие (2 EN)", prcSub, !game.canUseSkill("pierce", 2), () => game.playerAction("pierce", render)),
+                makeActionBtn("🌪️ Вихрь (2 EN)", whrSub, !game.canUseSkill("whirlwind", 2), () => game.playerAction("whirlwind", render)),
             ]),
             el("div", { className: "flex-row" }, [
-                el("button", {
-                    disabled: !game.canUseSkill("whirlwind", 2),
-                    text: whrLabel,
-                    onClick: () => game.playerAction("whirlwind", render)
-                }),
-                el("button", {
-                    disabled: !game.canUseSkill("concentrate", 0),
-                    text: cncLabel,
-                    onClick: () => game.playerAction("concentrate", render)
-                })
-            ])
+                makeActionBtn("💀 Казнь (1 EN)", heavySub, !game.canUseSkill("heavy", 1), () => game.playerAction("heavy", render)),
+                makeActionBtn("🧘 Концентрация", cncSub, !game.canUseSkill("concentrate", 0), () => game.playerAction("concentrate", render)),
+            ]),
         ]);
         wrap.appendChild(actionsGrid);
 
@@ -880,6 +861,9 @@ function renderCorridorScreen() {
                 border: "1px solid #333333",
                 marginBottom: "10px",
                 display: "block",
+            },
+            onError: e => {
+                e.target.style.display = "none";
             },
         }) : null,
         el("div", {

@@ -35,10 +35,10 @@ class Player {
         this.bleed = 0;
         this.concentrateBonus = 0;
 
-        this.cooldowns = { defend: 0, pierce: 0, whirlwind: 0, concentrate: 0 };
-        this.concentrateUsesLeft = 2;
+        this.cooldowns = { defend: 0, heavy: 0, pierce: 0, whirlwind: 0, concentrate: 0 };
         this.secondWindAvailable = true;
         this.forceCritNext = false;
+        this.damageReduction50 = false;
 
         this.perks = [];
         this.potionSlots = 2 + (meta.potions || 0);
@@ -189,6 +189,9 @@ class Player {
 
     takeDamage(rawAmount, ignoreDef = false) {
         let amount = rawAmount;
+        if (this.damageReduction50) {
+            amount = Math.ceil(amount * 0.5);
+        }
         if (this.hasArtifact("art18")) {
             amount = Math.max(1, amount - 1);
         }
