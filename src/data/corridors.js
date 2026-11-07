@@ -1,4 +1,4 @@
-const DATA_CORRIDOR_ROOMS = [
+export const DATA_CORRIDOR_ROOMS = [
     {
         id: "dusty_passage",
         title: "Пыльный переход",
@@ -169,7 +169,7 @@ const DATA_CORRIDOR_ROOMS = [
     },
 ];
 
-const DATA_CORRIDOR_OUTCOMES = {
+export const DATA_CORRIDOR_OUTCOMES = {
     empty_dust: {
         id: "empty_dust",
         text: "В помещении царит мертвая тишина. Ничего ценного не обнаружено.",

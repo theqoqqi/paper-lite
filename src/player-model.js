@@ -2,7 +2,10 @@
 // PLAYER-MODEL.JS — Модель игрока, динамические статы, инвентарь и артефакты
 // ============================================================================
 
-class Player {
+import { RNG } from "./rng-service.js";
+import { GAME_DATA } from "./game-data.js";
+
+export class Player {
     constructor(classKey = "wanderer", meta = {}) {
         const base = GAME_DATA.classes[classKey] || GAME_DATA.classes.wanderer;
         this.classId = base.id;

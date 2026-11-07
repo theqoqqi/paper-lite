@@ -1,4 +1,4 @@
-const DATA_MUTATIONS = [
+export const DATA_MUTATIONS = [
     { id: "armored", prefix: "Бронированный", hpBonus: 4, defBonus: 1, atkBonus: 0, xpBonus: 2 },
     { id: "furious", prefix: "Яростный", hpBonus: 2, defBonus: 0, atkBonus: 2, xpBonus: 2 },
     { id: "plagued", prefix: "Чумной", hpBonus: 3, defBonus: 0, atkBonus: 0, poisonOnHit: 1, xpBonus: 2 },
@@ -12,7 +12,7 @@ const DATA_MUTATIONS = [
     { id: "undying", prefix: "Бессмертный", hpBonus: 8, defBonus: 1, atkBonus: 0, regen: 4, xpBonus: 3 },
 ];
 
-const DATA_FLOORS = [
+export const DATA_FLOORS = [
     {
         id: 0,
         name: "Заброшенные Катакомбы",
@@ -43,7 +43,7 @@ const DATA_FLOORS = [
     },
 ];
 
-const DATA_ENEMIES = {
+export const DATA_ENEMIES = {
     // Этаж 1
     rat: { name: "Пещерная Крыса", weight: 1, hp: 7, def: 0, xp: 2, pattern: [{ type: "attack", val: 3, text: "Укус" }] },
     slime: {

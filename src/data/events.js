@@ -1,4 +1,4 @@
-const DATA_EVENTS = [
+export const DATA_EVENTS = [
     {
         id: "altar",
         title: "Кровавый Алтарь",

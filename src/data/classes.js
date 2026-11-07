@@ -1,4 +1,4 @@
-const DATA_CLASSES = {
+export const DATA_CLASSES = {
     wanderer: {
         id: "wanderer",
         name: "Странник",
@@ -67,7 +67,7 @@ const DATA_CLASSES = {
     },
 };
 
-const DATA_SKILLS = [
+export const DATA_SKILLS = [
     {
         id: "fast",
         name: "⚔️ Быстрый удар",
@@ -112,7 +112,7 @@ const DATA_SKILLS = [
     },
 ];
 
-const DATA_META_UPGRADES = [
+export const DATA_META_UPGRADES = [
     { key: "hp", name: "Живучесть", desc: "+4 MAX HP на старте", max: 10, costs: [5, 10, 15, 20, 25, 30, 35, 40, 45, 50] },
     { key: "atk", name: "Сила крови", desc: "+1 ATK на старте", max: 8, costs: [15, 30, 45, 60, 75, 90, 105, 120] },
     { key: "def", name: "Каменная кожа", desc: "+1 DEF на старте", max: 4, costs: [30, 70, 130, 210] },

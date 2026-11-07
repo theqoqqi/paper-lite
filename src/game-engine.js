@@ -2,7 +2,12 @@
 // GAME-ENGINE.JS — Движок игры, пошаговые задержки боя, трофеи и слоты сейвов
 // ============================================================================
 
-class Game {
+import { RNG } from "./rng-service.js";
+import { GAME_DATA } from "./game-data.js";
+import { DungeonGenerator } from "./dungeon-generator.js";
+import { Player } from "./player-model.js";
+
+export class Game {
     constructor() {
         this.defaultMeta = {
             souls: 0, hp: 0, atk: 0, def: 0, en: 0, gold: 0, potions: 0, unlockedClasses: ["wanderer"],
@@ -1601,5 +1606,5 @@ class Game {
     }
 }
 
-const game = new Game();
+export const game = new Game();
 game.init();

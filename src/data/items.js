@@ -1,4 +1,4 @@
-const DATA_PERKS = [
+export const DATA_PERKS = [
     { id: "p1", name: "Тяжёлая рука", desc: "+1 ATK, Казнь наносит +4 урона." },
     { id: "p2", name: "Смертоносная точность", desc: "+12% к базовому шансу Критического удара." },
     { id: "p3", name: "Палач", desc: "+4 урона врагам с HP <= 50%." },
@@ -37,7 +37,7 @@ const DATA_PERKS = [
     { id: "p36", name: "Двойной глоток", desc: "Использование любого зелья в бою восстанавливает +1 EN." },
 ];
 
-const DATA_ITEMS = {
+export const DATA_ITEMS = {
     weapons: [
         // Обычные и Редкие (Тир 1)
         { id: "w1", name: "Ржавый Фальшион", type: "weapon", rarity: "Обычное", tier: 1, cost: 10, atk: 1, bleed: 1, desc: "+1 ATK, атаки вешают Кровоток (1)" },

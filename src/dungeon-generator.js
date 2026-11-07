@@ -1,4 +1,6 @@
-class DungeonGenerator {
+import { RNG } from "./rng-service.js";
+
+export class DungeonGenerator {
     static generate(floor = 0) {
         const dirs = [
             { name: "up", opp: "down", dx: 0, dy: -1 },
