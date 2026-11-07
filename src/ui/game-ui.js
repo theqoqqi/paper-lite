@@ -62,26 +62,7 @@ function renderStatsPanel() {
     ]);
 }
 
-function render() {
-    const container = document.getElementById("screen-container");
-    container.replaceChildren();
-    renderGlobalNav();
-
-    if (game.state === "MENU") container.appendChild(renderMenuScreen());
-    else if (game.state === "META_SHOP") container.appendChild(renderMetaShopScreen());
-    else if (game.state === "CLASS_SELECT") container.appendChild(renderClassSelectScreen());
-    else if (game.state === "MAP") container.appendChild(renderMapScreen());
-    else if (game.state === "BATTLE") container.appendChild(renderBattleScreen());
-    else if (game.state === "LEVELUP") container.appendChild(renderLevelUpScreen());
-    else if (game.state === "EVENT") container.appendChild(renderEventScreen());
-    else if (game.state === "EVENT_REWARDS") container.appendChild(renderEventRewardsScreen());
-    else if (game.state === "CAMPFIRE") container.appendChild(renderCampfireScreen());
-    else if (game.state === "CORRIDOR") container.appendChild(renderCorridorScreen());
-    else if (game.state === "SHOP") container.appendChild(renderShopScreen());
-    else if (game.state === "GAMEOVER" || game.state === "VICTORY") container.appendChild(renderEndScreen());
-}
-
-function renderGlobalNav() {
+function renderGlobalNav(render) {
     const nav = document.getElementById("global-nav");
     nav.replaceChildren();
 
@@ -91,18 +72,18 @@ function renderGlobalNav() {
             className: "btn-center",
             style: { background: "#2b3a4a" },
             text: "👤 Герой и Навыки",
-            onClick: openCharacterModal
+            onClick: () => openCharacterModal(render),
         }));
     }
     row.appendChild(el("button", {
         className: "btn-center",
         text: "💾 Сохранения",
-        onClick: openSaveManagerModal
+        onClick: () => openSaveManagerModal(render),
     }));
     nav.appendChild(row);
 }
 
-function renderMenuScreen() {
+function renderMenuScreen(render) {
     const autoSummary = game.getSlotSummary("autosave");
     return el("div", {}, [
         el("h1", { text: "ХРОНИКИ КЛЕТЧАТОЙ БЕЗДНЫ" }),
@@ -136,7 +117,7 @@ function renderMenuScreen() {
     ]);
 }
 
-function renderMetaShopScreen() {
+function renderMetaShopScreen(render) {
     const wrap = el("div", {}, [
         el("h2", { text: "Алтарь Душ" }),
         el("div", { className: "panel text-center", text: `Доступно Очков Душ: 🔮 ${game.meta.souls}` }),
@@ -199,7 +180,7 @@ function renderMetaShopScreen() {
     return wrap;
 }
 
-function renderClassSelectScreen() {
+function renderClassSelectScreen(render) {
     const wrap = el("div", {}, [el("h2", { text: "Выберите Класс Героя" })]);
 
     Object.values(GAME_DATA.classes).forEach(cls => {
@@ -230,7 +211,7 @@ function renderClassSelectScreen() {
     return wrap;
 }
 
-function renderMapScreen() {
+function renderMapScreen(render) {
     const floorData = GAME_DATA.floors[game.floor];
     const roomTypes = {
         start: { icon: "🚪", name: "Вход" },
@@ -545,7 +526,7 @@ function renderMapScreen() {
     ]);
 }
 
-function renderBattleScreen() {
+function renderBattleScreen(render) {
     game.ensureValidTarget();
     const p = game.player;
     const cds = p.cooldowns || {};
@@ -699,7 +680,7 @@ function renderBattleScreen() {
     return wrap;
 }
 
-function renderLevelUpScreen() {
+function renderLevelUpScreen(render) {
     const wrap = el("div", {}, [
         el("h2", { text: `⬆️ Уровень ${game.player.level + 1}!` }),
         el("p", {
@@ -724,7 +705,7 @@ function renderLevelUpScreen() {
     return wrap;
 }
 
-function renderEventScreen() {
+function renderEventScreen(render) {
     const ev = GAME_DATA.events.find(e => e.id === game.currentEventId) || GAME_DATA.events[0];
     const wrap = el("div", {}, [
         el("h3", { text: `❓ ${ev.title}` }),
@@ -745,7 +726,7 @@ function renderEventScreen() {
     return wrap;
 }
 
-function renderEventRewardsScreen() {
+function renderEventRewardsScreen(render) {
     const rewards = game.eventRewards || { gold: 0, items: [] };
     const wrap = el("div", {}, [
         el("h3", { text: "❓ Награда за событие" }),
@@ -796,7 +777,7 @@ function renderEventRewardsScreen() {
     return wrap;
 }
 
-function renderCampfireScreen() {
+function renderCampfireScreen(render) {
     const mult = game.player.perks.includes("p28") ? 0.7 : 0.45;
     const healAmt = Math.ceil(game.player.getTotalMaxHp() * mult);
     return el("div", {}, [
@@ -826,7 +807,7 @@ function renderCampfireScreen() {
     ]);
 }
 
-function renderCorridorScreen() {
+function renderCorridorScreen(render) {
     const res = game.currentCorridorResult || {
         title: "Коридор",
         desc: "Темный коридор подземелья.",
@@ -916,7 +897,7 @@ function renderCorridorScreen() {
     return wrap;
 }
 
-function renderShopScreen() {
+function renderShopScreen(render) {
     const wrap = el("div", {}, [
         el("h3", { text: "⚖️ Лавка Торговца и Кузнец" }),
         renderStatsPanel()
@@ -962,7 +943,7 @@ function renderShopScreen() {
     return wrap;
 }
 
-function renderEndScreen() {
+function renderEndScreen(render) {
     const isWin = game.state === "VICTORY";
     return el("div", {}, [
         el("h2", { text: isWin ? "🏆 ПОБЕДА!" : "💀 ВЫ ПОГИБЛИ" }),
@@ -1043,7 +1024,7 @@ function renderEquipmentComparison(pendingEquip, onResolved) {
 
 // ================= МОДАЛЬНОЕ ОКНО: ГЕРОЙ, ИНВЕНТАРЬ И СПРАВОЧНИК НАВЫКОВ =================
 
-function openCharacterModal() {
+function openCharacterModal(render) {
     const p = game.player;
     if (!p) return;
 
@@ -1139,7 +1120,7 @@ function openCharacterModal() {
                         onClick: () => {
                             game.discardPotion(idx);
                             modalOverlay.remove();
-                            openCharacterModal();
+                            openCharacterModal(render);
                             render();
                         }
                     })
@@ -1185,7 +1166,7 @@ function openCharacterModal() {
 
 // ================= МОДАЛЬНОЕ ОКНО: МЕНЕДЖЕР СОХРАНЕНИЙ (3 СЛОТА + JSON + СБРОС) =================
 
-function openSaveManagerModal() {
+function openSaveManagerModal(render) {
     const modalOverlay = el("div", { className: "modal-overlay" });
 
     function rebuildModalContent() {
@@ -1301,6 +1282,22 @@ function openSaveManagerModal() {
     document.body.appendChild(modalOverlay);
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-    render();
-});
+export {
+    el,
+    renderStatsPanel,
+    renderGlobalNav,
+    renderMenuScreen,
+    renderMetaShopScreen,
+    renderClassSelectScreen,
+    renderMapScreen,
+    renderBattleScreen,
+    renderLevelUpScreen,
+    renderEventScreen,
+    renderEventRewardsScreen,
+    renderCampfireScreen,
+    renderCorridorScreen,
+    renderShopScreen,
+    renderEndScreen,
+    openCharacterModal,
+    openSaveManagerModal,
+};
