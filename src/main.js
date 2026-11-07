@@ -1,19 +1,21 @@
 import { game } from "./engine/game.js";
+import { renderGlobalNav } from "./ui/components.js";
 import {
-    renderGlobalNav,
     renderMenuScreen,
     renderMetaShopScreen,
     renderClassSelectScreen,
-    renderMapScreen,
-    renderBattleScreen,
+    renderEndScreen,
+} from "./ui/screens/menu.js";
+import { renderMapScreen } from "./ui/screens/map.js";
+import { renderBattleScreen } from "./ui/screens/battle.js";
+import {
     renderLevelUpScreen,
     renderEventScreen,
     renderEventRewardsScreen,
     renderCampfireScreen,
     renderCorridorScreen,
     renderShopScreen,
-    renderEndScreen,
-} from "./ui/game-ui.js";
+} from "./ui/screens/rooms.js";
 
 export function render() {
     const container = document.getElementById("screen-container");

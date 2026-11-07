@@ -1,0 +1,110 @@
+import { el } from "../utils/dom.js";
+import { game } from "../engine/game.js";
+import { openCharacterModal, openSaveManagerModal } from "./modals.js";
+
+export function renderStatsPanel() {
+    const p = game.player;
+    const maxHp = p.getTotalMaxHp();
+    const maxEn = p.getTotalMaxEn();
+    const wName = p.inventory.weapon ? `${p.inventory.weapon.name}${p.weaponUpgradeLvl ? ` (+${p.weaponUpgradeLvl})` : ""}` : `Кулаки (+${p.weaponUpgradeLvl})`;
+    const aName = p.inventory.armor ? `${p.inventory.armor.name}${p.armorUpgradeLvl ? ` (+${p.armorUpgradeLvl})` : ""}` : `Лохмотья (+${p.armorUpgradeLvl})`;
+
+    const statusTags = [];
+    if (p.poison > 0) statusTags.push(`☠️Яд:${p.poison}`);
+    if (p.bleed > 0) statusTags.push(`🩸Кровь:${p.bleed}`);
+    if (p.concentrateBonus > 0) statusTags.push(`🔥Усил:+${p.concentrateBonus}`);
+
+    return el("div", { className: "panel" }, [
+        el("div", { className: "stats-line" }, [
+            el("b", { text: `${p.className} (Ур. ${p.level})` }),
+            el("span", { text: `XP: ${p.xp}/${p.getRequiredXp()} | 💰 ${p.gold}G` }),
+        ]),
+        el("div", { className: "stats-line" }, [
+            el("span", { text: `❤️ HP: ${p.hp}/${maxHp} (Щит: ${p.shield})` }),
+            el("span", { text: `⚡ EN: ${p.en}/${maxEn}` }),
+        ]),
+        el("div", { className: "stats-line" }, [
+            el("span", { text: `⚔️ ATK: ${p.getTotalAtk()} | 🛡️ DEF: ${p.getTotalDef()} | 🎯 Крит: ${p.getCritChance()}% | 🌵 Шипы: ${p.getTotalSpikes()}` }),
+        ]),
+        statusTags.length > 0 ? el("div", {
+            style: { color: "#ff8a65", fontSize: "12px" },
+            text: `Статусы: ${statusTags.join(" ")}`,
+        }) : null,
+        el("div", {
+            className: "equip-line",
+            text: `⚔️ ${wName} | 🛡️ ${aName} | 💍 Артефактов: ${p.inventory.artifacts.length} | ⭐ Перков: ${p.perks.length}`,
+        }),
+    ]);
+}
+
+export function renderGlobalNav(render) {
+    const nav = document.getElementById("global-nav");
+    nav.replaceChildren();
+
+    const row = el("div", { className: "flex-row" });
+    if (game.player && ["MAP", "BATTLE", "SHOP", "EVENT", "CAMPFIRE", "EVENT_REWARDS", "CORRIDOR"].includes(game.state)) {
+        row.appendChild(el("button", {
+            className: "btn-center",
+            style: { background: "#2b3a4a" },
+            text: "👤 Герой и Навыки",
+            onClick: () => openCharacterModal(render),
+        }));
+    }
+    row.appendChild(el("button", {
+        className: "btn-center",
+        text: "💾 Сохранения",
+        onClick: () => openSaveManagerModal(render),
+    }));
+    nav.appendChild(row);
+}
+
+export function renderEquipmentComparison(pendingEquip, onResolved) {
+    if (!pendingEquip) return null;
+    const { type, item } = pendingEquip;
+    const current = type === "weapon" ? game.player.inventory.weapon : game.player.inventory.armor;
+    const currentName = current ? `${current.name} (${current.desc})` : (type === "weapon" ? "Кулаки" : "Лохмотья");
+    const oldRefund = (current && current.cost) ? Math.max(1, Math.floor(current.cost * 0.25)) : 0;
+    const salvageGain = (item && item.cost) ? Math.max(1, Math.floor(item.cost * 0.25)) : 0;
+    const typeLabel = type === "weapon" ? "Оружие" : "Броня";
+
+    return el("div", {
+        className: "panel",
+        style: {
+            borderColor: "#ff9800",
+            background: "#2a2218",
+            marginTop: "8px",
+        },
+    }, [
+        el("div", {
+            style: { fontWeight: "bold", color: "#ffb74d", marginBottom: "6px" },
+            text: `⚖️ Выбор экипировки: найдено [${typeLabel}]`,
+        }),
+        el("div", {
+            style: { fontSize: "12px", marginBottom: "4px" },
+            text: `Надето: ${currentName}`,
+        }),
+        el("div", {
+            style: { fontSize: "12px", color: "#81c784", marginBottom: "8px" },
+            text: `Найдено: [${item.rarity}] ${item.name} (${item.desc})`,
+        }),
+        el("div", { className: "flex-row" }, [
+            el("button", {
+                className: "btn-primary",
+                style: { padding: "8px", fontSize: "12px" },
+                text: `Надеть (+${oldRefund}G со старого)`,
+                onClick: () => {
+                    game.resolveEquipChoice();
+                    if (onResolved) onResolved();
+                },
+            }),
+            el("button", {
+                style: { padding: "8px", fontSize: "12px", background: "#4a3220" },
+                text: `Разобрать (+${salvageGain}G)`,
+                onClick: () => {
+                    game.resolveSalvageChoice();
+                    if (onResolved) onResolved();
+                },
+            }),
+        ]),
+    ]);
+}
