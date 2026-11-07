@@ -75,9 +75,9 @@ export function renderBattleScreen(render) {
         ]);
 
         game.enemies.forEach((en, idx) => {
-            if (en.currentHp <= 0) return;
-            const isSelected = idx === game.selectedTargetIndex;
-            const nextPat = en.pattern[(en.patternIndex || 0) % en.pattern.length];
+            if (en.currentHp <= 0 && (!en.isDying || en.deathAnimRendered)) return;
+            const isSelected = idx === game.selectedTargetIndex && !en.isDying;
+            const nextPat = en.pattern ? en.pattern[(en.patternIndex || 0) % en.pattern.length] : { text: "...", val: 0 };
             const previewVal = nextPat.val ? nextPat.val + (en.atkBonus || 0) : 0;
 
             const extraStats = [];
@@ -151,10 +151,18 @@ export function renderBattleScreen(render) {
                 text: en.name,
             }));
             infoChildren.push(el("div", { className: "enemy-stats" }, statChildren));
-            infoChildren.push(el("div", {
-                className: "enemy-intent",
-                text: `${nextPat.text}${previewVal > 0 ? ` (~${previewVal} ур.)` : ""}`,
-            }));
+            if (en.isDying) {
+                infoChildren.push(el("div", {
+                    className: "enemy-intent",
+                    style: { color: "#e57373", fontWeight: "bold" },
+                    text: "💀 Повержен",
+                }));
+            } else {
+                infoChildren.push(el("div", {
+                    className: "enemy-intent",
+                    text: `${nextPat.text}${previewVal > 0 ? ` (~${previewVal} ур.)` : ""}`,
+                }));
+            }
 
             const infoEl = el("div", { className: "enemy-info" }, infoChildren);
 
@@ -166,7 +174,10 @@ export function renderBattleScreen(render) {
             if (isBossBanner || en.isBoss) cardClasses.push("boss");
             if (isEliteSprite || en.isElite) cardClasses.push("elite");
             if (isSelected) cardClasses.push("selected");
-            if (hasEnCrit) {
+            if (en.isDying) {
+                en.deathAnimRendered = true;
+                cardClasses.push("dying");
+            } else if (hasEnCrit) {
                 cardClasses.push("anim-crit-shake");
             } else if (hasEnDmg) {
                 cardClasses.push("anim-shake");
@@ -175,7 +186,7 @@ export function renderBattleScreen(render) {
             const cardEl = el("div", {
                 className: cardClasses.join(" "),
                 onClick: () => {
-                    if (!game.isProcessingTurn) {
+                    if (!game.isProcessingTurn && !en.isDying) {
                         game.selectedTargetIndex = idx;
                         render();
                     }
@@ -184,6 +195,13 @@ export function renderBattleScreen(render) {
                 spriteEl,
                 infoEl,
             ]);
+            if (en.isDying) {
+                cardEl.addEventListener("animationend", (e) => {
+                    if (e.target !== cardEl) return;
+                    en.isDying = false;
+                    cardEl.remove();
+                });
+            }
             enemyBox.appendChild(cardEl);
             if (enFxList.length > 0) {
                 enemyCardEntries.push({ enemy: en, el: cardEl, fxList: enFxList });
@@ -238,8 +256,7 @@ export function renderBattleScreen(render) {
                     style: { padding: "6px", fontSize: "12px", background: "#243b24" },
                     text: `🧪 ${pot.name} — ${pot.desc}`,
                     onClick: () => {
-                        game.usePotion(pIdx);
-                        render();
+                        game.usePotion(pIdx, render);
                     },
                 }));
             });

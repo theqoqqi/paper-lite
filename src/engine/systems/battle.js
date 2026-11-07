@@ -151,7 +151,7 @@ export function tickCooldowns(game) {
     }
 }
 
-export function usePotion(game, potIndex) {
+export function usePotion(game, potIndex, onStepRender) {
     if (game.isProcessingTurn) return;
     const pot = game.player.inventory.potions[potIndex];
     if (!pot) return;
@@ -229,9 +229,10 @@ export function usePotion(game, potIndex) {
     game.player.inventory.potions.splice(potIndex, 1);
     if (game.state === "BATTLE") {
         ensureValidTarget(game);
-        checkBattleEnd(game);
+        if (handlePotentialBattleEnd(game, onStepRender)) return;
     }
     game.saveGame("autosave");
+    if (onStepRender) onStepRender();
 }
 
 export function discardPotion(game, potIndex) {
@@ -397,9 +398,7 @@ export function playerAction(game, actionType, onStepRender) {
     }
 
     ensureValidTarget(game);
-    if (checkBattleEnd(game)) {
-        if (onStepRender) onStepRender();
-        game.saveGame("autosave");
+    if (handlePotentialBattleEnd(game, onStepRender)) {
         return;
     }
 
@@ -486,14 +485,12 @@ export function runEnemyTurnSequence(game, onStepRender) {
                 if (onStepRender) onStepRender();
                 return;
             }
-            if (checkBattleEnd(game)) {
-                game.isProcessingTurn = false;
-                if (onStepRender) onStepRender();
-                game.saveGame("autosave");
+            if (handlePotentialBattleEnd(game, onStepRender)) {
                 return;
             }
             if (onStepRender) onStepRender();
-            setTimeout(nextStep, 420);
+            const stepDelay = game.enemies.some(e => e.isDying) ? 550 : 420;
+            setTimeout(nextStep, stepDelay);
         } else {
             game.isProcessingTurn = false;
             if (onStepRender) onStepRender();
@@ -501,7 +498,8 @@ export function runEnemyTurnSequence(game, onStepRender) {
         }
     };
 
-    setTimeout(nextStep, 380);
+    const initialDelay = game.enemies.some(e => e.isDying) ? 550 : 380;
+    setTimeout(nextStep, initialDelay);
 }
 
 export function executeSingleEnemyTurn(game, en) {
@@ -701,6 +699,13 @@ export function dealDamageToEnemy(game, enemy, amount, ignoreDef = false, isCrit
 }
 
 export function onEnemyKilled(game, enemy) {
+    if (enemy._killed) return;
+    enemy._killed = true;
+    enemy.isDying = true;
+    setTimeout(() => {
+        enemy.isDying = false;
+    }, 550);
+
     let xpGain = enemy.xp;
     if (game.player.hasArtifact("art12")) xpGain = Math.ceil(xpGain * 1.25);
     let goldGain = RNG.range(2, 5) + game.floor * 2;
@@ -737,6 +742,32 @@ export function onEnemyKilled(game, enemy) {
         });
         game.battleLog.unshift("💥 Токсичный взрыв наносит 5 чистого урона всем врагам!");
     }
+}
+
+export function handlePotentialBattleEnd(game, onStepRender) {
+    if (game.battleFinished) return true;
+    const allDead = game.enemies.every(en => en.currentHp <= 0);
+    if (!allDead) return false;
+
+    const hasDying = game.enemies.some(en => en.isDying && !en.deathAnimRendered);
+    if (hasDying) {
+        game.isProcessingTurn = true;
+        if (onStepRender) onStepRender();
+        setTimeout(() => {
+            game.enemies.forEach(en => {
+                en.isDying = false;
+            });
+            checkBattleEnd(game);
+            if (onStepRender) onStepRender();
+            game.saveGame("autosave");
+        }, 550);
+        return true;
+    }
+
+    checkBattleEnd(game);
+    if (onStepRender) onStepRender();
+    game.saveGame("autosave");
+    return true;
 }
 
 export function checkBattleEnd(game) {

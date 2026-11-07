@@ -378,8 +378,8 @@ export class Game {
         BattleSystem.tickCooldowns(this);
     }
 
-    usePotion(potIndex) {
-        BattleSystem.usePotion(this, potIndex);
+    usePotion(potIndex, onStepRender) {
+        BattleSystem.usePotion(this, potIndex, onStepRender);
     }
 
     discardPotion(potIndex) {
