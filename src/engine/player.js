@@ -2,8 +2,8 @@
 // PLAYER-MODEL.JS — Модель игрока, динамические статы, инвентарь и артефакты
 // ============================================================================
 
-import { RNG } from "./rng-service.js";
-import { GAME_DATA } from "./game-data.js";
+import { RNG } from "../utils/rng.js";
+import { GAME_DATA } from "../data/index.js";
 
 export class Player {
     constructor(classKey = "wanderer", meta = {}) {

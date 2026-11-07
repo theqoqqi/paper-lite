@@ -2,8 +2,8 @@
 // GAME-UI.JS — Отрисовка интерфейса, меню Персонажа/Скиллов и Менеджер Сейвов
 // ============================================================================
 
-import { game } from "./game-engine.js";
-import { GAME_DATA } from "./game-data.js";
+import { game } from "../engine/game-engine.js";
+import { GAME_DATA } from "../data/index.js";
 
 function el(tag, options = {}, children = []) {
     const element = document.createElement(tag);

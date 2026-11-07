@@ -1,8 +1,8 @@
-import { DATA_CLASSES, DATA_SKILLS, DATA_META_UPGRADES } from "./data/classes.js";
-import { DATA_MUTATIONS, DATA_FLOORS, DATA_ENEMIES } from "./data/enemies.js";
-import { DATA_PERKS, DATA_ITEMS } from "./data/items.js";
-import { DATA_EVENTS } from "./data/events.js";
-import { DATA_CORRIDOR_ROOMS, DATA_CORRIDOR_OUTCOMES } from "./data/corridors.js";
+import { DATA_CLASSES, DATA_SKILLS, DATA_META_UPGRADES } from "./classes.js";
+import { DATA_MUTATIONS, DATA_FLOORS, DATA_ENEMIES } from "./enemies.js";
+import { DATA_PERKS, DATA_ITEMS } from "./items.js";
+import { DATA_EVENTS } from "./events.js";
+import { DATA_CORRIDOR_ROOMS, DATA_CORRIDOR_OUTCOMES } from "./corridors.js";
 
 export const GAME_DATA = {
     classes: DATA_CLASSES,

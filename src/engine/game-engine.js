@@ -2,10 +2,10 @@
 // GAME-ENGINE.JS — Движок игры, пошаговые задержки боя, трофеи и слоты сейвов
 // ============================================================================
 
-import { RNG } from "./rng-service.js";
-import { GAME_DATA } from "./game-data.js";
+import { RNG } from "../utils/rng.js";
+import { GAME_DATA } from "../data/index.js";
 import { DungeonGenerator } from "./dungeon-generator.js";
-import { Player } from "./player-model.js";
+import { Player } from "./player.js";
 
 export class Game {
     constructor() {

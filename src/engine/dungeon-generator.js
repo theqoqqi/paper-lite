@@ -1,4 +1,4 @@
-import { RNG } from "./rng-service.js";
+import { RNG } from "../utils/rng.js";
 
 export class DungeonGenerator {
     static generate(floor = 0) {
