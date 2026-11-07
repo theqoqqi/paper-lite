@@ -2,15 +2,33 @@ import { el } from "../../utils/dom.js";
 import { game } from "../../engine/game.js";
 import { renderStatsPanel, renderEquipmentComparison } from "../components.js";
 
+const activeRowMap = new Map();
+
 export function renderBattleScreen(render) {
     game.ensureValidTarget();
     const p = game.player;
     const cds = p.cooldowns || {};
     const atk = p.getTotalAtk();
 
+    const activeFx = game.consumeBattleFx();
+    const enemyFxMap = new Map();
+    const playerFxList = [];
+    const enemyCardEntries = [];
+
+    activeFx.forEach(fx => {
+        if (fx.target === "player") {
+            playerFxList.push(fx);
+        } else if (fx.target === "enemy" && fx.enemy) {
+            if (!enemyFxMap.has(fx.enemy)) {
+                enemyFxMap.set(fx.enemy, []);
+            }
+            enemyFxMap.get(fx.enemy).push(fx);
+        }
+    });
+
     const wrap = el("div", {}, [
         el("h3", { text: `Бой — Этаж ${game.floor + 1} (Раунд ${game.battleTurn})` }),
-        renderStatsPanel(),
+        renderStatsPanel(playerFxList),
     ]);
 
     if (game.battleFinished) {
@@ -140,12 +158,21 @@ export function renderBattleScreen(render) {
 
             const infoEl = el("div", { className: "enemy-info" }, infoChildren);
 
+            const enFxList = enemyFxMap.get(en) || [];
+            const hasEnCrit = enFxList.some(f => f.isCrit);
+            const hasEnDmg = enFxList.some(f => f.type === "damage" || f.type === "crit" || f.type.endsWith("Damage"));
+
             const cardClasses = ["enemy-card"];
             if (isBossBanner || en.isBoss) cardClasses.push("boss");
             if (isEliteSprite || en.isElite) cardClasses.push("elite");
             if (isSelected) cardClasses.push("selected");
+            if (hasEnCrit) {
+                cardClasses.push("anim-crit-shake");
+            } else if (hasEnDmg) {
+                cardClasses.push("anim-shake");
+            }
 
-            enemyBox.appendChild(el("div", {
+            const cardEl = el("div", {
                 className: cardClasses.join(" "),
                 onClick: () => {
                     if (!game.isProcessingTurn) {
@@ -156,7 +183,11 @@ export function renderBattleScreen(render) {
             }, [
                 spriteEl,
                 infoEl,
-            ]));
+            ]);
+            enemyBox.appendChild(cardEl);
+            if (enFxList.length > 0) {
+                enemyCardEntries.push({ enemy: en, el: cardEl, fxList: enFxList });
+            }
         });
         wrap.appendChild(enemyBox);
 
@@ -222,5 +253,104 @@ export function renderBattleScreen(render) {
     });
     wrap.appendChild(logBox);
 
+    requestAnimationFrame(() => {
+        if (playerFxList.length > 0) {
+            const playerStatsEl = wrap.querySelector(".panel");
+            if (playerStatsEl) {
+                playerFxList.forEach(fx => spawnFloatingFx("player", playerStatsEl, fx));
+            }
+        }
+        enemyCardEntries.forEach(({ enemy, el: cardEl, fxList }) => {
+            fxList.forEach(fx => spawnFloatingFx(enemy, cardEl, fx));
+        });
+    });
+
     return wrap;
+}
+
+export function clearActiveFxRows() {
+    activeRowMap.clear();
+}
+
+function formatFxText(fx) {
+    if (fx.isCrit) {
+        return `💥 -${fx.value}!`;
+    }
+    if (fx.type === "damage") {
+        if (fx.value > 0) {
+            return fx.shieldValue > 0 ? `-${fx.value} (🛡️-${fx.shieldValue})` : `-${fx.value}`;
+        }
+        if (fx.shieldValue > 0) {
+            return `🛡️ -${fx.shieldValue}`;
+        }
+    }
+    if (fx.type === "shield") {
+        return `🛡️ +${fx.value}`;
+    }
+    if (fx.type === "heal") {
+        return `💚 +${fx.value}`;
+    }
+    if (fx.type === "poison") {
+        return `☠️ +${fx.value}`;
+    }
+    if (fx.type === "poisonDamage") {
+        return `☠️ -${fx.value}`;
+    }
+    if (fx.type === "bleed") {
+        return `🩸 +${fx.value}`;
+    }
+    if (fx.type === "bleedDamage") {
+        return `🩸 -${fx.value}`;
+    }
+    if (fx.type === "spikesDamage") {
+        return `🌵 -${fx.value}`;
+    }
+    return "";
+}
+
+function spawnFloatingFx(targetKey, targetElement, fx) {
+    const overlay = document.getElementById("fx-overlay");
+    const app = document.getElementById("app");
+    if (!overlay || !app || !targetElement) return;
+
+    const text = formatFxText(fx);
+    if (!text) return;
+
+    const now = performance.now();
+    let entry = activeRowMap.get(targetKey);
+    let rowEl = entry ? entry.rowEl : null;
+
+    if (!rowEl || !rowEl.isConnected || (now - entry.createdAt > 400)) {
+        const appRect = app.getBoundingClientRect();
+        const targetRect = targetElement.getBoundingClientRect();
+        const x = (targetRect.left - appRect.left) + targetRect.width / 2;
+        const y = (targetRect.top - appRect.top) + targetRect.height / 2;
+
+        rowEl = el("div", {
+            className: "fx-row",
+            style: {
+                left: `${x}px`,
+                top: `${y}px`,
+            },
+        });
+
+        rowEl.addEventListener("animationend", (e) => {
+            if (e.target !== rowEl) return;
+            rowEl.remove();
+            if (activeRowMap.get(targetKey)?.rowEl === rowEl) {
+                activeRowMap.delete(targetKey);
+            }
+        });
+
+        overlay.appendChild(rowEl);
+        activeRowMap.set(targetKey, { rowEl, createdAt: now });
+    }
+
+    const fxClass = (fx.type === "damage" && fx.value === 0 && fx.shieldValue > 0) ? "shield" : (fx.isCrit ? "crit" : fx.type);
+    const badgeEl = el("div", {
+        className: `fx-badge ${fxClass}`,
+        text,
+    });
+
+    rowEl.appendChild(badgeEl);
 }

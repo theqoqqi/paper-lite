@@ -7,7 +7,7 @@ import {
     renderEndScreen,
 } from "./ui/screens/menu.js";
 import { renderMapScreen } from "./ui/screens/map.js";
-import { renderBattleScreen } from "./ui/screens/battle.js";
+import { renderBattleScreen, clearActiveFxRows } from "./ui/screens/battle.js";
 import {
     renderLevelUpScreen,
     renderEventScreen,
@@ -20,6 +20,11 @@ import {
 export function render() {
     const container = document.getElementById("screen-container");
     container.replaceChildren();
+    if (game.state !== "BATTLE") {
+        const overlay = document.getElementById("fx-overlay");
+        if (overlay) overlay.replaceChildren();
+        clearActiveFxRows();
+    }
     renderGlobalNav(render);
 
     if (game.state === "MENU") {

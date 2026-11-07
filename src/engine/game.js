@@ -37,6 +37,7 @@ export class Game {
         this.pendingEquipment = null;
         this.eventRewards = null;
         this.currentCorridorResult = null;
+        this.battleFx = [];
     }
 
     init() {
@@ -405,8 +406,8 @@ export class Game {
         BattleSystem.applyWeaponEffects(this, enemy);
     }
 
-    dealDamageToEnemy(enemy, amount, ignoreDef = false) {
-        return BattleSystem.dealDamageToEnemy(this, enemy, amount, ignoreDef);
+    dealDamageToEnemy(enemy, amount, ignoreDef = false, isCrit = false) {
+        return BattleSystem.dealDamageToEnemy(this, enemy, amount, ignoreDef, isCrit);
     }
 
     onEnemyKilled(enemy) {
@@ -419,6 +420,16 @@ export class Game {
 
     proceedAfterBattle() {
         BattleSystem.proceedAfterBattle(this);
+    }
+
+    addBattleFx(fx) {
+        this.battleFx.push(fx);
+    }
+
+    consumeBattleFx() {
+        const list = this.battleFx;
+        this.battleFx = [];
+        return list;
     }
 }
 

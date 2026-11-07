@@ -163,6 +163,7 @@ export function usePotion(game, potIndex) {
         game.player.heal(12 + alchBonus);
         game.player.poison = 0;
         game.player.bleed = 0;
+        game.addBattleFx({ target: "player", type: "heal", value: 12 + alchBonus });
         if (game.state === "BATTLE") game.battleLog.unshift(`🧪 Зелье Исцеления (+${12 + alchBonus} HP, очищение).`);
     } else if (pot.id === "pot2") {
         game.player.en += 3;
@@ -171,33 +172,40 @@ export function usePotion(game, potIndex) {
     } else if (pot.id === "pot3") {
         game.battleLog.unshift("🧪 Взрывная Колба (11 чистого урона всем)!");
         game.enemies.forEach(en => {
-            if (en.currentHp > 0) dealDamageToEnemy(game, en, 11, true);
+            if (en.currentHp > 0) dealDamageToEnemy(game, en, 11, true, false);
         });
     } else if (pot.id === "pot4") {
         game.player.addShield(10);
+        game.addBattleFx({ target: "player", type: "shield", value: 10 });
         game.battleLog.unshift("🧪 Каменный Отвар (+10 Щита).");
     } else if (pot.id === "pot5") {
         game.enemies.forEach(en => {
             if (en.currentHp > 0) {
                 en.poison += 4;
                 en.bleed += 2;
+                game.addBattleFx({ target: "enemy", enemy: en, type: "poison", value: 4 });
+                game.addBattleFx({ target: "enemy", enemy: en, type: "bleed", value: 2 });
             }
         });
         game.battleLog.unshift("🧪 Ядовитый Флакон (+4 Яда и +2 Кровотока всем)!");
     } else if (pot.id === "pot6") {
         game.player.heal(8 + alchBonus);
         game.player.concentrateBonus += 4;
+        game.addBattleFx({ target: "player", type: "heal", value: 8 + alchBonus });
         if (game.state === "BATTLE") game.battleLog.unshift(`🧪 Кровь Дракона (+${8 + alchBonus} HP, +4 к след. атаке).`);
     } else if (pot.id === "pot7") {
         game.player.addShield(6);
         game.player.tempSpikes += 4;
+        game.addBattleFx({ target: "player", type: "shield", value: 6 });
         game.battleLog.unshift("🧪 Эликсир Железной Кожи (+6 Щита, +4 Шипов).");
     } else if (pot.id === "pot8") {
         game.player.heal(6 + alchBonus);
         game.player.poison = 0;
         game.player.bleed = 0;
+        game.addBattleFx({ target: "player", type: "heal", value: 6 + alchBonus });
         if (game.state === "BATTLE") {
             game.player.addShield(5);
+            game.addBattleFx({ target: "player", type: "shield", value: 5 });
             game.battleLog.unshift(`🧪 Очищающий Бальзам (+${6 + alchBonus} HP, очищение, +5 Щита).`);
         }
     } else if (pot.id === "pot9") {
@@ -263,12 +271,18 @@ export function playerAction(game, actionType, onStepRender) {
             const critMult = game.player.perks.includes("p35") ? 3.0 : 1.65;
             dmg = Math.round(dmg * critMult);
             game.player.en = Math.min(game.player.getTotalMaxEn(), game.player.en + 1);
-            if (game.player.perks.includes("p11")) game.player.heal(3);
+            if (game.player.perks.includes("p11")) {
+                game.player.heal(3);
+                game.addBattleFx({ target: "player", type: "heal", value: 3 });
+            }
             if (game.player.perks.includes("p32")) target.def = Math.max(0, target.def - 1);
         }
         applyWeaponEffects(game, target);
-        if (game.player.perks.includes("p7")) target.poison += 1;
-        const dealt = dealDamageToEnemy(game, target, dmg, ignoreAllDef);
+        if (game.player.perks.includes("p7")) {
+            target.poison += 1;
+            game.addBattleFx({ target: "enemy", enemy: target, type: "poison", value: 1 });
+        }
+        const dealt = dealDamageToEnemy(game, target, dmg, ignoreAllDef, isCrit);
         checkEnemySpikes(game, target);
         game.battleLog.unshift(`⚔️ Быстрый удар по ${target.name}${isCrit ? " (КРИТ!)" : ""}: ${dealt} урона.`);
         game.player.concentrateBonus = 0;
@@ -278,6 +292,7 @@ export function playerAction(game, actionType, onStepRender) {
         if (game.player.classId === "crusader") game.player.tempSpikes += 3;
         if (game.player.perks.includes("p14")) game.player.tempSpikes += 3;
         game.player.addShield(shieldGain);
+        game.addBattleFx({ target: "player", type: "shield", value: shieldGain });
         game.player.damageReduction50 = true;
         game.player.bleed = 0;
         game.player.poison = 0;
@@ -292,6 +307,14 @@ export function playerAction(game, actionType, onStepRender) {
         const execDmg = Math.round(2 + atkVal * 0.5) + (game.player.perks.includes("p1") ? 4 : 0);
         const hpBefore = target.currentHp;
         target.currentHp = Math.max(0, target.currentHp - execDmg);
+        const dealtExec = hpBefore - target.currentHp;
+        game.addBattleFx({
+            target: "enemy",
+            enemy: target,
+            type: "crit",
+            value: dealtExec,
+            isCrit: true,
+        });
         if (target.currentHp <= 0) {
             onEnemyKilled(game, target);
             game.battleLog.unshift(`💀 Казнь ${target.name}: ${hpBefore} чистого урона — ДОБИТ! Ход не тратится!`);
@@ -309,9 +332,21 @@ export function playerAction(game, actionType, onStepRender) {
         const prcRaw = atkVal + RNG.range(3, 7);
         const prcDef = ignoreAllDef ? 0 : Math.max(0, target.def - (game.player.hasArtifact("art3") ? 1 : 0));
         const prcActual = Math.max(1, prcRaw - prcDef);
-        if (game.player.perks.includes("p8")) target.bleed += 2;
+        if (game.player.perks.includes("p8")) {
+            target.bleed += 2;
+            game.addBattleFx({ target: "enemy", enemy: target, type: "bleed", value: 2 });
+        }
         target.currentHp = Math.max(0, target.currentHp - prcActual);
-        if (prcActual > 0 && game.player.hasArtifact("art17")) game.player.heal(1);
+        game.addBattleFx({
+            target: "enemy",
+            enemy: target,
+            type: "damage",
+            value: prcActual,
+        });
+        if (prcActual > 0 && game.player.hasArtifact("art17")) {
+            game.player.heal(1);
+            game.addBattleFx({ target: "player", type: "heal", value: 1 });
+        }
         if (target.currentHp <= 0) onEnemyKilled(game, target);
         applyWeaponEffects(game, target);
         checkEnemySpikes(game, target);
@@ -328,8 +363,11 @@ export function playerAction(game, actionType, onStepRender) {
         game.enemies.forEach(en => {
             if (en.currentHp > 0) {
                 applyWeaponEffects(game, en);
-                if (game.player.perks.includes("p7")) en.poison += 1;
-                dealDamageToEnemy(game, en, dmg, isArcanist || ignoreAllDef);
+                if (game.player.perks.includes("p7")) {
+                    en.poison += 1;
+                    game.addBattleFx({ target: "enemy", enemy: en, type: "poison", value: 1 });
+                }
+                dealDamageToEnemy(game, en, dmg, isArcanist || ignoreAllDef, false);
             }
         });
         game.player.concentrateBonus = 0;
@@ -338,6 +376,7 @@ export function playerAction(game, actionType, onStepRender) {
         game.player.en = Math.min(game.player.getTotalMaxEn(), game.player.en + 2);
         let healAmt = game.player.perks.includes("p9") ? 7 : 4;
         game.player.heal(healAmt);
+        game.addBattleFx({ target: "player", type: "heal", value: healAmt });
         for (const skillKey of Object.keys(game.player.cooldowns)) {
             if (game.player.cooldowns[skillKey] > 0) {
                 game.player.cooldowns[skillKey]--;
@@ -345,6 +384,7 @@ export function playerAction(game, actionType, onStepRender) {
         }
         if (game.player.hasArtifact("art10")) {
             game.player.addShield(4);
+            game.addBattleFx({ target: "player", type: "shield", value: 4 });
         }
         game.player.cooldowns.concentrate = 4;
         game.battleLog.unshift(`🧘 Концентрация (+2 EN, +${healAmt} HP, -1 ход ко всем КД).`);
@@ -352,6 +392,7 @@ export function playerAction(game, actionType, onStepRender) {
 
     if (["fast", "heavy", "pierce", "whirlwind"].includes(actionType) && game.player.bleed > 0) {
         game.player.hp = Math.max(0, game.player.hp - game.player.bleed);
+        game.addBattleFx({ target: "player", type: "bleedDamage", value: game.player.bleed });
         game.battleLog.unshift(`🩸 Кровотечение отнимает у вас ${game.player.bleed} HP!`);
     }
 
@@ -379,7 +420,8 @@ export function runEnemyTurnSequence(game, onStepRender) {
 
     steps.push(() => {
         if (game.player.poison > 0) {
-            game.player.takeDamage(game.player.poison, true);
+            const pDmg = game.player.takeDamage(game.player.poison, true);
+            game.addBattleFx({ target: "player", type: "poisonDamage", value: pDmg });
             game.battleLog.unshift(`☠️ Яд наносит вам ${game.player.poison} урона.`);
             game.player.poison--;
         }
@@ -404,15 +446,18 @@ export function runEnemyTurnSequence(game, onStepRender) {
             const aliveEnemies = game.enemies.filter(e => e.currentHp > 0);
             if (aliveEnemies.length > 0) {
                 const rndEn = RNG.choice(aliveEnemies);
-                dealDamageToEnemy(game, rndEn, 3, true);
+                dealDamageToEnemy(game, rndEn, 3, true, false);
                 game.battleLog.unshift(`⚙️ Авто-турель стреляет по ${rndEn.name} (3 чистого урона).`);
             }
         }
 
-        if (game.player.hasArtifact("art7")) game.player.heal(2);
+        if (game.player.hasArtifact("art7")) {
+            game.player.heal(2);
+            game.addBattleFx({ target: "player", type: "heal", value: 2 });
+        }
         if (game.player.hasArtifact("art8")) {
             game.enemies.forEach(en => {
-                if (en.currentHp > 0) dealDamageToEnemy(game, en, 3, true);
+                if (en.currentHp > 0) dealDamageToEnemy(game, en, 3, true, false);
             });
         }
 
@@ -462,9 +507,23 @@ export function runEnemyTurnSequence(game, onStepRender) {
 export function executeSingleEnemyTurn(game, en) {
     const enrageBonus = game.battleTurn >= 10 ? (game.battleTurn - 9) * 2 : 0;
 
+    const hitPlayer = (val, isPierce = false) => {
+        const shieldBefore = game.player.shield;
+        const taken = game.player.takeDamage(val, isPierce);
+        const shieldLost = Math.max(0, shieldBefore - game.player.shield);
+        game.addBattleFx({
+            target: "player",
+            type: "damage",
+            value: taken,
+            shieldValue: shieldLost,
+        });
+        return taken;
+    };
+
     if (en.poison > 0) {
         const pDmg = en.poison + (game.player.perks.includes("p16") ? 2 : 0);
         en.currentHp = Math.max(0, en.currentHp - pDmg);
+        game.addBattleFx({ target: "enemy", enemy: en, type: "poisonDamage", value: pDmg });
         game.battleLog.unshift(`☠️ ${en.name} теряет ${pDmg} HP от яда.`);
         en.poison--;
         if (en.currentHp <= 0) {
@@ -474,7 +533,12 @@ export function executeSingleEnemyTurn(game, en) {
     }
 
     if (en.regen > 0) {
+        const hpBefore = en.currentHp;
         en.currentHp = Math.min(en.hp, en.currentHp + en.regen);
+        const healed = en.currentHp - hpBefore;
+        if (healed > 0) {
+            game.addBattleFx({ target: "enemy", enemy: en, type: "heal", value: healed });
+        }
     }
 
     const patList = en.pattern || [{ type: "attack", val: 4, text: "Атака" }];
@@ -484,6 +548,7 @@ export function executeSingleEnemyTurn(game, en) {
 
     if (en.bleed > 0 && pat.val > 0) {
         en.currentHp = Math.max(0, en.currentHp - en.bleed);
+        game.addBattleFx({ target: "enemy", enemy: en, type: "bleedDamage", value: en.bleed });
         game.battleLog.unshift(`🩸 ${en.name} истекает кровью (-${en.bleed} HP).`);
         if (en.currentHp <= 0) {
             onEnemyKilled(game, en);
@@ -494,49 +559,73 @@ export function executeSingleEnemyTurn(game, en) {
     const baseVal = pat.val ? RNG.spread(pat.val + (en.atkBonus || 0) + enrageBonus, 0.15) : 0;
 
     if (pat.type === "attack") {
-        const taken = game.player.takeDamage(baseVal);
+        const taken = hitPlayer(baseVal);
         game.battleLog.unshift(`👹 ${en.name}: ${pat.text} -> вам ${taken} урона.`);
     } else if (pat.type === "pierce") {
-        const taken = game.player.takeDamage(baseVal, true);
+        const taken = hitPlayer(baseVal, true);
         game.battleLog.unshift(`👹 ${en.name}: ${pat.text} -> вам ${taken} чистого урона!`);
     } else if (pat.type === "attackPoison") {
-        const taken = game.player.takeDamage(baseVal);
-        game.player.poison += (pat.poison || 1);
+        const taken = hitPlayer(baseVal);
+        const pAmt = pat.poison || 1;
+        game.player.poison += pAmt;
+        game.addBattleFx({ target: "player", type: "poison", value: pAmt });
         game.battleLog.unshift(`👹 ${en.name}: ${pat.text} -> ${taken} урона и Яд!`);
     } else if (pat.type === "attackBleed") {
-        const taken = game.player.takeDamage(baseVal);
-        game.player.bleed += (pat.bleed || 1);
+        const taken = hitPlayer(baseVal);
+        const bAmt = pat.bleed || 1;
+        game.player.bleed += bAmt;
+        game.addBattleFx({ target: "player", type: "bleed", value: bAmt });
         game.battleLog.unshift(`👹 ${en.name}: ${pat.text} -> ${taken} урона и Кровоток!`);
     } else if (pat.type === "defendAttack") {
         en.shield += (pat.shield || 4);
-        const taken = game.player.takeDamage(baseVal);
+        game.addBattleFx({ target: "enemy", enemy: en, type: "shield", value: pat.shield || 4 });
+        const taken = hitPlayer(baseVal);
         game.battleLog.unshift(`👹 ${en.name}: +${pat.shield || 4} Щит и удар на ${taken} урона.`);
     } else if (pat.type === "vampire") {
-        const taken = game.player.takeDamage(baseVal);
+        const taken = hitPlayer(baseVal);
         en.currentHp = Math.min(en.hp, en.currentHp + taken);
+        if (taken > 0) {
+            game.addBattleFx({ target: "enemy", enemy: en, type: "heal", value: taken });
+        }
         game.battleLog.unshift(`👹 ${en.name}: укус на ${taken} урона и лечение!`);
     } else if (pat.type === "drainEn") {
-        const taken = game.player.takeDamage(baseVal);
+        const taken = hitPlayer(baseVal);
         game.player.en = Math.max(0, game.player.en - 1);
         game.battleLog.unshift(`👹 ${en.name}: ${taken} урона и -1 Энергия!`);
     } else if (pat.type === "heal" || pat.type === "shieldHeal") {
-        if (pat.val) en.currentHp = Math.min(en.hp, en.currentHp + pat.val);
-        if (pat.shield) en.shield += pat.shield;
+        if (pat.val) {
+            en.currentHp = Math.min(en.hp, en.currentHp + pat.val);
+            game.addBattleFx({ target: "enemy", enemy: en, type: "heal", value: pat.val });
+        }
+        if (pat.shield) {
+            en.shield += pat.shield;
+            game.addBattleFx({ target: "enemy", enemy: en, type: "shield", value: pat.shield });
+        }
         game.battleLog.unshift(`👹 ${en.name}: ${pat.text}.`);
     } else if (pat.type === "charge") {
         game.battleLog.unshift(`⚠️ ${en.name}: ${pat.text}`);
     }
 
     if (pat.val > 0) {
-        if (en.poisonOnHit) game.player.poison += en.poisonOnHit;
-        if (en.bleedOnHit) game.player.bleed += en.bleedOnHit;
-        if (game.player.hasArtifact("art15") && en.currentHp > 0) en.poison += 2;
+        if (en.poisonOnHit) {
+            game.player.poison += en.poisonOnHit;
+            game.addBattleFx({ target: "player", type: "poison", value: en.poisonOnHit });
+        }
+        if (en.bleedOnHit) {
+            game.player.bleed += en.bleedOnHit;
+            game.addBattleFx({ target: "player", type: "bleed", value: en.bleedOnHit });
+        }
+        if (game.player.hasArtifact("art15") && en.currentHp > 0) {
+            en.poison += 2;
+            game.addBattleFx({ target: "enemy", enemy: en, type: "poison", value: 2 });
+        }
     }
 
     if (pat.val > 0 && game.player.getTotalSpikes() > 0 && en.currentHp > 0) {
         let spk = game.player.getTotalSpikes();
         if (game.player.perks.includes("p34") && en.bleed > 0) spk *= 2;
         en.currentHp = Math.max(0, en.currentHp - spk);
+        game.addBattleFx({ target: "enemy", enemy: en, type: "spikesDamage", value: spk });
         game.battleLog.unshift(`🌵 Ваши Шипы ранят ${en.name} на ${spk} HP!`);
         if (en.currentHp <= 0) onEnemyKilled(game, en);
     }
@@ -544,7 +633,15 @@ export function executeSingleEnemyTurn(game, en) {
 
 export function checkEnemySpikes(game, enemy) {
     if (enemy && enemy.spikes > 0) {
-        game.player.takeDamage(enemy.spikes, true);
+        const shieldBefore = game.player.shield;
+        const taken = game.player.takeDamage(enemy.spikes, true);
+        const shieldLost = Math.max(0, shieldBefore - game.player.shield);
+        game.addBattleFx({
+            target: "player",
+            type: "spikesDamage",
+            value: taken,
+            shieldValue: shieldLost,
+        });
         game.battleLog.unshift(`🌵 Шипы врага (${enemy.name}) ранят вас на ${enemy.spikes} HP!`);
     }
 }
@@ -552,11 +649,17 @@ export function checkEnemySpikes(game, enemy) {
 export function applyWeaponEffects(game, enemy) {
     const w = game.player.inventory.weapon;
     if (!w) return;
-    if (w.poison) enemy.poison += w.poison;
-    if (w.bleed) enemy.bleed += w.bleed;
+    if (w.poison) {
+        enemy.poison += w.poison;
+        game.addBattleFx({ target: "enemy", enemy, type: "poison", value: w.poison });
+    }
+    if (w.bleed) {
+        enemy.bleed += w.bleed;
+        game.addBattleFx({ target: "enemy", enemy, type: "bleed", value: w.bleed });
+    }
 }
 
-export function dealDamageToEnemy(game, enemy, amount, ignoreDef = false) {
+export function dealDamageToEnemy(game, enemy, amount, ignoreDef = false, isCrit = false) {
     if (game.player.perks.includes("p3") && enemy.currentHp <= enemy.hp / 2) {
         amount += 4;
     }
@@ -566,18 +669,30 @@ export function dealDamageToEnemy(game, enemy, amount, ignoreDef = false) {
     }
 
     let actual = ignoreDef ? amount : Math.max(1, amount - enemyDef);
+    let shieldAbsorbed = 0;
     if (enemy.shield > 0) {
         if (enemy.shield >= actual) {
+            shieldAbsorbed = actual;
             enemy.shield -= actual;
             actual = 0;
         } else {
+            shieldAbsorbed = enemy.shield;
             actual -= enemy.shield;
             enemy.shield = 0;
         }
     }
     enemy.currentHp = Math.max(0, enemy.currentHp - actual);
+    game.addBattleFx({
+        target: "enemy",
+        enemy,
+        type: isCrit ? "crit" : "damage",
+        value: actual,
+        shieldValue: shieldAbsorbed,
+        isCrit,
+    });
     if (actual > 0 && game.player.hasArtifact("art17")) {
         game.player.heal(1);
+        game.addBattleFx({ target: "player", type: "heal", value: 1 });
     }
     if (enemy.currentHp <= 0) {
         onEnemyKilled(game, enemy);

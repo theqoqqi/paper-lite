@@ -21,6 +21,7 @@
             }
 
             #app {
+                position: relative;
                 width: 100%;
                 max-width: 480px;
                 background: #1a1a1a;
@@ -90,6 +91,7 @@
             }
 
             .panel {
+                position: relative;
                 background: #242424;
                 padding: 10px;
                 border-radius: 5px;
@@ -161,6 +163,7 @@
             }
 
             .enemy-card {
+                position: relative;
                 padding: 0;
                 margin-bottom: 6px;
                 cursor: pointer;
@@ -387,12 +390,157 @@
                 margin-bottom: 4px;
                 border-radius: 4px;
             }
+
+            #fx-overlay {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                pointer-events: none;
+                overflow: hidden;
+                z-index: 50;
+            }
+
+            .fx-row {
+                position: absolute;
+                transform: translate(-50%, -50%);
+                display: flex;
+                flex-direction: row;
+                align-items: center;
+                justify-content: center;
+                gap: 6px;
+                pointer-events: none;
+                white-space: nowrap;
+                user-select: none;
+                animation: fx-row-float-up 1100ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            }
+
+            .fx-badge {
+                font-family: inherit;
+                font-weight: 900;
+                text-shadow: 0 2px 4px rgba(0, 0, 0, 0.95), 0 0 6px rgba(0, 0, 0, 0.9);
+                animation: fx-badge-pop 160ms cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
+                pointer-events: none;
+                white-space: nowrap;
+                user-select: none;
+            }
+
+            .fx-badge.damage {
+                color: #ff5252;
+                font-size: 20px;
+            }
+
+            .fx-badge.crit {
+                color: #ffd700;
+                font-size: 24px;
+                letter-spacing: 1px;
+            }
+
+            .fx-badge.shield {
+                color: #4fc3f7;
+                font-size: 18px;
+            }
+
+            .fx-badge.heal {
+                color: #69f0ae;
+                font-size: 20px;
+            }
+
+            .fx-badge.poison {
+                color: #b2ff59;
+                font-size: 18px;
+            }
+
+            .fx-badge.poisonDamage {
+                color: #76ff03;
+                font-size: 19px;
+            }
+
+            .fx-badge.bleed {
+                color: #ff5252;
+                font-size: 18px;
+            }
+
+            .fx-badge.bleedDamage {
+                color: #ff1744;
+                font-size: 19px;
+            }
+
+            .fx-badge.spikesDamage {
+                color: #e0e050;
+                font-size: 19px;
+            }
+
+            @keyframes fx-row-float-up {
+                0% {
+                    transform: translate(-50%, calc(-50% + 10px)) scale(0.85);
+                    opacity: 0;
+                }
+                12% {
+                    transform: translate(-50%, calc(-50% - 6px)) scale(1);
+                    opacity: 1;
+                }
+                25% {
+                    transform: translate(-50%, calc(-50% - 14px)) scale(1);
+                    opacity: 1;
+                }
+                75% {
+                    transform: translate(-50%, calc(-50% - 32px)) scale(1);
+                    opacity: 0.95;
+                }
+                100% {
+                    transform: translate(-50%, calc(-50% - 48px)) scale(0.92);
+                    opacity: 0;
+                }
+            }
+
+            @keyframes fx-badge-pop {
+                0% {
+                    transform: scale(0.5);
+                    opacity: 0;
+                }
+                70% {
+                    transform: scale(1.15);
+                    opacity: 1;
+                }
+                100% {
+                    transform: scale(1);
+                    opacity: 1;
+                }
+            }
+
+            .anim-shake {
+                animation: fx-shake 260ms ease-in-out;
+            }
+
+            .anim-crit-shake {
+                animation: fx-crit-shake 320ms ease-in-out;
+            }
+
+            @keyframes fx-shake {
+                0%, 100% { transform: translateX(0); }
+                20% { transform: translateX(-5px); }
+                40% { transform: translateX(5px); }
+                60% { transform: translateX(-3px); }
+                80% { transform: translateX(3px); }
+            }
+
+            @keyframes fx-crit-shake {
+                0%, 100% { transform: translate(0, 0); }
+                15% { transform: translate(-7px, -2px); }
+                30% { transform: translate(6px, 2px); }
+                45% { transform: translate(-5px, 1px); }
+                60% { transform: translate(4px, -1px); }
+                75% { transform: translate(-2px, 0); }
+            }
         </style>
     </head>
     <body>
 
         <div id='app'>
             <div id='screen-container'></div>
+            <div id='fx-overlay'></div>
             <div id='global-nav' style='margin-top: 10px; border-top: 1px solid #333; padding-top: 8px;'></div>
         </div>
 

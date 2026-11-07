@@ -2,7 +2,7 @@ import { el } from "../utils/dom.js";
 import { game } from "../engine/game.js";
 import { openCharacterModal, openSaveManagerModal } from "./modals.js";
 
-export function renderStatsPanel() {
+export function renderStatsPanel(playerFxList = []) {
     const p = game.player;
     const maxHp = p.getTotalMaxHp();
     const maxEn = p.getTotalMaxEn();
@@ -14,7 +14,7 @@ export function renderStatsPanel() {
     if (p.bleed > 0) statusTags.push(`🩸Кровь:${p.bleed}`);
     if (p.concentrateBonus > 0) statusTags.push(`🔥Усил:+${p.concentrateBonus}`);
 
-    return el("div", { className: "panel" }, [
+    const panelChildren = [
         el("div", { className: "stats-line" }, [
             el("b", { text: `${p.className} (Ур. ${p.level})` }),
             el("span", { text: `XP: ${p.xp}/${p.getRequiredXp()} | 💰 ${p.gold}G` }),
@@ -34,7 +34,14 @@ export function renderStatsPanel() {
             className: "equip-line",
             text: `⚔️ ${wName} | 🛡️ ${aName} | 💍 Артефактов: ${p.inventory.artifacts.length} | ⭐ Перков: ${p.perks.length}`,
         }),
-    ]);
+    ];
+
+    const panelClasses = ["panel"];
+    if (playerFxList.some(f => f.type === "damage" || f.type.endsWith("Damage"))) {
+        panelClasses.push("anim-shake");
+    }
+
+    return el("div", { className: panelClasses.join(" ") }, panelChildren);
 }
 
 export function renderGlobalNav(render) {
