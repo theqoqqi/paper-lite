@@ -62,12 +62,38 @@ export function renderBattleScreen(render) {
             const nextPat = en.pattern[(en.patternIndex || 0) % en.pattern.length];
             const previewVal = nextPat.val ? nextPat.val + (en.atkBonus || 0) : 0;
 
-            const statusParts = [];
-            if (en.shield > 0) statusParts.push(`Щит:${en.shield}`);
-            if (en.spikes > 0) statusParts.push(`Шипы:${en.spikes}`);
-            if (en.poison > 0) statusParts.push(`Яд:${en.poison}`);
-            if (en.bleed > 0) statusParts.push(`Кровь:${en.bleed}`);
-            if (en.regen > 0) statusParts.push(`Реген:${en.regen}`);
+            const extraStats = [];
+            if (en.def > 0) extraStats.push(`🛡️ ${en.def}`);
+            if (en.poison > 0) extraStats.push(`☠️ ${en.poison}`);
+            if (en.bleed > 0) extraStats.push(`🩸 ${en.bleed}`);
+            if (en.spikes > 0) extraStats.push(`🌵 ${en.spikes}`);
+            if (en.regen > 0) extraStats.push(`💚 ${en.regen}`);
+
+            const statChildren = [
+                `❤️ ${en.currentHp}`,
+            ];
+            if (en.shield > 0) {
+                statChildren.push(el("span", {
+                    style: { color: "#888888" },
+                    text: ` (+${en.shield})`,
+                }));
+            }
+            if (extraStats.length > 0) {
+                statChildren.push(` | ${extraStats.join(" | ")}`);
+            }
+
+            const infoEl = el("div", { className: "enemy-info" }, [
+                el("div", {
+                    className: "enemy-name",
+                    style: { color: isSelected ? "#ef5350" : "#ffffff" },
+                    text: en.name,
+                }),
+                el("div", { className: "enemy-stats" }, statChildren),
+                el("div", {
+                    className: "enemy-intent",
+                    text: `${nextPat.text}${previewVal > 0 ? ` (~${previewVal} ур.)` : ""}`,
+                }),
+            ]);
 
             enemyBox.appendChild(el("div", {
                 className: `enemy-card ${isSelected ? "selected" : ""}`,
@@ -78,15 +104,7 @@ export function renderBattleScreen(render) {
                     }
                 },
             }, [
-                el("div", { className: "stats-line" }, [
-                    el("b", { text: `${isSelected ? "🎯 " : ""}${en.name}` }),
-                    el("span", { text: `❤️ ${en.currentHp}/${en.hp} | DEF:${en.def}` }),
-                ]),
-                statusParts.length > 0 ? el("div", { className: "enemy-status", text: statusParts.join(" | ") }) : null,
-                el("div", {
-                    className: "enemy-intent",
-                    text: `Намерение: ${nextPat.text}${previewVal > 0 ? ` (~${previewVal} ур.)` : ""}`,
-                }),
+                infoEl,
             ]));
         });
         wrap.appendChild(enemyBox);
