@@ -6,13 +6,28 @@ export function renderStatsPanel(playerFxList = []) {
     const p = game.player;
     const maxHp = p.getTotalMaxHp();
     const maxEn = p.getTotalMaxEn();
-    const wName = p.inventory.weapon ? `${p.inventory.weapon.name}${p.weaponUpgradeLvl ? ` (+${p.weaponUpgradeLvl})` : ""}` : `Кулаки (+${p.weaponUpgradeLvl})`;
-    const aName = p.inventory.armor ? `${p.inventory.armor.name}${p.armorUpgradeLvl ? ` (+${p.armorUpgradeLvl})` : ""}` : `Лохмотья (+${p.armorUpgradeLvl})`;
 
     const statusTags = [];
     if (p.poison > 0) statusTags.push(`☠️Яд:${p.poison}`);
     if (p.bleed > 0) statusTags.push(`🩸Кровь:${p.bleed}`);
     if (p.concentrateBonus > 0) statusTags.push(`🔥Усил:+${p.concentrateBonus}`);
+
+    const combatStats = [
+        `⚔️ ${p.getTotalAtk()}`,
+        `🛡️ ${p.getTotalDef()}`,
+        `🎯 ${p.getCritChance()}%`,
+    ];
+    if (p.getTotalSpikes() > 0) {
+        combatStats.push(`🌵 ${p.getTotalSpikes()}`);
+    }
+
+    const combatChildren = [];
+    combatStats.forEach((st, idx) => {
+        if (idx > 0) {
+            combatChildren.push(el("span", { className: "stat-divider" }));
+        }
+        combatChildren.push(st);
+    });
 
     const panelChildren = [
         el("div", { className: "stats-line" }, [
@@ -24,16 +39,12 @@ export function renderStatsPanel(playerFxList = []) {
             el("span", { text: `⚡ EN: ${p.en}/${maxEn}` }),
         ]),
         el("div", { className: "stats-line" }, [
-            el("span", { text: `⚔️ ATK: ${p.getTotalAtk()} | 🛡️ DEF: ${p.getTotalDef()} | 🎯 Крит: ${p.getCritChance()}% | 🌵 Шипы: ${p.getTotalSpikes()}` }),
+            el("span", {}, combatChildren),
         ]),
         statusTags.length > 0 ? el("div", {
             style: { color: "#ff8a65", fontSize: "12px" },
             text: `Статусы: ${statusTags.join(" ")}`,
         }) : null,
-        el("div", {
-            className: "equip-line",
-            text: `⚔️ ${wName} | 🛡️ ${aName} | 💍 Артефактов: ${p.inventory.artifacts.length} | ⭐ Перков: ${p.perks.length}`,
-        }),
     ];
 
     const panelClasses = ["panel"];
