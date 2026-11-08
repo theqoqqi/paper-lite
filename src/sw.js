@@ -32,8 +32,38 @@ self.addEventListener("message", (event) => {
     }
 });
 
+const isDev = (
+    self.location.hostname === "localhost"
+    || self.location.hostname === "127.0.0.1"
+    || self.location.hostname.startsWith("192.168.")
+    || self.location.hostname.startsWith("10.")
+    || self.location.hostname.endsWith(".local")
+);
+
 self.addEventListener("fetch", (event) => {
     if (event.request.method !== "GET") return;
+
+    if (isDev) {
+        event.respondWith(
+            fetch(event.request)
+                .then((networkResponse) => {
+                    if (networkResponse && networkResponse.status === 200) {
+                        const clone = networkResponse.clone();
+                        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+                    }
+                    return networkResponse;
+                })
+                .catch(() => {
+                    return caches.match(event.request).then((cached) => {
+                        if (cached) return cached;
+                        if (event.request.mode === "navigate") {
+                            return caches.match("./index.html");
+                        }
+                    });
+                }),
+        );
+        return;
+    }
 
     event.respondWith(
         caches.match(event.request).then((cachedResponse) => {
