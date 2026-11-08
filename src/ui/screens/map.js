@@ -276,6 +276,90 @@ export function renderMapScreen(render) {
                     corridorLayer.appendChild(corridorEl);
                 }
             }
+
+            if (dx === 2 && room.doors.right) {
+                const outsideRoom = game.dungeonRooms[`${rx + 1},${ry}`];
+                if (outsideRoom && outsideRoom.doors.left && (room.visited || (room.visible && outsideRoom.visited))) {
+                    corridorLayer.appendChild(el("div", {
+                        style: {
+                            position: "absolute",
+                            left: `${cellLeft + cellW}px`,
+                            top: `${cellTop + (cellH - CORRIDOR_W) / 2}px`,
+                            width: `${GAP}px`,
+                            height: `${CORRIDOR_W}px`,
+                            background: "#1a1a1a",
+                            borderTop: "1px solid #444444",
+                            borderBottom: "1px solid #444444",
+                            maskImage: "linear-gradient(to right, #000 15%, transparent 85%)",
+                            webkitMaskImage: "linear-gradient(to right, #000 15%, transparent 85%)",
+                            boxSizing: "border-box",
+                        },
+                    }));
+                }
+            }
+
+            if (dx === -2 && room.doors.left) {
+                const outsideRoom = game.dungeonRooms[`${rx - 1},${ry}`];
+                if (outsideRoom && outsideRoom.doors.right && (room.visited || (room.visible && outsideRoom.visited))) {
+                    corridorLayer.appendChild(el("div", {
+                        style: {
+                            position: "absolute",
+                            left: `${cellLeft - GAP}px`,
+                            top: `${cellTop + (cellH - CORRIDOR_W) / 2}px`,
+                            width: `${GAP}px`,
+                            height: `${CORRIDOR_W}px`,
+                            background: "#1a1a1a",
+                            borderTop: "1px solid #444444",
+                            borderBottom: "1px solid #444444",
+                            maskImage: "linear-gradient(to left, #000 15%, transparent 85%)",
+                            webkitMaskImage: "linear-gradient(to left, #000 15%, transparent 85%)",
+                            boxSizing: "border-box",
+                        },
+                    }));
+                }
+            }
+
+            if (dy === -2 && room.doors.up) {
+                const outsideRoom = game.dungeonRooms[`${rx},${ry - 1}`];
+                if (outsideRoom && outsideRoom.doors.down && (room.visited || (room.visible && outsideRoom.visited))) {
+                    corridorLayer.appendChild(el("div", {
+                        style: {
+                            position: "absolute",
+                            left: `${cellLeft + (cellW - CORRIDOR_W) / 2}px`,
+                            top: `${cellTop - GAP}px`,
+                            width: `${CORRIDOR_W}px`,
+                            height: `${GAP}px`,
+                            background: "#1a1a1a",
+                            borderLeft: "1px solid #444444",
+                            borderRight: "1px solid #444444",
+                            maskImage: "linear-gradient(to top, #000 15%, transparent 85%)",
+                            webkitMaskImage: "linear-gradient(to top, #000 15%, transparent 85%)",
+                            boxSizing: "border-box",
+                        },
+                    }));
+                }
+            }
+
+            if (dy === 2 && room.doors.down) {
+                const outsideRoom = game.dungeonRooms[`${rx},${ry + 1}`];
+                if (outsideRoom && outsideRoom.doors.up && (room.visited || (room.visible && outsideRoom.visited))) {
+                    corridorLayer.appendChild(el("div", {
+                        style: {
+                            position: "absolute",
+                            left: `${cellLeft + (cellW - CORRIDOR_W) / 2}px`,
+                            top: `${cellTop + cellH}px`,
+                            width: `${CORRIDOR_W}px`,
+                            height: `${GAP}px`,
+                            background: "#1a1a1a",
+                            borderLeft: "1px solid #444444",
+                            borderRight: "1px solid #444444",
+                            maskImage: "linear-gradient(to bottom, #000 15%, transparent 85%)",
+                            webkitMaskImage: "linear-gradient(to bottom, #000 15%, transparent 85%)",
+                            boxSizing: "border-box",
+                        },
+                    }));
+                }
+            }
         });
     });
 
