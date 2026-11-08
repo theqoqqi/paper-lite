@@ -1,0 +1,12 @@
+{
+    "name": "Хроники Клетчатой Бездны",
+    "short_name": "Paper Lite",
+    "description": "Пошаговый процедурный rogue-lite RPG",
+    "start_url": "./",
+    "scope": "./",
+    "display": "standalone",
+    "orientation": "portrait",
+    "background_color": "#121212",
+    "theme_color": "#1a1a1a",
+    "icons": []
+}

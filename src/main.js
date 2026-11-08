@@ -1,5 +1,11 @@
 import { game } from "./engine/game.js";
 import { playSound } from "./utils/audio.js";
+import { DATA_CORRIDOR_ROOMS } from "./data/corridors.js";
+import {
+    REGULAR_SPRITESHEET_PATH,
+    ELITES_SPRITESHEET_PATH,
+    enemySprites,
+} from "./data/enemy-sprites.js";
 import { renderGlobalNav } from "./ui/components.js";
 import {
     renderMenuScreen,
@@ -62,4 +68,17 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
     render();
+    setTimeout(warmImageCache, 800);
 });
+
+function warmImageCache() {
+    const urls = [
+        REGULAR_SPRITESHEET_PATH,
+        ELITES_SPRITESHEET_PATH,
+        ...Object.values(enemySprites).filter((s) => s.isBanner).map((s) => s.src),
+        ...DATA_CORRIDOR_ROOMS.map((r) => r.image),
+    ];
+    urls.forEach((src) => {
+        fetch(src).catch(() => {});
+    });
+}
