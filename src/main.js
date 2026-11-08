@@ -62,6 +62,8 @@ export function render() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+    history.pushState({ screen: "game" }, "");
+    window.addEventListener("popstate", handlePopState);
     document.addEventListener("click", (e) => {
         if (e.target.closest("button:not(:disabled)")) {
             playSound("click");
@@ -70,6 +72,41 @@ document.addEventListener("DOMContentLoaded", () => {
     render();
     setTimeout(warmImageCache, 800);
 });
+
+function handlePopState() {
+    history.pushState({ screen: "game" }, "");
+
+    const modal = document.querySelector(".modal-overlay");
+    if (modal) {
+        modal.remove();
+        return;
+    }
+
+    if (game.state === "CLASS_SELECT" || game.state === "META_SHOP") {
+        game.state = "MENU";
+        render();
+        return;
+    }
+
+    if (game.state === "SHOP") {
+        if (game.previewShopOfferIndex !== null) {
+            game.previewShopOfferIndex = null;
+        } else {
+            game.finishRoom();
+        }
+        render();
+        return;
+    }
+
+    if (game.state === "EVENT_REWARDS") {
+        if (!game.pendingEquipment) {
+            game.eventRewards = null;
+            game.checkLevelUpOrFinishRoom();
+            render();
+        }
+        return;
+    }
+}
 
 function warmImageCache() {
     const urls = [
