@@ -1,6 +1,7 @@
 import { el } from "../../utils/dom.js";
 import { game } from "../../engine/game.js";
 import { GAME_DATA } from "../../data/index.js";
+import { playSound } from "../../utils/audio.js";
 
 export function renderMenuScreen(render) {
     const autoSummary = game.getSlotSummary("autosave");
@@ -132,6 +133,10 @@ export function renderClassSelectScreen(render) {
 
 export function renderEndScreen(render) {
     const isWin = game.state === "VICTORY";
+    if (!game._endSoundPlayed) {
+        playSound(isWin ? "victory" : "gameOver");
+        game._endSoundPlayed = true;
+    }
     return el("div", {}, [
         el("h2", { text: isWin ? "🏆 ПОБЕДА!" : "💀 ВЫ ПОГИБЛИ" }),
         el("div", { className: "panel text-center" }, [
@@ -143,6 +148,7 @@ export function renderEndScreen(render) {
             className: "btn-center btn-primary",
             text: "🔮 Перейти в Алтарь Душ",
             onClick: () => {
+                game._endSoundPlayed = false;
                 game.state = "META_SHOP";
                 render();
             },
@@ -151,6 +157,7 @@ export function renderEndScreen(render) {
             className: "btn-center",
             text: "В главное меню",
             onClick: () => {
+                game._endSoundPlayed = false;
                 game.state = "MENU";
                 render();
             },

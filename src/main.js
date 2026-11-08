@@ -1,4 +1,5 @@
 import { game } from "./engine/game.js";
+import { playSound } from "./utils/audio.js";
 import { renderGlobalNav } from "./ui/components.js";
 import {
     renderMenuScreen,
@@ -55,5 +56,10 @@ export function render() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+    document.addEventListener("click", (e) => {
+        if (e.target.closest("button:not(:disabled)")) {
+            playSound("click");
+        }
+    });
     render();
 });

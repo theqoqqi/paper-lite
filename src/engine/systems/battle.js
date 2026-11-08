@@ -1,5 +1,6 @@
 import { RNG } from "../../utils/rng.js";
 import { GAME_DATA } from "../../data/index.js";
+import { playSound } from "../../utils/audio.js";
 
 export function createEnemyInstance(game, enemyKey, applyMutation = false) {
     const template = GAME_DATA.enemies[enemyKey];
@@ -40,21 +41,26 @@ export function setupBattle(game, mode = "normal") {
     game.enemies = [];
     game.isProcessingTurn = false;
     game.battleFinished = false;
+    game._victorySoundPlayed = false;
     game.battleRewards = { xp: 0, gold: 0, items: [] };
 
     const floorData = GAME_DATA.floors[game.floor];
 
     if (mode === "boss") {
+        playSound("bossEncounter");
         game.enemies.push(createEnemyInstance(game, floorData.boss));
         game.battleLog = ["👑 БИТВА С БОССОМ ЭТАЖА!"];
     } else if (mode === "elite") {
+        playSound("battleStart");
         const eliteKey = RNG.choice(floorData.elite);
         game.enemies.push(createEnemyInstance(game, eliteKey, game.floor >= 2));
         game.battleLog = ["💀 Встречен Элитный противник!"];
     } else if (mode === "mimic") {
+        playSound("battleStart");
         game.enemies.push(createEnemyInstance(game, "mimic", game.floor >= 1));
         game.battleLog = ["📦 Сундук оказался Алчным Мимиком!"];
     } else {
+        playSound("battleStart");
         let budget = Math.min(7, 2 + Math.floor(game.room / 3) + game.floor);
         let attempts = 0;
         while (budget > 0 && game.enemies.length < 3 && attempts < 18) {
@@ -245,11 +251,26 @@ export function playerAction(game, actionType, onStepRender) {
     ensureValidTarget(game);
     const target = game.enemies[game.selectedTargetIndex];
 
-    if (actionType === "defend" && !canUseSkill(game, "defend", 0)) return;
-    if (actionType === "heavy" && !canUseSkill(game, "heavy", 1)) return;
-    if (actionType === "pierce" && !canUseSkill(game, "pierce", 2)) return;
-    if (actionType === "whirlwind" && !canUseSkill(game, "whirlwind", 2)) return;
-    if (actionType === "concentrate" && !canUseSkill(game, "concentrate", 0)) return;
+    if (actionType === "defend" && !canUseSkill(game, "defend", 0)) {
+        playSound("error");
+        return;
+    }
+    if (actionType === "heavy" && !canUseSkill(game, "heavy", 1)) {
+        playSound("error");
+        return;
+    }
+    if (actionType === "pierce" && !canUseSkill(game, "pierce", 2)) {
+        playSound("error");
+        return;
+    }
+    if (actionType === "whirlwind" && !canUseSkill(game, "whirlwind", 2)) {
+        playSound("error");
+        return;
+    }
+    if (actionType === "concentrate" && !canUseSkill(game, "concentrate", 0)) {
+        playSound("error");
+        return;
+    }
 
     game.player.tempSpikes = 0;
 
@@ -304,6 +325,7 @@ export function playerAction(game, actionType, onStepRender) {
     } else if (actionType === "heavy") {
         if (!target || target.currentHp <= 0) return;
         if (!spendEn(game, 1)) return;
+        playSound("heavy");
         if (game.player.perks.includes("p15")) target.shield = 0;
         const execDmg = Math.round(2 + atkVal * 0.5) + (game.player.perks.includes("p1") ? 4 : 0);
         const hpBefore = target.currentHp;
@@ -329,6 +351,7 @@ export function playerAction(game, actionType, onStepRender) {
     } else if (actionType === "pierce") {
         if (!target || target.currentHp <= 0) return;
         if (!spendEn(game, 2)) return;
+        playSound("pierce");
         if (game.player.perks.includes("p15")) target.shield = 0;
         const prcRaw = atkVal + RNG.range(3, 7);
         const prcDef = ignoreAllDef ? 0 : Math.max(0, target.def - (game.player.hasArtifact("art3") ? 1 : 0));
@@ -357,6 +380,7 @@ export function playerAction(game, actionType, onStepRender) {
 
     } else if (actionType === "whirlwind") {
         if (!spendEn(game, 2)) return;
+        playSound("whirlwind");
         const isArcanist = game.player.classId === "arcanist";
         let dmg = Math.round(atkVal * 0.75) + (isArcanist ? RNG.range(3, 6) : RNG.range(1, 4));
         game.player.cooldowns.whirlwind = Math.max(1, 3 - cdReduction);
@@ -374,6 +398,7 @@ export function playerAction(game, actionType, onStepRender) {
         game.player.concentrateBonus = 0;
 
     } else if (actionType === "concentrate") {
+        playSound("concentrate");
         game.player.en = Math.min(game.player.getTotalMaxEn(), game.player.en + 2);
         let healAmt = game.player.perks.includes("p9") ? 7 : 4;
         game.player.heal(healAmt);
@@ -514,6 +539,7 @@ export function executeSingleEnemyTurn(game, en) {
             type: "damage",
             value: taken,
             shieldValue: shieldLost,
+            isBoss: Boolean(en.isBoss),
         });
         return taken;
     };
@@ -702,6 +728,7 @@ export function onEnemyKilled(game, enemy) {
     if (enemy._killed) return;
     enemy._killed = true;
     enemy.isDying = true;
+    playSound("death");
     setTimeout(() => {
         enemy.isDying = false;
     }, 550);

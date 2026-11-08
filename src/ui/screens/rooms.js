@@ -1,9 +1,14 @@
 import { el } from "../../utils/dom.js";
 import { game } from "../../engine/game.js";
 import { GAME_DATA } from "../../data/index.js";
+import { playSound } from "../../utils/audio.js";
 import { renderStatsPanel, renderEquipmentComparison } from "../components.js";
 
 export function renderLevelUpScreen(render) {
+    if (!game._levelUpSoundPlayed) {
+        playSound("levelUp");
+        game._levelUpSoundPlayed = true;
+    }
     const wrap = el("div", {}, [
         el("h2", { text: `⬆️ Уровень ${game.player.level + 1}!` }),
         el("p", {
@@ -15,6 +20,7 @@ export function renderLevelUpScreen(render) {
     game.selectedPerkChoices.forEach(perk => {
         wrap.appendChild(el("button", {
             onClick: () => {
+                game._levelUpSoundPlayed = false;
                 game.choosePerk(perk.id);
                 render();
             },
@@ -109,6 +115,7 @@ export function renderCampfireScreen(render) {
         el("button", {
             text: `💤 Отдохнуть у огня (+${healAmt} HP)`,
             onClick: () => {
+                playSound("campfire");
                 game.resolveCampfire("heal");
                 render();
             },
@@ -116,6 +123,7 @@ export function renderCampfireScreen(render) {
         el("button", {
             text: "🔨 Заточить оружие (+1 ATK к заточке до конца забега)",
             onClick: () => {
+                playSound("campfire");
                 game.resolveCampfire("sharpen");
                 render();
             },
@@ -123,6 +131,7 @@ export function renderCampfireScreen(render) {
         el("button", {
             text: "🧘 Медитировать (+4 MAX HP и +4 HP)",
             onClick: () => {
+                playSound("campfire");
                 game.resolveCampfire("meditate");
                 render();
             },
@@ -231,6 +240,7 @@ export function renderShopScreen(render) {
         wrap.appendChild(el("button", {
             disabled: !canBuy,
             onClick: () => {
+                playSound("gold");
                 game.buyShopOffer(idx);
                 render();
             },
@@ -248,6 +258,7 @@ export function renderShopScreen(render) {
         style: { marginTop: "8px", background: "#2b3a4a" },
         text: `🔄 Обновить товары на витрине (${game.rerollCost}G)`,
         onClick: () => {
+            playSound("gold");
             game.rerollShop();
             render();
         },

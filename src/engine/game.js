@@ -1,5 +1,6 @@
 import { RNG } from "../utils/rng.js";
 import { GAME_DATA } from "../data/index.js";
+import { playSound } from "../utils/audio.js";
 import { DungeonGenerator } from "./dungeon-generator.js";
 import { Player } from "./player.js";
 import * as SaveSystem from "./systems/save.js";
@@ -140,6 +141,7 @@ export class Game {
 
         const isNewRoom = !targetRoom.visited;
         this.playerPos = { x: targetX, y: targetY };
+        playSound("step");
         if (isNewRoom) {
             this.player.en = Math.min(this.player.getTotalMaxEn(), this.player.en + 1);
         }

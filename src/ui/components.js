@@ -1,5 +1,6 @@
 import { el } from "../utils/dom.js";
 import { game } from "../engine/game.js";
+import { isMuted, playSound, toggleMute } from "../utils/audio.js";
 import { openCharacterModal, openSaveManagerModal } from "./modals.js";
 
 export function renderStatsPanel(playerFxList = []) {
@@ -73,6 +74,15 @@ export function renderGlobalNav(render) {
         text: "💾 Сохранения",
         onClick: () => openSaveManagerModal(render),
     }));
+    row.appendChild(el("button", {
+        className: "btn-center",
+        style: { width: "44px", flex: "0 0 44px", padding: "6px" },
+        text: isMuted() ? "🔇" : "🔊",
+        onClick: () => {
+            toggleMute();
+            render();
+        },
+    }));
     nav.appendChild(row);
 }
 
@@ -111,6 +121,7 @@ export function renderEquipmentComparison(pendingEquip, onResolved) {
                 style: { padding: "8px", fontSize: "12px" },
                 text: `Надеть (+${oldRefund}G со старого)`,
                 onClick: () => {
+                    playSound("equip");
                     game.resolveEquipChoice();
                     if (onResolved) onResolved();
                 },
@@ -119,6 +130,7 @@ export function renderEquipmentComparison(pendingEquip, onResolved) {
                 style: { padding: "8px", fontSize: "12px", background: "#4a3220" },
                 text: `Разобрать (+${salvageGain}G)`,
                 onClick: () => {
+                    playSound("gold");
                     game.resolveSalvageChoice();
                     if (onResolved) onResolved();
                 },

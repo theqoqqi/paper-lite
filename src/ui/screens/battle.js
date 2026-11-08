@@ -1,5 +1,6 @@
 import { el } from "../../utils/dom.js";
 import { game } from "../../engine/game.js";
+import { playSound } from "../../utils/audio.js";
 import { renderStatsPanel, renderEquipmentComparison } from "../components.js";
 
 const activeRowMap = new Map();
@@ -26,12 +27,20 @@ export function renderBattleScreen(render) {
         }
     });
 
+    if (activeFx.length > 0) {
+        playBattleFxSound(activeFx);
+    }
+
     const wrap = el("div", {}, [
         el("h3", { text: `Бой — Этаж ${game.floor + 1} (Раунд ${game.battleTurn})` }),
         renderStatsPanel(playerFxList),
     ]);
 
     if (game.battleFinished) {
+        if (!game._victorySoundPlayed) {
+            playSound("victory");
+            game._victorySoundPlayed = true;
+        }
         const rewardBox = el("div", { className: "panel", style: { borderColor: "#4caf50", background: "#1b2e1b" } }, [
             el("h3", { style: { color: "#81c784" }, text: "🏆 ПОБЕДА В БОЮ!" }),
             el("p", {
@@ -370,4 +379,43 @@ function spawnFloatingFx(targetKey, targetElement, fx) {
     });
 
     rowEl.appendChild(badgeEl);
+}
+
+function playBattleFxSound(activeFx) {
+    if (activeFx.some(f => f.isCrit)) {
+        playSound("crit");
+        return;
+    }
+    if (activeFx.some(f => f.type === "spikesDamage")) {
+        playSound("spikes");
+        return;
+    }
+    if (activeFx.some(f => f.type === "bleedDamage")) {
+        playSound("bleed");
+        return;
+    }
+    if (activeFx.some(f => f.type === "shield" || (f.type === "damage" && f.value === 0 && f.shieldValue > 0))) {
+        playSound("shield");
+        return;
+    }
+    if (activeFx.some(f => f.target === "player" && f.isBoss)) {
+        playSound("bossAttack");
+        return;
+    }
+    if (activeFx.some(f => f.type === "damage" || f.type.endsWith("Damage"))) {
+        playSound("hit");
+        return;
+    }
+    if (activeFx.some(f => f.type === "heal")) {
+        playSound("heal");
+        return;
+    }
+    if (activeFx.some(f => f.type === "poison")) {
+        playSound("poison");
+        return;
+    }
+    if (activeFx.some(f => f.type === "bleed")) {
+        playSound("bleed");
+        return;
+    }
 }
