@@ -97,24 +97,40 @@ export function openCharacterModal(render) {
         el("div", { style: { marginTop: "8px", cursor: "default" } }, statsHelpList),
     ]));
 
-    contentBox.appendChild(el("h4", { text: "📖 Боевые Навыки:" }));
-    const skillsPanel = el("div", { className: "panel" });
-    GAME_DATA.skillsInfo.forEach(sk => {
-        skillsPanel.appendChild(el("div", {
+    const skillItems = GAME_DATA.skillsInfo.map(sk => el("div", {
+        style: {
+            marginBottom: "6px",
+            borderBottom: "1px dashed #333",
+            paddingBottom: "4px",
+        },
+    }, [
+        el("div", { className: "stats-line" }, [
+            el("b", { text: sk.name }),
+            el("small", { style: { color: "#ffb74d" }, text: `${sk.cost} | КД: ${sk.cd}` }),
+        ]),
+        el("div", { style: { fontSize: "11px", color: "#ccc" }, text: sk.desc }),
+    ]));
+
+    contentBox.appendChild(el("details", {
+        className: "panel",
+        style: {
+            marginBottom: "8px",
+            background: "#181f26",
+            borderColor: "#37474f",
+            cursor: "pointer",
+        },
+    }, [
+        el("summary", {
             style: {
-                marginBottom: "6px",
-                borderBottom: "1px dashed #333",
-                paddingBottom: "4px",
+                fontWeight: "bold",
+                color: "#90caf9",
+                outline: "none",
+                userSelect: "none",
             },
-        }, [
-            el("div", { className: "stats-line" }, [
-                el("b", { text: sk.name }),
-                el("small", { style: { color: "#ffb74d" }, text: `${sk.cost} | КД: ${sk.cd}` }),
-            ]),
-            el("div", { style: { fontSize: "11px", color: "#ccc" }, text: sk.desc }),
-        ]));
-    });
-    contentBox.appendChild(skillsPanel);
+            text: "⚔️ Боевые Навыки",
+        }),
+        el("div", { style: { marginTop: "8px", cursor: "default" } }, skillItems),
+    ]));
 
     contentBox.appendChild(el("h4", { text: "🛡️ Экипировка и Артефакты:" }));
     const eqPanel = el("div", { className: "panel" }, [
