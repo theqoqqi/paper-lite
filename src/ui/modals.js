@@ -2,6 +2,49 @@ import { el } from "../utils/dom.js";
 import { game } from "../engine/game.js";
 import { GAME_DATA } from "../data/index.js";
 
+const STATS_HELP = [
+    {
+        name: "❤️ Здоровье (HP)",
+        desc: "Текущий и максимальный запас жизни. Падение до 0 означает гибель в забеге.",
+    },
+    {
+        name: "🛡️ Щит",
+        desc: "Поглощает урон перед вычетом из HP. Не сгорает в конце хода и сохраняется до конца текущего боя.",
+    },
+    {
+        name: "⚡ Энергия (EN)",
+        desc: "Расходуется на применение боевых навыков. Восполняется перед боем, а также восстанавливает +1 EN за каждую новую открытую комнату.",
+    },
+    {
+        name: "⚔️ Атака (ATK)",
+        desc: "Базовая сила ударов и боевых умений. Складывается из силы класса, оружия, заточки и бонусов перков.",
+    },
+    {
+        name: "🛡️ Защита (DEF)",
+        desc: "Прямое вычитание из входящего урона (за исключением чистого урона). Каждый пункт DEF снижает урон на 1 (минимум 1 урона).",
+    },
+    {
+        name: "🎯 Крит и Pity-бонус",
+        desc: "Шанс нанести критический удар (x1.75 урона). За каждый удар без крита шанс увеличивается на +7% (защита от неудач). При успешном крите бонус сбрасывается.",
+    },
+    {
+        name: "🌵 Шипы",
+        desc: "Наносят чистый урон атакующему противнику каждый раз, когда он наносит удар герою.",
+    },
+    {
+        name: "☠️ Яд",
+        desc: "Наносит чистый урон в конце хода, игнорируя защиту и щит. Каждый ход количество яда уменьшается на 1.",
+    },
+    {
+        name: "🩸 Кровоток",
+        desc: "Наносит урон каждый раз, когда цель совершает атакующее действие.",
+    },
+    {
+        name: "🔥 Концентрация",
+        desc: "Увеличивает силу следующего удара. После совершения атаки эффект сбрасывается.",
+    },
+];
+
 export function openCharacterModal(render) {
     const p = game.player;
     if (!p) return;
@@ -20,6 +63,38 @@ export function openCharacterModal(render) {
             style: { fontSize: "12px" },
             text: `Бонус Pity-Крита сейчас: +${p.pityCritBonus}% (Всего шанс: ${p.getCritChance()}%)`,
         }),
+    ]));
+
+    const statsHelpList = STATS_HELP.map(item => el("div", {
+        style: {
+            marginTop: "6px",
+            borderTop: "1px dashed #263238",
+            paddingTop: "4px",
+        },
+    }, [
+        el("b", { style: { color: "#e0e0e0", fontSize: "12px" }, text: item.name }),
+        el("div", { style: { fontSize: "11px", color: "#b0bec5", marginTop: "2px", lineHeight: "1.3" }, text: item.desc }),
+    ]));
+
+    contentBox.appendChild(el("details", {
+        className: "panel",
+        style: {
+            marginBottom: "8px",
+            background: "#181f26",
+            borderColor: "#37474f",
+            cursor: "pointer",
+        },
+    }, [
+        el("summary", {
+            style: {
+                fontWeight: "bold",
+                color: "#90caf9",
+                outline: "none",
+                userSelect: "none",
+            },
+            text: "📖 Характеристики и эффекты",
+        }),
+        el("div", { style: { marginTop: "8px", cursor: "default" } }, statsHelpList),
     ]));
 
     contentBox.appendChild(el("h4", { text: "📖 Боевые Навыки:" }));
