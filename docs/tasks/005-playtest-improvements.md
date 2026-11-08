@@ -145,7 +145,7 @@
 
 ## 4. Пошаговый план реализации
 
-1. [ ] **Шаг 1: Стабилизация финализации забега и сохранений (п. 7)**
+1. [x] **Шаг 1: Стабилизация финализации забега и сохранений (п. 7)**
    * В [`src/engine/systems/encounter.js`](../../src/engine/systems/encounter.js) в `finishRoom` исключить `saveGame("autosave")` при `game.state === "VICTORY"`.
    * В [`src/engine/systems/save.js`](../../src/engine/systems/save.js) в `saveGame` блокировать автосейв при `VICTORY`/`GAMEOVER`.
    * В [`src/engine/systems/save.js`](../../src/engine/systems/save.js) в `loadGame` удалить затирание `game.meta` из слота забега.

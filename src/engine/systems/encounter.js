@@ -96,7 +96,9 @@ export function finishRoom(game) {
     } else {
         game.state = "MAP";
     }
-    game.saveGame("autosave");
+    if (game.state !== "VICTORY") {
+        game.saveGame("autosave");
+    }
 }
 
 export function generatePerkChoices(game) {

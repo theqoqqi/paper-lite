@@ -48,6 +48,10 @@ export function serializeState(game) {
 
 export function saveGame(game, slotKey = "autosave") {
     if (!game.player) return serializeState(game);
+    if (slotKey === "autosave" && (game.state === "VICTORY" || game.state === "GAMEOVER")) {
+        localStorage.removeItem(`${SLOT_PREFIX}autosave`);
+        return null;
+    }
     const json = serializeState(game);
     localStorage.setItem(`${SLOT_PREFIX}${slotKey}`, json);
     return json;
@@ -63,7 +67,7 @@ export function loadGame(game, slotKeyOrJson = "autosave") {
         const data = JSON.parse(raw);
         if (!data || !data.player) return false;
 
-        game.meta = Object.assign(JSON.parse(JSON.stringify(game.defaultMeta)), data.meta || {});
+        loadMeta(game);
         game.player = Object.assign(new Player(data.player.classId || "wanderer"), data.player);
         if (!game.player.inventory.artifacts) game.player.inventory.artifacts = [];
         if (!game.player.cooldowns) {
@@ -93,7 +97,6 @@ export function loadGame(game, slotKeyOrJson = "autosave") {
         game.pendingEquipment = data.pendingEquipment || null;
         game.eventRewards = data.eventRewards || null;
         game.currentCorridorResult = data.currentCorridorResult || null;
-        saveMeta(game);
         return true;
     } catch (e) {
         console.error(e);
@@ -107,6 +110,7 @@ export function getSlotSummary(slotKey) {
     try {
         const d = JSON.parse(raw);
         if (!d || !d.player) return null;
+        if (d.state === "VICTORY" || d.state === "GAMEOVER") return null;
         const dateStr = d.timestamp ? new Date(d.timestamp).toLocaleString("ru-RU", {
             hour: "2-digit",
             minute: "2-digit",
