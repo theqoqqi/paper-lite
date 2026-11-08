@@ -98,6 +98,7 @@ export function rerollShop(game) {
     if (game.player.gold < game.rerollCost) return;
     game.player.gold -= game.rerollCost;
     game.rerollCost += 4;
+    game.previewShopOfferIndex = null;
     setupShop(game);
     game.saveGame("autosave");
 }
@@ -110,6 +111,7 @@ export function buyShopOffer(game, index) {
         return;
     }
 
+    game.previewShopOfferIndex = null;
     game.player.gold -= offer.cost;
     offer.bought = true;
 

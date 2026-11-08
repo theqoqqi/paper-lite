@@ -39,6 +39,7 @@ export class Game {
         this.eventRewards = null;
         this.currentCorridorResult = null;
         this.battleFx = [];
+        this.previewShopOfferIndex = null;
     }
 
     init() {
@@ -108,6 +109,7 @@ export class Game {
         this.pendingEquipment = null;
         this.eventRewards = null;
         this.currentCorridorResult = null;
+        this.previewShopOfferIndex = null;
         this.generateFloorMap();
         this.state = "MAP";
         this.saveGame("autosave");

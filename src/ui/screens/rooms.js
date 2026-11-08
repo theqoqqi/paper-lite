@@ -262,14 +262,45 @@ export function renderShopScreen(render) {
 
     game.shopOffers.forEach((offer, idx) => {
         const isPotion = offer.kind === "potion";
+        const isEquip = offer.kind === "weapon" || offer.kind === "armor";
+        const isPreviewingThis = game.previewShopOfferIndex === idx;
         const bagFull = isPotion && game.player.inventory.potions.length >= game.player.potionSlots;
         const notEnoughGold = game.player.gold < offer.cost;
         const canBuy = !offer.bought && !notEnoughGold && !bagFull;
 
+        const rightColChildren = [
+            el("b", { style: { color: "#ffd54f" }, text: `${offer.cost}G` }),
+        ];
+
+        if (isEquip && !offer.bought) {
+            rightColChildren.push(el("span", {
+                style: {
+                    fontSize: "11px",
+                    color: isPreviewingThis ? "#ffb74d" : "#81c784",
+                    marginTop: "2px",
+                },
+                text: isPreviewingThis ? "Свернуть" : "Сравнить",
+            }));
+        }
+
         const btnChildren = [
-            el("div", { className: "stats-line" }, [
-                el("span", { text: offer.name }),
-                el("b", { style: { color: "#ffd54f", marginLeft: "6px" }, text: `${offer.cost}G` }),
+            el("div", {
+                className: "stats-line",
+                style: {
+                    alignItems: isEquip && !offer.bought ? "flex-start" : "center",
+                    marginBottom: "0",
+                },
+            }, [
+                el("span", { style: { flex: "1" }, text: offer.name }),
+                el("div", {
+                    style: {
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "flex-end",
+                        marginLeft: "8px",
+                        flexShrink: "0",
+                    },
+                }, rightColChildren),
             ]),
         ];
 
@@ -285,14 +316,33 @@ export function renderShopScreen(render) {
             }));
         }
 
+        const btnStyle = {};
+        if (isEquip && isPreviewingThis) {
+            btnStyle.border = "1px solid #ff9800";
+            btnStyle.borderBottom = "none";
+            btnStyle.borderRadius = "5px 5px 0 0";
+            btnStyle.background = "#2a2218";
+            btnStyle.marginBottom = "0";
+        }
+
         wrap.appendChild(el("button", {
+            style: btnStyle,
             disabled: !canBuy,
             onClick: () => {
-                playSound("gold");
-                game.buyShopOffer(idx);
-                render();
+                if (isEquip) {
+                    game.previewShopOfferIndex = isPreviewingThis ? null : idx;
+                    render();
+                } else {
+                    playSound("gold");
+                    game.buyShopOffer(idx);
+                    render();
+                }
             },
         }, btnChildren));
+
+        if (isEquip && isPreviewingThis) {
+            wrap.appendChild(renderShopEquipmentComparison(offer, idx, render));
+        }
     });
 
     wrap.appendChild(el("button", {
@@ -312,10 +362,53 @@ export function renderShopScreen(render) {
         style: { marginTop: "8px" },
         text: "Покинуть лавку ➡️",
         onClick: () => {
+            game.previewShopOfferIndex = null;
             game.finishRoom();
             render();
         },
     }));
 
     return wrap;
+}
+
+function renderShopEquipmentComparison(offer, offerIndex, render) {
+    const isWeapon = offer.kind === "weapon";
+    const current = isWeapon ? game.player.inventory.weapon : game.player.inventory.armor;
+    const currentName = current ? `${current.name} (${current.desc})` : (isWeapon ? "Кулаки" : "Лохмотья");
+    const oldRefund = (current && current.cost) ? Math.max(1, Math.floor(current.cost * 0.25)) : 0;
+    const item = offer.item;
+
+    return el("div", {
+        className: "panel",
+        style: {
+            borderColor: "#ff9800",
+            borderTop: "1px dashed #554020",
+            borderRadius: "0 0 5px 5px",
+            background: "#2a2218",
+            marginTop: "0",
+            marginBottom: "6px",
+        },
+    }, [
+        el("div", {
+            style: { fontSize: "12px", marginBottom: "4px" },
+            text: `Надето: ${currentName}`,
+        }),
+        el("div", {
+            style: { fontSize: "12px", color: "#81c784", marginBottom: "8px" },
+            text: `В лавке: [${item.rarity}] ${item.name} (${item.desc})`,
+        }),
+        el("div", { className: "flex-row" }, [
+            el("button", {
+                className: "btn-primary",
+                style: { padding: "8px", fontSize: "12px" },
+                text: `Купить (+${oldRefund}G со старого)`,
+                onClick: () => {
+                    playSound("equip");
+                    game.buyShopOffer(offerIndex);
+                    game.previewShopOfferIndex = null;
+                    render();
+                },
+            }),
+        ]),
+    ]);
 }
