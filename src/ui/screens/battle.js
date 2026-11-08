@@ -31,7 +31,7 @@ export function renderBattleScreen(render) {
         playBattleFxSound(activeFx);
     }
 
-    const enrageBonus = game.battleTurn >= 10 ? (game.battleTurn - 9) * 2 : 0;
+    const enrageBonus = game.battleTurn >= 11 ? (game.battleTurn - 10) * 2 : 0;
     const wrap = el("div", {}, [
         el("h3", { text: `Бой — Этаж ${game.floor + 1} (Раунд ${game.battleTurn})` }),
         renderStatsPanel(playerFxList),

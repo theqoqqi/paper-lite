@@ -450,7 +450,7 @@ export function runEnemyTurnSequence(game, onStepRender) {
             game.battleLog.unshift(`☠️ Яд наносит вам ${game.player.poison} урона.`);
             game.player.poison--;
         }
-        const enrageBonus = game.battleTurn >= 10 ? (game.battleTurn - 9) * 2 : 0;
+        const enrageBonus = game.battleTurn >= 11 ? (game.battleTurn - 10) * 2 : 0;
         if (enrageBonus > 0) {
             game.battleLog.unshift(`🔥 Ярость Бездны (Раунд ${game.battleTurn}): враги получают +${enrageBonus} к урону!`);
         }
@@ -491,7 +491,7 @@ export function runEnemyTurnSequence(game, onStepRender) {
         }
         game.player.damageReduction50 = false;
         game.battleTurn++;
-        if (game.battleTurn >= 10 && !game.enrageAnnounced) {
+        if (game.battleTurn >= 11 && !game.enrageAnnounced) {
             game.enrageAnnounced = true;
             game.addBattleFx({
                 target: "player",
@@ -537,7 +537,7 @@ export function runEnemyTurnSequence(game, onStepRender) {
 }
 
 export function executeSingleEnemyTurn(game, en) {
-    const enrageBonus = game.battleTurn >= 10 ? (game.battleTurn - 9) * 2 : 0;
+    const enrageBonus = game.battleTurn >= 11 ? (game.battleTurn - 10) * 2 : 0;
 
     const hitPlayer = (val, isPierce = false) => {
         const shieldBefore = game.player.shield;

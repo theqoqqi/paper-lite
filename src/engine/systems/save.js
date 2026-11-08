@@ -81,7 +81,7 @@ export function loadGame(game, slotKeyOrJson = "autosave") {
         game.enemies = data.enemies || [];
         game.selectedTargetIndex = data.selectedTargetIndex || 0;
         game.battleTurn = data.battleTurn || 1;
-        game.enrageAnnounced = Boolean(data.enrageAnnounced || game.battleTurn >= 10);
+        game.enrageAnnounced = Boolean(data.enrageAnnounced || game.battleTurn >= 11);
         game.battleFinished = Boolean(data.battleFinished);
         game.battleRewards = data.battleRewards || { xp: 0, gold: 0, items: [] };
         game.isProcessingTurn = false;
