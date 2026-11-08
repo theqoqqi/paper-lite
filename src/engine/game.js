@@ -22,6 +22,7 @@ export class Game {
         this.enemies = [];
         this.selectedTargetIndex = 0;
         this.battleTurn = 1;
+        this.enrageAnnounced = false;
         this.battleLog = [];
         this.isProcessingTurn = false;
         this.battleFinished = false;

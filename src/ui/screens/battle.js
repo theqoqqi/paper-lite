@@ -31,6 +31,7 @@ export function renderBattleScreen(render) {
         playBattleFxSound(activeFx);
     }
 
+    const enrageBonus = game.battleTurn >= 10 ? (game.battleTurn - 9) * 2 : 0;
     const wrap = el("div", {}, [
         el("h3", { text: `Бой — Этаж ${game.floor + 1} (Раунд ${game.battleTurn})` }),
         renderStatsPanel(playerFxList),
@@ -76,18 +77,26 @@ export function renderBattleScreen(render) {
         }));
         wrap.appendChild(rewardBox);
     } else {
-        const enemyBox = el("div", { style: { marginBottom: "8px" } }, [
-            el("div", {
-                style: { marginBottom: "4px", fontSize: "12px", color: "#aaa" },
-                text: game.isProcessingTurn ? "⏳ Ход противников..." : "Выберите цель для атаки:",
-            }),
-        ]);
+        const enemyBoxChildren = [];
+        if (enrageBonus > 0) {
+            enemyBoxChildren.push(el("div", {
+                className: "text-center",
+                style: {
+                    color: "#ff9800",
+                    fontSize: "12px",
+                    fontWeight: "bold",
+                    marginBottom: "6px",
+                },
+                text: `🔥 Ярость Бездны (+${enrageBonus} к атакам врагов)`,
+            }));
+        }
+        const enemyBox = el("div", { style: { marginBottom: "8px" } }, enemyBoxChildren);
 
         game.enemies.forEach((en, idx) => {
             if (en.currentHp <= 0 && (!en.isDying || en.deathAnimRendered)) return;
             const isSelected = idx === game.selectedTargetIndex && !en.isDying;
             const nextPat = en.pattern ? en.pattern[(en.patternIndex || 0) % en.pattern.length] : { text: "...", val: 0 };
-            const previewVal = nextPat.val ? nextPat.val + (en.atkBonus || 0) : 0;
+            const previewVal = nextPat.val ? nextPat.val + (en.atkBonus || 0) + enrageBonus : 0;
 
             const extraStats = [];
             if (en.def > 0) extraStats.push(`🛡️ ${en.def}`);
@@ -299,6 +308,9 @@ export function clearActiveFxRows() {
 }
 
 function formatFxText(fx) {
+    if (fx.text) {
+        return fx.text;
+    }
     if (fx.isCrit) {
         return `💥 -${fx.value}!`;
     }

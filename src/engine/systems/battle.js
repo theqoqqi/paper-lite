@@ -41,6 +41,7 @@ export function setupBattle(game, mode = "normal") {
     game.enemies = [];
     game.isProcessingTurn = false;
     game.battleFinished = false;
+    game.enrageAnnounced = false;
     game._victorySoundPlayed = false;
     game.battleRewards = { xp: 0, gold: 0, items: [] };
 
@@ -490,6 +491,14 @@ export function runEnemyTurnSequence(game, onStepRender) {
         }
         game.player.damageReduction50 = false;
         game.battleTurn++;
+        if (game.battleTurn >= 10 && !game.enrageAnnounced) {
+            game.enrageAnnounced = true;
+            game.addBattleFx({
+                target: "player",
+                type: "enrageAnnounce",
+                text: "🔥 Враги стали сильнее!",
+            });
+        }
         if (game.player.perks.includes("p18") && game.battleTurn % 3 === 0) {
             game.player.en = Math.min(game.player.getTotalMaxEn(), game.player.en + 2);
             game.battleLog.unshift("⚡ Боевой транс даёт +2 EN!");
