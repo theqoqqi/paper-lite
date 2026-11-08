@@ -86,8 +86,6 @@ export function finishRoom(game) {
         game.player.heal(game.player.getTotalMaxHp());
         game.player.en = game.player.getTotalMaxEn();
         if (game.floor < 3) {
-            game.floor++;
-            game.generateFloorMap();
             game.state = "MAP";
         } else {
             game.calculateSouls();

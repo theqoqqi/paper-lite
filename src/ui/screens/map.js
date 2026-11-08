@@ -289,22 +289,63 @@ export function renderMapScreen(render) {
         scoutBtnText = "🔍 Разведать окружение (3 ❤️ HP)";
     }
 
+    const actionButtons = [];
+
+    if (currentRoom.type === "boss" && currentRoom.cleared && game.floor < 3) {
+        actionButtons.push(el("button", {
+            className: "btn-center",
+            style: {
+                marginBottom: "6px",
+                background: "#2e4c38",
+                borderColor: "#4caf50",
+                fontWeight: "bold",
+            },
+            text: `⬇️ Спуститься на Этаж ${game.floor + 2}`,
+            onClick: () => {
+                game.floor++;
+                game.generateFloorMap();
+                game.state = "MAP";
+                game.saveGame("autosave");
+                render();
+            },
+        }));
+    }
+
+    if (currentRoom.type === "shop" && currentRoom.cleared) {
+        actionButtons.push(el("button", {
+            className: "btn-center",
+            style: {
+                marginBottom: "6px",
+                background: "#2b3a4a",
+                borderColor: "#4a7a96",
+                fontWeight: "bold",
+            },
+            text: "⚖️ Войти в Лавку Торговца",
+            onClick: () => {
+                game.state = "SHOP";
+                render();
+            },
+        }));
+    }
+
+    actionButtons.push(el("button", {
+        className: "btn-center btn-primary",
+        style: {
+            marginBottom: "6px",
+        },
+        disabled: !scoutStatus.canScout,
+        text: scoutBtnText,
+        onClick: () => {
+            game.scoutSurroundings();
+            render();
+        },
+    }));
+
     return el("div", {}, [
         el("h3", { text: `Этаж ${game.floor + 1}: ${floorData.name}` }),
         renderStatsPanel(),
         gridWrapper,
-        el("button", {
-            className: "btn-center btn-primary",
-            style: {
-                marginBottom: "6px",
-            },
-            disabled: !scoutStatus.canScout,
-            text: scoutBtnText,
-            onClick: () => {
-                game.scoutSurroundings();
-                render();
-            },
-        }),
+        ...actionButtons,
         el("div", {
             className: "panel text-center",
             style: {

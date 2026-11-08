@@ -158,7 +158,7 @@
    * В [`src/engine/systems/encounter.js`](../../src/engine/systems/encounter.js) для опций артефактов (`altar_gold`, `soul_sell_hp`, `well_blood`, `pawn_relic`) заполнять `game.eventRewards` и выставлять `state = "EVENT_REWARDS"`.
    * В [`src/ui/screens/rooms.js`](../../src/ui/screens/rooms.js) в `renderShopScreen` блокировать покупку зелий при переполнении пояса с бейджем `[НЕТ МЕСТА В ПОЯСЕ]`.
 
-3. [ ] **Шаг 3: Навигация карты — комната босса и магазин (п. 3, п. 4)**
+3. [x] **Шаг 3: Навигация карты — комната босса и магазин (п. 3, п. 4)**
    * В [`src/engine/game.js`](../../src/engine/game.js) в `enterCurrentRoomContent` не переключать `state = "SHOP"`, если `roomObj.cleared === true`.
    * В [`src/ui/screens/map.js`](../../src/ui/screens/map.js) добавить кнопку «🛒 Войти в Лавку Торговца», когда игрок стоит на посещенном магазине.
    * В [`src/engine/systems/encounter.js`](../../src/engine/systems/encounter.js) в `finishRoom` после победы над боссом при `floor < 3` оставлять `state = "MAP"` на текущем этаже.

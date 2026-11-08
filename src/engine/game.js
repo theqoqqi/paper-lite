@@ -303,8 +303,10 @@ export class Game {
                 this.rerollCost = 5;
                 this.setupShop();
                 roomObj.cleared = true;
+                this.state = "SHOP";
+            } else {
+                this.state = "MAP";
             }
-            this.state = "SHOP";
         }
     }
 
