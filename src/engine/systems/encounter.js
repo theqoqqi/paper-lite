@@ -122,14 +122,26 @@ export function choosePerk(game, perkId) {
 
 export function resolveEventOption(game, optionId) {
     if (optionId === "altar_hp") {
-        game.player.hp = Math.max(1, game.player.hp - 6);
+        if (game.player.hp <= 6) return;
+        game.player.hp -= 6;
         game.player.baseAtk += 1;
     } else if (optionId === "altar_gold") {
-        if (game.player.gold >= 12) {
-            game.player.gold -= 12;
-            const unowned = GAME_DATA.items.artifacts.filter(a => !game.player.hasArtifact(a.id));
-            if (unowned.length > 0) game.player.addArtifact(RNG.choice(unowned));
+        if (game.player.gold < 12) return;
+        game.player.gold -= 12;
+        const unowned = GAME_DATA.items.artifacts.filter(a => !game.player.hasArtifact(a.id));
+        const items = [];
+        if (unowned.length > 0) {
+            const art = RNG.choice(unowned);
+            game.player.addArtifact(art);
+            items.push(`💍 Артефакт: ${art.name} (${art.desc})`);
         }
+        game.eventRewards = {
+            gold: 0,
+            items: items,
+        };
+        game.state = "EVENT_REWARDS";
+        game.saveGame("autosave");
+        return;
     } else if (optionId === "spring_heal") {
         game.player.heal(game.player.getTotalMaxHp());
     } else if (optionId === "spring_max") {
@@ -169,21 +181,34 @@ export function resolveEventOption(game, optionId) {
         game.player.xp += 12;
         game.player.totalRunXp += 12;
     } else if (optionId === "lib_perk") {
-        game.player.hp = Math.max(1, game.player.hp - 6);
+        if (game.player.hp <= 6) return;
+        game.player.hp -= 6;
         const available = GAME_DATA.perks.filter(p => !game.player.perks.includes(p.id));
         if (available.length > 0) game.player.perks.push(RNG.choice(available).id);
     } else if (optionId === "gamble_play") {
-        if (game.player.gold >= 8) {
-            game.player.gold -= 8;
-            if (RNG.chance(50)) {
-                game.player.gold += 20;
-                if (game.player.inventory.potions.length < game.player.potionSlots) {
-                    game.player.inventory.potions.push({ ...RNG.choice(GAME_DATA.items.potions) });
-                }
+        if (game.player.gold < 8) return;
+        game.player.gold -= 8;
+        let wonGold = 0;
+        const wonItems = [];
+        if (RNG.chance(50)) {
+            wonGold = 20;
+            game.player.gold += 20;
+            if (game.player.inventory.potions.length < game.player.potionSlots) {
+                const pot = { ...RNG.choice(GAME_DATA.items.potions) };
+                game.player.inventory.potions.push(pot);
+                wonItems.push(`Зелье: ${pot.name}`);
             }
         }
+        game.eventRewards = {
+            gold: wonGold,
+            items: wonItems.length > 0 ? wonItems : (wonGold === 0 ? ["Ничего не выиграно! Бес забирает ставку."] : []),
+        };
+        game.state = "EVENT_REWARDS";
+        game.saveGame("autosave");
+        return;
     } else if (optionId === "gamble_rob") {
-        game.player.hp = Math.max(1, game.player.hp - 4);
+        if (game.player.hp <= 4) return;
+        game.player.hp -= 4;
         game.player.gold += 9;
     } else if (optionId === "lab_potions") {
         game.player.potionSlots += 1;
@@ -196,35 +221,60 @@ export function resolveEventOption(game, optionId) {
         game.player.baseMaxHp += 7;
         game.player.hp = Math.max(1, game.player.hp - 3);
     } else if (optionId === "soul_sell_hp") {
+        if (game.player.baseMaxHp <= 5) return;
         game.player.baseMaxHp = Math.max(6, game.player.baseMaxHp - 5);
         game.player.clampHp();
         game.player.gold += 18;
         const unowned = GAME_DATA.items.artifacts.filter(a => !game.player.hasArtifact(a.id));
-        if (unowned.length > 0) game.player.addArtifact(RNG.choice(unowned));
-    } else if (optionId === "soul_buy_souls") {
-        if (game.player.gold >= 12) {
-            game.player.gold -= 12;
-            game.meta.souls += 10;
-            game.saveMeta();
+        const items = [];
+        if (unowned.length > 0) {
+            const art = RNG.choice(unowned);
+            game.player.addArtifact(art);
+            items.push(`💍 Артефакт: ${art.name} (${art.desc})`);
         }
+        game.eventRewards = {
+            gold: 18,
+            items: items,
+        };
+        game.state = "EVENT_REWARDS";
+        game.saveGame("autosave");
+        return;
+    } else if (optionId === "soul_buy_souls") {
+        if (game.player.gold < 12) return;
+        game.player.gold -= 12;
+        game.meta.souls += 10;
+        game.saveMeta();
     } else if (optionId === "arena_fight") {
         game.player.gold += 10;
         game.setupBattle("elite");
         game.saveGame("autosave");
         return;
     } else if (optionId === "well_gold") {
-        if (game.player.gold >= 10) {
-            game.player.gold -= 10;
-            game.player.heal(12);
-            game.player.xp += 10;
-            game.player.totalRunXp += 10;
-        }
+        if (game.player.gold < 10) return;
+        game.player.gold -= 10;
+        game.player.heal(12);
+        game.player.xp += 10;
+        game.player.totalRunXp += 10;
     } else if (optionId === "well_blood") {
-        game.player.hp = Math.max(1, game.player.hp - 6);
+        if (game.player.hp <= 6) return;
+        game.player.hp -= 6;
         const unowned = GAME_DATA.items.artifacts.filter(a => !game.player.hasArtifact(a.id));
-        if (unowned.length > 0) game.player.addArtifact(RNG.choice(unowned));
+        const items = [];
+        if (unowned.length > 0) {
+            const art = RNG.choice(unowned);
+            game.player.addArtifact(art);
+            items.push(`💍 Артефакт: ${art.name} (${art.desc})`);
+        }
+        game.eventRewards = {
+            gold: 0,
+            items: items,
+        };
+        game.state = "EVENT_REWARDS";
+        game.saveGame("autosave");
+        return;
     } else if (optionId === "pilgrim_help") {
-        game.player.hp = Math.max(1, game.player.hp - 5);
+        if (game.player.hp <= 5) return;
+        game.player.hp -= 5;
         game.player.weaponUpgradeLvl += 1;
         game.player.xp += 8;
         game.player.totalRunXp += 8;
@@ -247,7 +297,8 @@ export function resolveEventOption(game, optionId) {
     } else if (optionId === "cauldron_gold") {
         game.player.gold += 12;
     } else if (optionId === "monolith_perk") {
-        game.player.hp = Math.max(1, game.player.hp - 7);
+        if (game.player.hp <= 7) return;
+        game.player.hp -= 7;
         const available = GAME_DATA.perks.filter(p => !game.player.perks.includes(p.id));
         if (available.length > 0) game.player.perks.push(RNG.choice(available).id);
     } else if (optionId === "monolith_pray") {
@@ -262,27 +313,46 @@ export function resolveEventOption(game, optionId) {
         game.saveGame("autosave");
         return;
     } else if (optionId === "sarcophagus_pray") {
-        if (game.player.gold >= 8) {
-            game.player.gold -= 8;
-            game.player.baseMaxHp += 5;
-            game.player.heal(5);
-        }
+        if (game.player.gold < 8) return;
+        game.player.gold -= 8;
+        game.player.baseMaxHp += 5;
+        game.player.heal(5);
     } else if (optionId === "pawn_dice") {
-        if (game.player.gold >= 10) {
-            game.player.gold -= 10;
-            if (RNG.chance(50)) {
-                game.player.gold += 22;
-            }
+        if (game.player.gold < 10) return;
+        game.player.gold -= 10;
+        let won = false;
+        if (RNG.chance(50)) {
+            game.player.gold += 22;
+            won = true;
         }
+        game.eventRewards = {
+            gold: won ? 22 : 0,
+            items: won ? [] : ["Проигрыш в кости (-10G)"],
+        };
+        game.state = "EVENT_REWARDS";
+        game.saveGame("autosave");
+        return;
     } else if (optionId === "pawn_blood") {
-        game.player.hp = Math.max(1, game.player.hp - 8);
+        if (game.player.hp <= 8) return;
+        game.player.hp -= 8;
         game.player.gold += 18;
     } else if (optionId === "pawn_relic") {
-        if (game.player.gold >= 20) {
-            game.player.gold -= 20;
-            const unowned = GAME_DATA.items.artifacts.filter(a => !game.player.hasArtifact(a.id));
-            if (unowned.length > 0) game.player.addArtifact(RNG.choice(unowned));
+        if (game.player.gold < 20) return;
+        game.player.gold -= 20;
+        const unowned = GAME_DATA.items.artifacts.filter(a => !game.player.hasArtifact(a.id));
+        const items = [];
+        if (unowned.length > 0) {
+            const art = RNG.choice(unowned);
+            game.player.addArtifact(art);
+            items.push(`💍 Артефакт: ${art.name} (${art.desc})`);
         }
+        game.eventRewards = {
+            gold: 0,
+            items: items,
+        };
+        game.state = "EVENT_REWARDS";
+        game.saveGame("autosave");
+        return;
     } else if (optionId === "rift_dive") {
         if (RNG.chance(50)) {
             game.player.armorUpgradeLvl += 1;

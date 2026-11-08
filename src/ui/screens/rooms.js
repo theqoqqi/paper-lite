@@ -43,13 +43,38 @@ export function renderEventScreen(render) {
     ]);
 
     ev.options.forEach(opt => {
+        let disabled = false;
+        let warningText = "";
+
+        if (opt.goldCost && game.player.gold < opt.goldCost) {
+            disabled = true;
+            warningText = `Не хватает ${opt.goldCost - game.player.gold}G`;
+        } else if (opt.hpCost && game.player.hp <= opt.hpCost) {
+            disabled = true;
+            warningText = "Слишком мало здоровья";
+        } else if (opt.maxHpCost && game.player.baseMaxHp <= opt.maxHpCost) {
+            disabled = true;
+            warningText = "Слишком мало максимального здоровья";
+        }
+
+        const btnChildren = [
+            el("div", { text: opt.text }),
+        ];
+
+        if (warningText) {
+            btnChildren.push(el("div", {
+                style: { fontSize: "11px", color: "#ff8a65", marginTop: "3px" },
+                text: warningText,
+            }));
+        }
+
         wrap.appendChild(el("button", {
-            text: opt.text,
+            disabled: disabled,
             onClick: () => {
                 game.resolveEventOption(opt.id);
                 render();
             },
-        }));
+        }, btnChildren));
     });
 
     return wrap;
@@ -236,7 +261,30 @@ export function renderShopScreen(render) {
     ]);
 
     game.shopOffers.forEach((offer, idx) => {
-        const canBuy = !offer.bought && game.player.gold >= offer.cost;
+        const isPotion = offer.kind === "potion";
+        const bagFull = isPotion && game.player.inventory.potions.length >= game.player.potionSlots;
+        const notEnoughGold = game.player.gold < offer.cost;
+        const canBuy = !offer.bought && !notEnoughGold && !bagFull;
+
+        const btnChildren = [
+            el("div", { className: "stats-line" }, [
+                el("span", { text: offer.name }),
+                el("b", { style: { color: "#ffd54f", marginLeft: "6px" }, text: `${offer.cost}G` }),
+            ]),
+        ];
+
+        if (offer.bought) {
+            btnChildren.push(el("div", {
+                style: { fontSize: "11px", color: "#888888", marginTop: "3px" },
+                text: "Куплено",
+            }));
+        } else if (bagFull) {
+            btnChildren.push(el("div", {
+                style: { fontSize: "11px", color: "#ff8a65", marginTop: "3px" },
+                text: "Нет места в поясе",
+            }));
+        }
+
         wrap.appendChild(el("button", {
             disabled: !canBuy,
             onClick: () => {
@@ -244,12 +292,7 @@ export function renderShopScreen(render) {
                 game.buyShopOffer(idx);
                 render();
             },
-        }, [
-            el("div", { className: "stats-line" }, [
-                el("span", { text: offer.bought ? `[КУПЛЕНО] ${offer.name}` : offer.name }),
-                el("b", { style: { color: "#ffd54f", marginLeft: "6px" }, text: `${offer.cost}G` }),
-            ]),
-        ]));
+        }, btnChildren));
     });
 
     wrap.appendChild(el("button", {

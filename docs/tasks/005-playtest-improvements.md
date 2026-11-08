@@ -151,7 +151,7 @@
    * В [`src/engine/systems/save.js`](../../src/engine/systems/save.js) в `loadGame` удалить затирание `game.meta` из слота забега.
    * В [`src/engine/systems/save.js`](../../src/engine/systems/save.js) в `getSlotSummary` фильтровать завершенные состояния.
 
-2. [ ] **Шаг 2: Валидация действий в событиях и лавке (п. 2, п. 6)**
+2. [x] **Шаг 2: Валидация действий в событиях и лавке (п. 2, п. 6)**
    * В [`src/data/events.js`](../../src/data/events.js) разметить опции событий затратами (`goldCost`, `hpCost`).
    * В [`src/ui/screens/rooms.js`](../../src/ui/screens/rooms.js) в `renderEventScreen` дизейблить недоступные опции с указанием причины.
    * В [`src/engine/systems/encounter.js`](../../src/engine/systems/encounter.js) в `resolveEventOption` прерывать обработку при нехватке ресурсов без закрытия комнаты.
