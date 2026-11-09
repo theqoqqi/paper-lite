@@ -2,12 +2,18 @@ import { RNG } from "../../utils/rng.js";
 import { GAME_DATA } from "../../data/index.js";
 import { playSound } from "../../utils/audio.js";
 
+const FLOOR_HP_MULTIPLIERS = [1.0, 1.5, 2.15, 3.0];
+const FLOOR_ATK_BONUSES = [0, 2, 4, 7];
+const MUTATION_CHANCE_NORMAL = [10, 30, 50, 70];
+const MUTATION_CHANCE_ELITE = [0, 30, 60, 90];
+
 export function createEnemyInstance(game, enemyKey, applyMutation = false) {
     const template = GAME_DATA.enemies[enemyKey];
     const e = JSON.parse(JSON.stringify(template));
 
-    const depthMult = 1 + (game.floor * 0.22) + (game.room * 0.05);
-    const atkDepthBonus = Math.floor(game.floor * 1.2 + game.room / 4);
+    const floorIdx = Math.min(3, Math.max(0, game.floor || 0));
+    const depthMult = FLOOR_HP_MULTIPLIERS[floorIdx];
+    const atkDepthBonus = FLOOR_ATK_BONUSES[floorIdx];
 
     e.hp = Math.round(e.hp * depthMult);
     e.currentHp = e.hp;
@@ -45,7 +51,8 @@ export function setupBattle(game, mode = "normal") {
     game._victorySoundPlayed = false;
     game.battleRewards = { xp: 0, gold: 0, items: [] };
 
-    const floorData = GAME_DATA.floors[game.floor];
+    const floorIdx = Math.min(3, Math.max(0, game.floor || 0));
+    const floorData = GAME_DATA.floors[floorIdx];
 
     if (mode === "boss") {
         playSound("bossEncounter");
@@ -54,7 +61,8 @@ export function setupBattle(game, mode = "normal") {
     } else if (mode === "elite") {
         playSound("battleStart");
         const eliteKey = RNG.choice(floorData.elite);
-        game.enemies.push(createEnemyInstance(game, eliteKey, game.floor >= 2));
+        const mutateElite = RNG.chance(MUTATION_CHANCE_ELITE[floorIdx]);
+        game.enemies.push(createEnemyInstance(game, eliteKey, mutateElite));
         game.battleLog = ["💀 Встречен Элитный противник!"];
     } else if (mode === "mimic") {
         playSound("battleStart");
@@ -62,6 +70,7 @@ export function setupBattle(game, mode = "normal") {
         game.battleLog = ["📦 Сундук оказался Алчным Мимиком!"];
     } else {
         playSound("battleStart");
+        const mutChance = MUTATION_CHANCE_NORMAL[floorIdx];
         let budget = Math.min(7, 2 + Math.floor(game.room / 3) + game.floor);
         let attempts = 0;
         while (budget > 0 && game.enemies.length < 3 && attempts < 18) {
@@ -69,9 +78,9 @@ export function setupBattle(game, mode = "normal") {
             const enemyKey = RNG.choice(floorData.enemies);
             const template = GAME_DATA.enemies[enemyKey];
             if (template.weight <= budget) {
-                const mutate = (budget - template.weight >= 1 && (game.floor >= 1 || game.room >= 6) && RNG.chance(40));
+                const mutate = RNG.chance(mutChance);
                 game.enemies.push(createEnemyInstance(game, enemyKey, mutate));
-                budget -= (template.weight + (mutate ? 1 : 0));
+                budget -= template.weight;
             }
         }
         if (game.enemies.length === 0) {

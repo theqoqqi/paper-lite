@@ -8,5 +8,6 @@
 | Регламент генерации арта для коридоров | Регламент | [corridor-art-guide.md](corridor-art-guide.md) |
 | Регламент генерации арта для врагов | Регламент | [enemy-art-guide.md](enemy-art-guide.md) |
 | Сборка и упаковка проекта в ZIP для телефона | Реализовано | [004-build-and-packaging.md](tasks/004-build-and-packaging.md) |
-| Комплексный пакет исправлений и улучшений по результатам плейтеста | В работе | [005-playtest-improvements.md](tasks/005-playtest-improvements.md) |
+| Комплексный пакет исправлений и улучшений по результатам плейтеста | Реализовано | [005-playtest-improvements.md](tasks/005-playtest-improvements.md) |
+| Прогрессия сложности этажей и ребаланс мутаций | Реализовано | [006-floor-scaling-and-mutations.md](tasks/006-floor-scaling-and-mutations.md) |
 | Идеи развития и бэклог доработок | Справочник | [improvement-ideas.md](improvement-ideas.md) |
