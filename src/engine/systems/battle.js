@@ -430,6 +430,7 @@ export function playerAction(game, actionType, onStepRender) {
         game.player.hp = Math.max(0, game.player.hp - game.player.bleed);
         game.addBattleFx({ target: "player", type: "bleedDamage", value: game.player.bleed });
         game.battleLog.unshift(`🩸 Кровотечение отнимает у вас ${game.player.bleed} HP!`);
+        game.player.bleed--;
     }
 
     ensureValidTarget(game);
@@ -592,6 +593,7 @@ export function executeSingleEnemyTurn(game, en) {
         en.currentHp = Math.max(0, en.currentHp - en.bleed);
         game.addBattleFx({ target: "enemy", enemy: en, type: "bleedDamage", value: en.bleed });
         game.battleLog.unshift(`🩸 ${en.name} истекает кровью (-${en.bleed} HP).`);
+        en.bleed--;
         if (en.currentHp <= 0) {
             onEnemyKilled(game, en);
             return;
