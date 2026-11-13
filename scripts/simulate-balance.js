@@ -265,68 +265,87 @@ function tryUsePotions(game) {
     const p = game.player;
     if (!p.inventory.potions || p.inventory.potions.length === 0) return;
     const maxHp = p.getTotalMaxHp();
+    const aliveEnemies = game.enemies.filter(e => e.currentHp > 0);
+    if (aliveEnemies.length === 0) return;
+    const totalAliveHp = aliveEnemies.reduce((s, e) => s + e.currentHp, 0);
+    const incomingDmg = getIncomingDamage(game);
+    const seriousFight = aliveEnemies.length >= 2
+        || aliveEnemies.some(e => e.isElite || e.isBoss)
+        || totalAliveHp >= 14 + (game.floor || 0) * 8
+        || p.hp <= maxHp * 0.65
+        || incomingDmg >= p.hp * 0.35;
 
     for (let i = p.inventory.potions.length - 1; i >= 0; i--) {
         const pot = p.inventory.potions[i];
         if (!pot) continue;
 
-        // Лечение
-        if (["pot1", "pot6", "pot8"].includes(pot.id)) {
+        if (["pot1", "pot8"].includes(pot.id)) {
             if (p.hp <= maxHp * 0.45 || p.poison >= 3 || p.bleed >= 3) {
                 BattleSystem.usePotion(game, i);
                 return;
             }
         }
+        if (pot.id === "pot6") {
+            if (p.hp <= maxHp * 0.55 || (p.battleAtk === 0 && (aliveEnemies.some(e => e.isElite || e.isBoss) || seriousFight) && p.hp <= maxHp - 4)) {
+                BattleSystem.usePotion(game, i);
+                return;
+            }
+        }
         if (pot.id === "pot4") {
-            if (p.hp <= maxHp * 0.55 && p.shield <= 3) {
+            if (incomingDmg > p.shield && (incomingDmg >= 6 || p.hp <= maxHp * 0.60 || incomingDmg >= p.hp + p.shield)) {
                 BattleSystem.usePotion(game, i);
                 return;
             }
         }
         if (pot.id === "pot7") {
-            const aliveEnemies = game.enemies.filter(e => e.currentHp > 0);
             const shouldStartBuff = p.battleSpikes === 0 && (aliveEnemies.length >= 2 || aliveEnemies.some(e => e.currentHp >= 14));
-            if (shouldStartBuff || (p.hp <= maxHp * 0.55 && p.shield <= 3)) {
+            if (shouldStartBuff || (incomingDmg > p.shield && p.hp <= maxHp * 0.55)) {
                 BattleSystem.usePotion(game, i);
                 return;
             }
         }
-        // АОЕ / дебаффы (pot3, pot5)
         if (["pot3", "pot5"].includes(pot.id)) {
-            const aliveCount = game.enemies.filter(e => e.currentHp > 0).length;
-            if (aliveCount >= 1) {
+            if (seriousFight) {
                 BattleSystem.usePotion(game, i);
                 return;
             }
         }
-        // Бутыль с Кислотой (pot9) — снимает щиты и -2 DEF
         if (pot.id === "pot9") {
-            const aliveEnemies = game.enemies.filter(e => e.currentHp > 0);
             const worthAcid = aliveEnemies.some(e => e.shield >= 3 || e.def >= 2 || (e.currentHp >= 10 && (e.shield > 0 || e.def > 0)))
                 || aliveEnemies.filter(e => e.shield > 0 || e.def > 0).length >= 2;
-            if (worthAcid) {
+            if (worthAcid || seriousFight) {
                 BattleSystem.usePotion(game, i);
                 return;
             }
         }
-        // Энергия / сброс кулдаунов (pot2)
         if (pot.id === "pot2") {
-            const aliveHp = game.enemies.reduce((s, e) => s + Math.max(0, e.currentHp), 0);
-            if (aliveHp >= 8 && (p.en <= 1 || (p.cooldowns.heavy > 0 && p.cooldowns.pierce > 0 && p.en <= 2))) {
+            if (totalAliveHp >= 10 && (p.en <= 1 || (p.cooldowns.heavy > 0 && p.cooldowns.pierce > 0 && p.en <= 2) || (incomingDmg > p.shield && p.hp <= maxHp * 0.55))) {
                 BattleSystem.usePotion(game, i);
                 return;
             }
         }
-        // Гарантированный крит (pot10)
         if (pot.id === "pot10") {
-            const aliveEnemies = game.enemies.filter(e => e.currentHp > 0);
-            const isAssassinFirstTurn = p.classId === "assassin" && game.battleTurn === 1;
-            if (aliveEnemies.length > 0 && !p.forceCritNext && !isAssassinFirstTurn && aliveEnemies.some(e => e.currentHp >= 5)) {
+            if (!p.forceCritNext && seriousFight && aliveEnemies.some(e => e.currentHp >= 9)) {
                 BattleSystem.usePotion(game, i);
                 return;
             }
         }
     }
+}
+
+function getIncomingDamage(game) {
+    const p = game.player;
+    const totalDef = p.getTotalDef();
+    const flatReduce = p.hasArtifact("art18") ? 1 : 0;
+    let total = 0;
+    for (const e of game.enemies) {
+        if (e.currentHp <= 0) continue;
+        const patList = e.pattern || [];
+        const nextPat = patList[(e.patternIndex || 0) % patList.length];
+        if (!nextPat || !nextPat.val || nextPat.val <= 0) continue;
+        total += Math.max(1, nextPat.val - totalDef - flatReduce);
+    }
+    return total;
 }
 
 function chooseAction(game, playstyleId) {
@@ -543,6 +562,7 @@ function processIntermission(game, step, roomsSinceCampfire) {
     p.shield = 0;
     p.tempSpikes = 0;
     p.battleSpikes = 0;
+    p.battleAtk = 0;
     p.damageReduction50 = false;
     p.forceCritNext = false;
     p.concentrateBonus = 0;

@@ -35,6 +35,7 @@ export class Player {
         this.shield = 0;
         this.tempSpikes = 0;
         this.battleSpikes = 0;
+        this.battleAtk = 0;
         this.poison = 0;
         this.bleed = 0;
         this.concentrateBonus = 0;
@@ -113,7 +114,7 @@ export class Player {
         let val = this.baseMaxHp;
         if (this.inventory.armor && this.inventory.armor.hp) val += this.inventory.armor.hp;
         val += this.armorUpgradeLvl * 3;
-        if (this.hasArtifact("art9")) val += 6;
+        if (this.hasArtifact("art9")) val += 10;
         if (this.perks.includes("p23")) val += 10;
         return val;
     }
@@ -132,8 +133,9 @@ export class Player {
     }
 
     getTotalAtk() {
-        let val = this.baseAtk + this.concentrateBonus + this.weaponUpgradeLvl;
+        let val = this.baseAtk + this.concentrateBonus + (this.battleAtk || 0) + this.weaponUpgradeLvl;
         if (this.inventory.weapon) val += this.inventory.weapon.atk || 0;
+        if (this.hasArtifact("art3")) val += 1;
         if (this.hasArtifact("art5")) val += 1;
         if (this.perks.includes("p1")) val += 1;
         if (this.perks.includes("p4") && this.hp <= this.getTotalMaxHp() / 2) val += 3;
@@ -153,7 +155,7 @@ export class Player {
         let val = this.tempSpikes + this.battleSpikes;
         if (this.inventory.armor && this.inventory.armor.spikes) val += this.inventory.armor.spikes;
         if (this.perks.includes("p12")) val += 2;
-        if (this.hasArtifact("art14")) val += 3;
+        if (this.hasArtifact("art14")) val += 2;
         return val;
     }
 
@@ -162,7 +164,7 @@ export class Player {
         if (this.inventory.weapon && this.inventory.weapon.crit) val += this.inventory.weapon.crit;
         if (this.perks.includes("p2")) val += 12;
         if (this.hasArtifact("art5")) val += 8;
-        if (this.hasArtifact("art11")) val += 12;
+        if (this.hasArtifact("art11")) val += 24;
         return Math.min(100, val);
     }
 
