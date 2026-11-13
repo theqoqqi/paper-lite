@@ -438,8 +438,8 @@ function simulateFloorRun(classId, itemDef, playstyleId, runIndex, metrics, floo
         } else if (itemDef.type === "armor") {
             p.equipArmor(itemDef);
         } else if (itemDef.type === "potion") {
-            p.potionSlots += 2;
-            p.inventory.potions.push({ ...itemDef }, { ...itemDef });
+            p.potionSlots += 1;
+            p.inventory.potions.push({ ...itemDef });
         }
     }
 
@@ -848,37 +848,36 @@ function evaluateFloorItem(itemDef, baselines, activeFloors = ACTIVE_FLOOR_PROFI
         }
     }
 
-    let verdict = "Баланс";
-    let icon = "✅";
-
-    if (deltaRmsPctVal >= 80 || deltaRmsVal >= 2.5) {
-        verdict = "Универсальная имба";
-        icon = "🚨";
-    } else if (cost && cost >= 20 && deltaRmsPctVal <= 15) {
-        verdict = "Оверпрайс / Ловушка";
-        icon = "💸";
-    } else if (cost && cost <= 14 && cost > 0 && (deltaRmsPctVal / cost) >= 3.0 && deltaRmsPctVal >= 30) {
-        verdict = "Сверхвыгодно (Высокий ROI)";
-        icon = "💎";
-    } else if (maxStyleMult >= 1.65 || (bestPlaystyle && bestPlaystyle.deltaRms >= 2.0)) {
-        verdict = "Сломанная синергия";
-        icon = "⚡";
-    } else if (deltaRmsPctVal <= 8 && deltaRmsVal <= 0.25) {
-        verdict = "Слабо / Мусор";
-        icon = "💤";
-    }
-
     const roi = cost && cost > 0
         ? Math.max(0, Math.round((deltaRmsPctVal / cost) * 10) / 10)
         : null;
+    const targetRoi = cost && cost > 0
+        ? getExpectedRoiPerG(itemDef.category, itemDef.rarity)
+        : null;
+    const expectedPct = getExpectedDeltaPct(itemDef);
+    const valueScore = expectedPct > 0
+        ? Math.max(0, Math.round((deltaRmsPctVal / expectedPct) * 100))
+        : 0;
+
+    const { verdict, icon } = classifyItemVerdict({
+        cost,
+        deltaRmsPctVal,
+        deltaRmsVal,
+        valueScore,
+        maxStyleMult,
+        bestPlaystyle,
+    });
 
     return {
         id: itemDef.id,
         name: itemDef.name,
         category: itemDef.category,
+        rarity: itemDef.rarity || null,
         cost: itemDef.cost ?? null,
         desc: itemDef.desc || "",
         roi,
+        targetRoi,
+        valueScore,
         avgDamage: overallAvgDamage,
         deltaDamage: deltaDmgVal,
         deltaDamagePct: deltaDmgPctVal,
@@ -929,8 +928,10 @@ function buildItemPool() {
 // 10. Форматирование консольного вывода и Markdown
 function formatConsoleRow(res, activeFloors = ACTIVE_FLOOR_PROFILES) {
     const dRms = `+${res.deltaRooms} (+${res.deltaRoomsPct}%)`;
+    const rarityPad = formatShortRarity(res.rarity).padEnd(5);
     const costStr = res.cost !== null ? `${res.cost}G`.padEnd(6) : "—".padEnd(6);
     const roiStr = res.roi !== null ? `+${res.roi}`.padEnd(6) : "—".padEnd(6);
+    const vsStr = `${res.valueScore}`.padEnd(4);
     const idPad = res.id.padEnd(5);
     const namePad = res.name.slice(0, 20).padEnd(21);
     const catPad = res.category.padEnd(9);
@@ -942,7 +943,7 @@ function formatConsoleRow(res, activeFloors = ACTIVE_FLOOR_PROFILES) {
     const bestStylePad = res.bestPlaystyle ? `${res.bestPlaystyle.name} (x${res.bestPlaystyle.mult})`.slice(0, 23).padEnd(24) : "-".padEnd(24);
     const verdPad = `${res.icon} ${res.verdict}`;
 
-    return `${idPad} | ${namePad} | ${catPad} | ${costStr} | ${roiStr} | ${floorCols} | ${rmsPad} | ${bestStylePad} | ${verdPad}`;
+    return `${idPad} | ${namePad} | ${catPad} | ${rarityPad} | ${costStr} | ${roiStr} | ${vsStr} | ${floorCols} | ${rmsPad} | ${bestStylePad} | ${verdPad}`;
 }
 
 function generateMarkdownReport(results, baselines, activeFloors = ACTIVE_FLOOR_PROFILES) {
@@ -968,6 +969,13 @@ function generateMarkdownReport(results, baselines, activeFloors = ACTIVE_FLOOR_
     }
     md += "\n";
 
+    md += "### Целевая матрица ROI (%/G) по категориям и редкости\n\n";
+    md += "| Категория | Обычное | Редкое | Эпическое | Легендарное |\n";
+    md += "| :--- | :---: | :---: | :---: | :---: |\n";
+    md += `| **Оружие и Броня** (1.0x) | ${EXPECTED_ROI_MATRIX.weapons["Обычное"]} | ${EXPECTED_ROI_MATRIX.weapons["Редкое"]} | ${EXPECTED_ROI_MATRIX.weapons["Эпическое"]} | ${EXPECTED_ROI_MATRIX.weapons["Легендарное"]} |\n`;
+    md += `| **Артефакты** (0.5x) | ${EXPECTED_ROI_MATRIX.artifacts["Обычное"]} | ${EXPECTED_ROI_MATRIX.artifacts["Редкое"]} | ${EXPECTED_ROI_MATRIX.artifacts["Эпическое"]} | ${EXPECTED_ROI_MATRIX.artifacts["Легендарное"]} |\n`;
+    md += `| **Зелья (1 шт.)** (1.5x) | ${EXPECTED_ROI_MATRIX.potions["Обычное"]} | ${EXPECTED_ROI_MATRIX.potions["Редкое"]} | ${EXPECTED_ROI_MATRIX.potions["Эпическое"]} | ${EXPECTED_ROI_MATRIX.potions["Легендарное"]} |\n\n`;
+
     const imbaList = results.filter(r => r.verdict === "Универсальная имба");
     const superRoiList = results.filter(r => r.verdict === "Сверхвыгодно (Высокий ROI)");
     const overpriceList = results.filter(r => r.verdict === "Оверпрайс / Ловушка");
@@ -981,8 +989,8 @@ function generateMarkdownReport(results, baselines, activeFloors = ACTIVE_FLOOR_
 
     md += "## 1. Сводка критических отклонений баланса\n\n";
     md += `* 🚨 **Универсальная имба (${imbaList.length}):** ${imbaList.map(r => `\`${r.id}\` **${r.name}** (+${r.deltaRoomsPct}% комнат, +${r.deltaRooms} комнат)`).join(", ") || "Нет"}\n`;
-    md += `* 💎 **Сверхвыгодные предметы магазина (Высокий ROI, ${superRoiList.length}):** ${superRoiList.map(r => `\`${r.id}\` **${r.name}** (${r.cost}G, ROI: +${r.roi})`).join(", ") || "Нет"}\n`;
-    md += `* 💸 **Оверпрайс / Ловушки для игрока (${overpriceList.length}):** ${overpriceList.map(r => `\`${r.id}\` **${r.name}** (${r.cost}G, +${r.deltaRoomsPct}% комнат)`).join(", ") || "Нет"}\n`;
+    md += `* 💎 **Сверхвыгодные предметы магазина (Высокий ROI, ${superRoiList.length}):** ${superRoiList.map(r => `\`${r.id}\` **${r.name}** (${r.cost}G, ROI: +${r.roi}, VS: ${r.valueScore})`).join(", ") || "Нет"}\n`;
+    md += `* 💸 **Оверпрайс / Ловушки для игрока (${overpriceList.length}):** ${overpriceList.map(r => `\`${r.id}\` **${r.name}** (${r.cost}G, +${r.deltaRoomsPct}% комнат, VS: ${r.valueScore})`).join(", ") || "Нет"}\n`;
     md += `* ⚡ **Мощные синергии стилей (${synergyList.length}):** ${synergyList.map(r => `\`${r.id}\` **${r.name}** (${r.bestPlaystyle ? r.bestPlaystyle.name + " x" + r.bestPlaystyle.mult : ""})`).join(", ") || "Нет"}\n`;
     md += `* 📈 **Сильнее в лейте, чем на старте (Э4 ≥ Э1 + 10% п.п., ${lateScalingList.length}):** ${lateScalingList.map(r => `\`${r.id}\` ${r.name} (+${r.byFloor.f1.deltaRoomsPct}% → +${r.byFloor.f4.deltaRoomsPct}%)`).join(", ") || "Нет"}\n`;
     md += `* 💤 **Слабый / Мёртвый груз (${weakList.length}):** ${weakList.map(r => `\`${r.id}\` ${r.name} (+${r.deltaRoomsPct}% комнат)`).join(", ") || "Нет"}\n\n`;
@@ -1003,12 +1011,16 @@ function generateMarkdownReport(results, baselines, activeFloors = ACTIVE_FLOOR_
         if (catResults.length === 0) continue;
 
         md += `## 2. ${cat.title}\n\n`;
-        md += `| ID | Название | Цена | Эффект | ${floorHeaders} | Ср. Δ% | ROI (%/G) | Лучший стиль | Вердикт |\n`;
-        md += `| :--- | :--- | :---: | :--- | ${floorAligns} | :---: | :---: | :--- | :--- |\n`;
+        md += `| ID | Название | Редкость | Цена | Эффект | ${floorHeaders} | Ср. Δ% | ROI (%/G) | VS | Лучший стиль | Вердикт |\n`;
+        md += `| :--- | :--- | :---: | :---: | :--- | ${floorAligns} | :---: | :---: | :---: | :--- | :--- |\n`;
 
         for (const r of catResults) {
+            const rarityStr = r.rarity || "—";
             const costStr = r.cost !== null ? `${r.cost}G` : "— *(LvlUp)*";
-            const roiStr = r.roi !== null ? `**+${r.roi}**` : "—";
+            const roiStr = r.roi !== null
+                ? (r.targetRoi ? `**+${r.roi}** / ${r.targetRoi}` : `**+${r.roi}**`)
+                : "—";
+            const vsStr = `**${r.valueScore}**`;
             const floorCells = activeFloors.map(fp => {
                 const fr = r.byFloor[fp.id];
                 return fr ? `**+${fr.deltaRoomsPct}%** (+${fr.deltaRooms})` : "—";
@@ -1017,7 +1029,7 @@ function generateMarkdownReport(results, baselines, activeFloors = ACTIVE_FLOOR_
             const styleStr = r.bestPlaystyle ? `**${r.bestPlaystyle.name}** (x${r.bestPlaystyle.mult})` : "-";
             const descEscaped = r.desc.replace(/\|/g, "\\|");
 
-            md += `| \`${r.id}\` | **${r.name}** | ${costStr} | ${descEscaped} | ${floorCells} | **${dRmsStr}** | ${roiStr} | ${styleStr} | ${r.icon} ${r.verdict} |\n`;
+            md += `| \`${r.id}\` | **${r.name}** | ${rarityStr} | ${costStr} | ${descEscaped} | ${floorCells} | **${dRmsStr}** | ${roiStr} | ${vsStr} | ${styleStr} | ${r.icon} ${r.verdict} |\n`;
         }
         md += "\n";
     }
@@ -1046,7 +1058,38 @@ function hslToHex(h, s, l) {
 }
 
 const PERK_EXPECTED_PCT = 35;
-const GOLD_EXPECTED_PCT_PER_G = 3.5;
+const DEFAULT_RARITY_BY_CATEGORY = {
+    weapons: "Обычное",
+    armors: "Обычное",
+    artifacts: "Редкое",
+    potions: "Обычное",
+};
+const EXPECTED_ROI_MATRIX = {
+    weapons: {
+        "Обычное": 2.0,
+        "Редкое": 2.2,
+        "Эпическое": 2.4,
+        "Легендарное": 2.6,
+    },
+    armors: {
+        "Обычное": 2.0,
+        "Редкое": 2.2,
+        "Эпическое": 2.4,
+        "Легендарное": 2.6,
+    },
+    artifacts: {
+        "Обычное": 1.0,
+        "Редкое": 1.1,
+        "Эпическое": 1.2,
+        "Легендарное": 1.3,
+    },
+    potions: {
+        "Обычное": 3.0,
+        "Редкое": 3.3,
+        "Эпическое": 3.6,
+        "Легендарное": 3.9,
+    },
+};
 
 function calculateScoreHue(score) {
     if (score <= 100) {
@@ -1070,12 +1113,9 @@ function calculateRawPctHue(pct) {
     return calculateScoreHue(normalizedScore);
 }
 
-function calculateItemValueScore(id, pct, itemCostMap) {
-    const cost = itemCostMap.get(id);
-    const expected = cost === null || cost === undefined
-        ? PERK_EXPECTED_PCT
-        : cost * GOLD_EXPECTED_PCT_PER_G;
-    return Math.max(0, Math.round((pct / expected) * 100));
+function calculateItemValueScore(id, pct, itemMetaMap) {
+    const expected = getExpectedDeltaPct(itemMetaMap.get(id));
+    return expected > 0 ? Math.max(0, Math.round((pct / expected) * 100)) : 0;
 }
 
 function parseReportMetrics(reportPath) {
@@ -1127,12 +1167,12 @@ function colorizeAuditMarkdown(simResults = null) {
         return;
     }
 
-    const itemCostMap = new Map();
-    DATA_PERKS.forEach(p => itemCostMap.set(p.id, null));
-    DATA_ITEMS.weapons.forEach(w => itemCostMap.set(w.id, w.cost));
-    (DATA_ITEMS.armors || DATA_ITEMS.armor || []).forEach(a => itemCostMap.set(a.id, a.cost));
-    DATA_ITEMS.artifacts.forEach(art => itemCostMap.set(art.id, art.cost));
-    DATA_ITEMS.potions.forEach(pot => itemCostMap.set(pot.id, pot.cost));
+    const itemMetaMap = new Map();
+    DATA_PERKS.forEach(p => itemMetaMap.set(p.id, { id: p.id, cost: null, category: "perks", rarity: null }));
+    DATA_ITEMS.weapons.forEach(w => itemMetaMap.set(w.id, { id: w.id, cost: w.cost, category: "weapons", rarity: w.rarity || null }));
+    (DATA_ITEMS.armors || DATA_ITEMS.armor || []).forEach(a => itemMetaMap.set(a.id, { id: a.id, cost: a.cost, category: "armors", rarity: a.rarity || null }));
+    DATA_ITEMS.artifacts.forEach(art => itemMetaMap.set(art.id, { id: art.id, cost: art.cost, category: "artifacts", rarity: art.rarity || null }));
+    DATA_ITEMS.potions.forEach(pot => itemMetaMap.set(pot.id, { id: pot.id, cost: pot.cost, category: "potions", rarity: pot.rarity || null }));
 
     const metrics = new Map();
 
@@ -1207,11 +1247,12 @@ function colorizeAuditMarkdown(simResults = null) {
                 if (insertFloorPos >= 0) cols.splice(insertFloorPos, 0, ...FLOOR_PROFILES.map(() => ""));
 
                 const id = idMatch[1];
-                const cost = itemCostMap.get(id);
-                const fallbackPct = cost ? cost * GOLD_EXPECTED_PCT_PER_G : PERK_EXPECTED_PCT;
+                const itemMeta = itemMetaMap.get(id);
+                const cost = itemMeta ? itemMeta.cost : null;
+                const fallbackPct = getExpectedDeltaPct(itemMeta);
                 const entry = metrics.get(id);
                 const pct = entry ? entry.avgPct : fallbackPct;
-                const score = calculateItemValueScore(id, pct, itemCostMap);
+                const score = calculateItemValueScore(id, pct, itemMetaMap);
 
                 const scoreHue = calculateScoreHue(score);
                 const scoreHex = hslToHex(scoreHue, 85, 54);
@@ -1247,8 +1288,8 @@ function colorizeAuditMarkdown(simResults = null) {
         "> **Шкала оценок эффективности (Две шкалы, 4 этажа Э1–Э4 + среднее):**",
         "> 1. **Э1–Э4 и Сырой прирост (растянутая шкала прироста дальности комнат от $+0\\%$ до $+180\\%+$):**  ",
         `>    <span style="color: ${hslToHex(calculateRawPctHue(0), 85, 54)}">**+0% (база)**</span> $\\to$ <span style="color: ${hslToHex(calculateRawPctHue(35), 85, 54)}">**+35% (норма)**</span> $\\to$ <span style="color: ${hslToHex(calculateRawPctHue(56), 85, 54)}">**+56% (сильно)**</span> $\\to$ <span style="color: ${hslToHex(calculateRawPctHue(75), 85, 54)}">**+75% (алый)**</span> $\\to$ <span style="color: ${hslToHex(calculateRawPctHue(125), 85, 54)}">**+125% (мощно)**</span> $\\to$ <span style="color: ${hslToHex(calculateRawPctHue(180), 85, 54)}">**+180%+ (пурпур)**</span>`,
-        "> 2. **Оценка силы / Value Score (справедливая ценность среднего прироста к стоимости, эталон — 100):**  ",
-        ">    *Ориентир 100 означает: $+3.5\\%$ средней дальности на $1G$ цены предмета, либо $+35\\%$ на слот бесплатного перка (для перков обе колонки окрашены идентично).*  ",
+        "> 2. **Оценка силы / Value Score (отношение среднего прироста к эталону категории и редкости, где 100 — точное попадание):**  ",
+        ">    *Эталон 100: Оружие/Броня `2.0 / 2.2 / 2.4 / 2.6 %/G`, Артефакты `1.0 / 1.1 / 1.2 / 1.3 %/G`, Зелья (1 шт.) `3.0 / 3.3 / 3.6 %/G`, Перки `+35%` (для перков обе колонки окрашены идентично).*  ",
         `>    <span style="color: ${hslToHex(calculateScoreHue(0), 85, 54)}">**0 (мусор)**</span> $\\to$ <span style="color: ${hslToHex(calculateScoreHue(50), 85, 54)}">**50 (слабо)**</span> $\\to$ <span style="color: ${hslToHex(calculateScoreHue(100), 85, 54)}">**100 (идеал)**</span> $\\to$ <span style="color: ${hslToHex(calculateScoreHue(130), 85, 54)}">**130 (лайм)**</span> $\\to$ <span style="color: ${hslToHex(calculateScoreHue(160), 85, 54)}">**160 (янтарь)**</span> $\\to$ <span style="color: ${hslToHex(calculateScoreHue(215), 85, 54)}">**215 (алый)**</span> $\\to$ <span style="color: ${hslToHex(calculateScoreHue(350), 85, 54)}">**350 (малина)**</span> $\\to$ <span style="color: ${hslToHex(calculateScoreHue(500), 85, 54)}">**500+ (пурпур)**</span>`,
     ].join("\n");
 
@@ -1263,6 +1304,62 @@ function colorizeAuditMarkdown(simResults = null) {
 
     fs.writeFileSync(auditPath, resultMd, "utf8");
     console.log(`🎨 Обновлены колонки Э1–Э4, Сырой прирост и Value Score (${modifiedCount} шт.) в ${auditPath}`);
+}
+
+function classifyItemVerdict({ cost, deltaRmsPctVal, deltaRmsVal, valueScore, maxStyleMult, bestPlaystyle }) {
+    if (cost && cost > 0) {
+        if ((valueScore >= 165 && deltaRmsPctVal >= 50) || deltaRmsPctVal >= 120) {
+            return { verdict: "Универсальная имба", icon: "🚨" };
+        }
+        if (valueScore >= 140 && deltaRmsPctVal >= 20) {
+            return { verdict: "Сверхвыгодно (Высокий ROI)", icon: "💎" };
+        }
+        if (deltaRmsPctVal <= 6 && deltaRmsVal <= 0.2) {
+            return { verdict: "Слабо / Мусор", icon: "💤" };
+        }
+        if (valueScore <= 60) {
+            return { verdict: "Оверпрайс / Ловушка", icon: "💸" };
+        }
+        if (bestPlaystyle && bestPlaystyle.deltaRms >= 2.0 && bestPlaystyle.deltaRms >= deltaRmsVal * 1.5 && maxStyleMult >= 1.65) {
+            return { verdict: "Сломанная синергия", icon: "⚡" };
+        }
+        return { verdict: "Баланс", icon: "✅" };
+    }
+
+    if (deltaRmsPctVal >= 75 || deltaRmsVal >= 2.5) {
+        return { verdict: "Универсальная имба", icon: "🚨" };
+    }
+    if (maxStyleMult >= 1.65 || (bestPlaystyle && bestPlaystyle.deltaRms >= 2.0)) {
+        return { verdict: "Сломанная синергия", icon: "⚡" };
+    }
+    if (deltaRmsPctVal <= 8 && deltaRmsVal <= 0.25) {
+        return { verdict: "Слабо / Мусор", icon: "💤" };
+    }
+    return { verdict: "Баланс", icon: "✅" };
+}
+
+function getExpectedDeltaPct(item) {
+    if (!item || item.cost === null || item.cost === undefined) {
+        return PERK_EXPECTED_PCT;
+    }
+    const targetRoi = getExpectedRoiPerG(item.category, item.rarity);
+    return targetRoi ? item.cost * targetRoi : item.cost * 2.0;
+}
+
+function getExpectedRoiPerG(category, rarity) {
+    const catTable = EXPECTED_ROI_MATRIX[category];
+    if (!catTable) return null;
+    const effectiveRarity = rarity || DEFAULT_RARITY_BY_CATEGORY[category] || "Обычное";
+    return catTable[effectiveRarity] ?? Object.values(catTable)[0] ?? null;
+}
+
+function formatShortRarity(rarity) {
+    if (!rarity) return "—";
+    if (rarity === "Обычное") return "Обыч.";
+    if (rarity === "Редкое") return "Редк.";
+    if (rarity === "Эпическое") return "Эпик.";
+    if (rarity === "Легендарное") return "Лег.";
+    return rarity.slice(0, 5);
 }
 
 // 11. Точка входа
@@ -1289,8 +1386,8 @@ async function main() {
     console.log(`\nЗапуск оценки пула сущностей: ${itemPool.length} шт...\n`);
     const floorColsHeader = activeFloors.map(fp => fp.label.padEnd(6)).join(" | ");
     const floorColsRule = activeFloors.map(() => "--------").join("+");
-    const tableRule = `------+-------------------------+-----------+--------+--------+${floorColsRule}+--------------------+--------------------------+-----------------------`;
-    console.log(`ID    | Название                | Катег.    | Цена   | ROI    | ${floorColsHeader} | Ср.Комн (Δ)        | Лучший стиль (xMult)     | Вердикт`);
+    const tableRule = `------+-------------------------+-----------+-------+--------+--------+------+${floorColsRule}+--------------------+--------------------------+-----------------------`;
+    console.log(`ID    | Название                | Катег.    | Редк. | Цена   | ROI    | VS   | ${floorColsHeader} | Ср.Комн (Δ)        | Лучший стиль (xMult)     | Вердикт`);
     console.log(tableRule);
 
     const results = [];
