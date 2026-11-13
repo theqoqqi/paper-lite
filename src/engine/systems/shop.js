@@ -1,5 +1,6 @@
 import { RNG } from "../../utils/rng.js";
 import { GAME_DATA } from "../../data/index.js";
+import { pickItemByRarity } from "./encounter.js";
 
 export function buyMetaUpgrade(game, key) {
     const upg = GAME_DATA.metaUpgrades.find(u => u.key === key);
@@ -25,12 +26,10 @@ export function unlockClass(game, classKey) {
 }
 
 export function setupShop(game) {
-    const wPool = GAME_DATA.items.weapons.filter(i => game.floor >= 1 || i.tier === 1);
-    const aPool = GAME_DATA.items.armors.filter(i => game.floor >= 1 || i.tier === 1);
     const unownedArts = GAME_DATA.items.artifacts.filter(a => !game.player.hasArtifact(a.id));
 
-    const w = RNG.choice(wPool);
-    const a = RNG.choice(aPool);
+    const w = pickItemByRarity(GAME_DATA.items.weapons, game.floor);
+    const a = pickItemByRarity(GAME_DATA.items.armors, game.floor);
     const pot1 = RNG.choice(GAME_DATA.items.potions);
     const pot2 = RNG.choice(GAME_DATA.items.potions);
 
@@ -81,8 +80,15 @@ export function setupShop(game) {
         bought: false,
     }];
 
-    const shuffledArts = RNG.shuffle(unownedArts).slice(0, 2);
-    shuffledArts.forEach(art => {
+    const shopArts = [];
+    let availableArts = unownedArts;
+    for (let i = 0; i < 2 && availableArts.length > 0; i++) {
+        const art = pickItemByRarity(availableArts, game.floor);
+        if (!art) break;
+        shopArts.push(art);
+        availableArts = availableArts.filter(item => item.id !== art.id);
+    }
+    shopArts.forEach(art => {
         game.shopOffers.push({
             id: art.id,
             kind: "artifact",

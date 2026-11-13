@@ -15,37 +15,27 @@ export function checkLevelUpOrFinishRoom(game) {
 }
 
 export function grantRandomEquipment(game, origin = "battle") {
-    const tier = game.floor >= 2 ? 2 : 1;
+    const minRarity = origin === "battle" ? "Редкое" : null;
     const roll = RNG.range(1, 3);
-    if (roll === 1) {
-        const pool = GAME_DATA.items.weapons.filter(w => w.tier === tier);
-        const item = RNG.choice(pool);
+    if (roll === 1 || roll === 2) {
+        const type = roll === 1 ? "weapon" : "armor";
+        const pool = roll === 1 ? GAME_DATA.items.weapons : GAME_DATA.items.armors;
+        const label = roll === 1 ? "Оружие" : "Броня";
+        const item = pickItemByRarity(pool, game.floor, minRarity);
+        if (!item) return null;
         game.pendingEquipment = {
-            type: "weapon",
+            type: type,
             item: { ...item },
             origin: origin,
         };
-        return `Оружие: ${item.name} (${item.desc})`;
-    } else if (roll === 2) {
-        const pool = GAME_DATA.items.armors.filter(a => a.tier === tier);
-        const item = RNG.choice(pool);
-        game.pendingEquipment = {
-            type: "armor",
-            item: { ...item },
-            origin: origin,
-        };
-        return `Броня: ${item.name} (${item.desc})`;
-    } else {
-        const unowned = GAME_DATA.items.artifacts.filter(a => !game.player.hasArtifact(a.id));
-        if (unowned.length > 0) {
-            const art = RNG.choice(unowned);
-            game.player.addArtifact(art);
-            return `Артефакт: ${art.name}`;
-        } else {
-            game.player.gold += 15;
-            return "Сундук золота (+15G)";
-        }
+        return `${label}: ${item.name} (${item.desc})`;
     }
+    const art = grantRandomArtifact(game, minRarity);
+    if (art) {
+        return `Артефакт: ${art.name}`;
+    }
+    game.player.gold += 15;
+    return "Сундук золота (+15G)";
 }
 
 export function resolveEquipChoice(game) {
@@ -126,13 +116,8 @@ export function resolveEventOption(game, optionId) {
     } else if (optionId === "altar_gold") {
         if (game.player.gold < 12) return;
         game.player.gold -= 12;
-        const unowned = GAME_DATA.items.artifacts.filter(a => !game.player.hasArtifact(a.id));
-        const items = [];
-        if (unowned.length > 0) {
-            const art = RNG.choice(unowned);
-            game.player.addArtifact(art);
-            items.push(`💍 Артефакт: ${art.name} (${art.desc})`);
-        }
+        const art = grantRandomArtifact(game);
+        const items = art ? [`💍 Артефакт: ${art.name} (${art.desc})`] : [];
         game.eventRewards = {
             gold: 0,
             items: items,
@@ -223,13 +208,8 @@ export function resolveEventOption(game, optionId) {
         game.player.baseMaxHp = Math.max(6, game.player.baseMaxHp - 5);
         game.player.clampHp();
         game.player.gold += 18;
-        const unowned = GAME_DATA.items.artifacts.filter(a => !game.player.hasArtifact(a.id));
-        const items = [];
-        if (unowned.length > 0) {
-            const art = RNG.choice(unowned);
-            game.player.addArtifact(art);
-            items.push(`💍 Артефакт: ${art.name} (${art.desc})`);
-        }
+        const art = grantRandomArtifact(game);
+        const items = art ? [`💍 Артефакт: ${art.name} (${art.desc})`] : [];
         game.eventRewards = {
             gold: 18,
             items: items,
@@ -256,13 +236,8 @@ export function resolveEventOption(game, optionId) {
     } else if (optionId === "well_blood") {
         if (game.player.hp <= 6) return;
         game.player.hp -= 6;
-        const unowned = GAME_DATA.items.artifacts.filter(a => !game.player.hasArtifact(a.id));
-        const items = [];
-        if (unowned.length > 0) {
-            const art = RNG.choice(unowned);
-            game.player.addArtifact(art);
-            items.push(`💍 Артефакт: ${art.name} (${art.desc})`);
-        }
+        const art = grantRandomArtifact(game);
+        const items = art ? [`💍 Артефакт: ${art.name} (${art.desc})`] : [];
         game.eventRewards = {
             gold: 0,
             items: items,
@@ -305,8 +280,7 @@ export function resolveEventOption(game, optionId) {
         game.player.totalRunXp += 15;
     } else if (optionId === "sarcophagus_fight") {
         game.player.gold += 20;
-        const unowned = GAME_DATA.items.artifacts.filter(a => !game.player.hasArtifact(a.id));
-        if (unowned.length > 0) game.player.addArtifact(RNG.choice(unowned));
+        grantRandomArtifact(game);
         game.setupBattle("elite");
         game.saveGame("autosave");
         return;
@@ -337,13 +311,8 @@ export function resolveEventOption(game, optionId) {
     } else if (optionId === "pawn_relic") {
         if (game.player.gold < 20) return;
         game.player.gold -= 20;
-        const unowned = GAME_DATA.items.artifacts.filter(a => !game.player.hasArtifact(a.id));
-        const items = [];
-        if (unowned.length > 0) {
-            const art = RNG.choice(unowned);
-            game.player.addArtifact(art);
-            items.push(`💍 Артефакт: ${art.name} (${art.desc})`);
-        }
+        const art = grantRandomArtifact(game);
+        const items = art ? [`💍 Артефакт: ${art.name} (${art.desc})`] : [];
         game.eventRewards = {
             gold: 0,
             items: items,
@@ -370,8 +339,7 @@ export function resolveEventOption(game, optionId) {
         }
     } else if (optionId === "nest_hunt") {
         game.player.gold += 15;
-        const unowned = GAME_DATA.items.artifacts.filter(a => !game.player.hasArtifact(a.id));
-        if (unowned.length > 0) game.player.addArtifact(RNG.choice(unowned));
+        grantRandomArtifact(game);
         game.setupBattle("elite");
         game.saveGame("autosave");
         return;
@@ -464,4 +432,50 @@ export function leaveCorridorRoom(game) {
     }
     game.currentCorridorResult = null;
     checkLevelUpOrFinishRoom(game);
+}
+
+export function grantRandomArtifact(game, minRarity = null) {
+    const unowned = GAME_DATA.items.artifacts.filter(a => !game.player.hasArtifact(a.id));
+    if (unowned.length === 0) return null;
+    const art = pickItemByRarity(unowned, game.floor, minRarity);
+    if (!art) return null;
+    game.player.addArtifact(art);
+    return art;
+}
+
+export function pickItemByRarity(items, floor = 0, minRarity = null) {
+    if (!items || items.length === 0) return null;
+
+    const rarityOrder = GAME_DATA.rarityOrder;
+    if (minRarity && !rarityOrder.includes(minRarity)) {
+        throw new Error(`Unknown minRarity: ${minRarity}`);
+    }
+
+    const weightsByFloor = GAME_DATA.rarityWeightsByFloor;
+    const floorIndex = Math.min(Math.max(Number(floor) || 0, 0), weightsByFloor.length - 1);
+    const weights = weightsByFloor[floorIndex];
+    const minIndex = minRarity ? rarityOrder.indexOf(minRarity) : 0;
+    const allowedRarities = rarityOrder.slice(minIndex);
+
+    const weightedPools = [];
+    for (const rarity of allowedRarities) {
+        const weight = weights[rarity] || 0;
+        if (weight <= 0) continue;
+        const pool = items.filter(item => item.rarity === rarity);
+        if (pool.length > 0) {
+            weightedPools.push({ weight, pool });
+        }
+    }
+
+    if (weightedPools.length > 0) {
+        const selected = RNG.weightedChoice(weightedPools);
+        return RNG.choice(selected.pool);
+    }
+
+    const allowedPool = items.filter(item => allowedRarities.includes(item.rarity));
+    if (allowedPool.length > 0) {
+        return RNG.choice(allowedPool);
+    }
+
+    return RNG.choice(items);
 }

@@ -1,6 +1,6 @@
 import { DATA_CLASSES, DATA_SKILLS, DATA_META_UPGRADES } from "./classes.js";
 import { DATA_MUTATIONS, DATA_FLOORS, DATA_ENEMIES } from "./enemies.js";
-import { DATA_PERKS, DATA_ITEMS } from "./items.js";
+import { DATA_PERKS, DATA_ITEMS, DATA_RARITY_ORDER, DATA_RARITY_WEIGHTS_BY_FLOOR } from "./items.js";
 import { DATA_EVENTS } from "./events.js";
 import { DATA_CORRIDOR_ROOMS, DATA_CORRIDOR_OUTCOMES } from "./corridors.js";
 
@@ -13,6 +13,8 @@ export const GAME_DATA = {
     enemies: DATA_ENEMIES,
     perks: DATA_PERKS,
     items: DATA_ITEMS,
+    rarityOrder: DATA_RARITY_ORDER,
+    rarityWeightsByFloor: DATA_RARITY_WEIGHTS_BY_FLOOR,
     events: DATA_EVENTS,
     corridorRooms: DATA_CORRIDOR_ROOMS,
     corridorOutcomes: DATA_CORRIDOR_OUTCOMES,
