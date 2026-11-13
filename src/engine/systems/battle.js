@@ -115,6 +115,7 @@ export function setupBattle(game, mode = "normal") {
     }
 
     game.player.tempSpikes = 0;
+    game.player.battleSpikes = 0;
     game.player.poison = 0;
     game.player.bleed = 0;
     game.player.forceCritNext = false;
@@ -211,9 +212,9 @@ export function usePotion(game, potIndex, onStepRender) {
         if (game.state === "BATTLE") game.battleLog.unshift(`🧪 Кровь Дракона (+${8 + alchBonus} HP, +4 к след. атаке).`);
     } else if (pot.id === "pot7") {
         game.player.addShield(6);
-        game.player.tempSpikes += 4;
+        game.player.battleSpikes += 4;
         game.addBattleFx({ target: "player", type: "shield", value: 6 });
-        game.battleLog.unshift("🧪 Эликсир Железной Кожи (+6 Щита, +4 Шипов).");
+        game.battleLog.unshift("🧪 Эликсир Железной Кожи (+6 Щита, +4 Шипов до конца боя).");
     } else if (pot.id === "pot8") {
         game.player.heal(6 + alchBonus);
         game.player.poison = 0;
@@ -233,13 +234,13 @@ export function usePotion(game, potIndex, onStepRender) {
         });
         game.battleLog.unshift("🧪 Бутыль с Кислотой (снятие Щитов и -2 DEF всем врагам)!");
     } else if (pot.id === "pot10") {
-        game.player.en = Math.min(game.player.getTotalMaxEn(), game.player.en + 2);
+        game.player.en += 2;
         game.player.forceCritNext = true;
         game.battleLog.unshift("🧪 Флакон Концентрации (+2 EN, гарантированный КРИТ на след. удар)!");
     }
 
     if (game.state === "BATTLE" && game.player.perks.includes("p36")) {
-        game.player.en = Math.min(game.player.getTotalMaxEn(), game.player.en + 1);
+        game.player.en += 1;
     }
 
     game.player.inventory.potions.splice(potIndex, 1);
@@ -309,7 +310,7 @@ export function playerAction(game, actionType, onStepRender) {
             }
             if (game.player.perks.includes("p32")) target.def = Math.max(0, target.def - 1);
         }
-        applyWeaponEffects(game, target);
+        applyWeaponEffects(game, target, isCrit);
         if (game.player.perks.includes("p7")) {
             target.poison += 1;
             game.addBattleFx({ target: "enemy", enemy: target, type: "poison", value: 1 });
@@ -397,7 +398,6 @@ export function playerAction(game, actionType, onStepRender) {
         game.battleLog.unshift(`🌪️ ${isArcanist ? "Огненный залп" : "Круговой вихрь"} по всем (${dmg} базы)!`);
         game.enemies.forEach(en => {
             if (en.currentHp > 0) {
-                applyWeaponEffects(game, en);
                 if (game.player.perks.includes("p7")) {
                     en.poison += 1;
                     game.addBattleFx({ target: "enemy", enemy: en, type: "poison", value: 1 });
@@ -410,7 +410,7 @@ export function playerAction(game, actionType, onStepRender) {
     } else if (actionType === "concentrate") {
         playSound("concentrate");
         game.player.en = Math.min(game.player.getTotalMaxEn(), game.player.en + 2);
-        let healAmt = game.player.perks.includes("p9") ? 7 : 4;
+        let healAmt = game.player.perks.includes("p9") ? 8 : 4;
         game.player.heal(healAmt);
         game.addBattleFx({ target: "player", type: "heal", value: healAmt });
         for (const skillKey of Object.keys(game.player.cooldowns)) {
@@ -690,9 +690,10 @@ export function checkEnemySpikes(game, enemy) {
     }
 }
 
-export function applyWeaponEffects(game, enemy) {
+export function applyWeaponEffects(game, enemy, isCrit = false) {
     const w = game.player.inventory.weapon;
     if (!w) return;
+    if (w.onCrit && !isCrit) return;
     if (w.poison) {
         enemy.poison += w.poison;
         game.addBattleFx({ target: "enemy", enemy, type: "poison", value: w.poison });

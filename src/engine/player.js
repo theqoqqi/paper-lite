@@ -34,6 +34,7 @@ export class Player {
 
         this.shield = 0;
         this.tempSpikes = 0;
+        this.battleSpikes = 0;
         this.poison = 0;
         this.bleed = 0;
         this.concentrateBonus = 0;
@@ -149,7 +150,7 @@ export class Player {
     }
 
     getTotalSpikes() {
-        let val = this.tempSpikes;
+        let val = this.tempSpikes + this.battleSpikes;
         if (this.inventory.armor && this.inventory.armor.spikes) val += this.inventory.armor.spikes;
         if (this.perks.includes("p12")) val += 2;
         if (this.hasArtifact("art14")) val += 3;
@@ -214,7 +215,7 @@ export class Player {
             }
         }
         this.hp = Math.max(0, this.hp - dmg);
-        if (this.perks.includes("p29")) {
+        if (this.perks.includes("p29") && dmg > 0) {
             this.addShield(2);
         }
 

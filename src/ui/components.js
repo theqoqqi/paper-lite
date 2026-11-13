@@ -65,7 +65,7 @@ export function renderGlobalNav(render) {
         row.appendChild(el("button", {
             className: "btn-center",
             style: { background: "#2b3a4a" },
-            text: "👤 Герой и Навыки",
+            text: "👤 Персонаж",
             onClick: () => openCharacterModal(render),
         }));
     }
