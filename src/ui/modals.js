@@ -1,6 +1,7 @@
 import { el } from "../utils/dom.js";
 import { game } from "../engine/game.js";
 import { GAME_DATA } from "../data/index.js";
+import { renderItemLabelChildren } from "./rarity.js";
 
 const STATS_HELP = [
     {
@@ -133,12 +134,17 @@ export function openCharacterModal(render) {
     ]));
 
     contentBox.appendChild(el("h4", { text: "🛡️ Экипировка и Артефакты:" }));
+    const weaponChildren = p.inventory.weapon
+        ? renderItemLabelChildren("⚔️ Оружие: ", p.inventory.weapon)
+        : ["⚔️ Оружие: Нет"];
+    const armorChildren = p.inventory.armor
+        ? renderItemLabelChildren("🛡️ Броня: ", p.inventory.armor)
+        : ["🛡️ Броня: Нет"];
     const eqPanel = el("div", { className: "panel" }, [
-        el("div", { text: `⚔️ Оружие: ${p.inventory.weapon ? `${p.inventory.weapon.name} (${p.inventory.weapon.desc})` : "Нет"}` }),
+        el("div", {}, weaponChildren),
         el("div", {
             style: { marginTop: "4px" },
-            text: `🛡️ Броня: ${p.inventory.armor ? `${p.inventory.armor.name} (${p.inventory.armor.desc})` : "Нет"}`,
-        }),
+        }, armorChildren),
     ]);
 
     if (p.inventory.artifacts.length > 0) {
@@ -149,8 +155,7 @@ export function openCharacterModal(render) {
         p.inventory.artifacts.forEach(art => {
             eqPanel.appendChild(el("div", {
                 style: { fontSize: "12px", color: "#81c784", marginTop: "2px" },
-                text: `• ${art.name}: ${art.desc}`,
-            }));
+            }, renderItemLabelChildren("• ", art, "colon")));
         });
     } else {
         eqPanel.appendChild(el("div", {

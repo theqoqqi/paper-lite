@@ -28,11 +28,11 @@ export function grantRandomEquipment(game, origin = "battle") {
             item: { ...item },
             origin: origin,
         };
-        return `${label}: ${item.name} (${item.desc})`;
+        return `${label}: [${item.rarity}] ${item.name} (${item.desc})`;
     }
     const art = grantRandomArtifact(game, minRarity);
     if (art) {
-        return `Артефакт: ${art.name}`;
+        return `Артефакт: [${art.rarity}] ${art.name}`;
     }
     game.player.gold += 15;
     return "Сундук золота (+15G)";
@@ -117,7 +117,7 @@ export function resolveEventOption(game, optionId) {
         if (game.player.gold < 12) return;
         game.player.gold -= 12;
         const art = grantRandomArtifact(game);
-        const items = art ? [`💍 Артефакт: ${art.name} (${art.desc})`] : [];
+        const items = formatArtifactReward(art);
         game.eventRewards = {
             gold: 0,
             items: items,
@@ -209,7 +209,7 @@ export function resolveEventOption(game, optionId) {
         game.player.clampHp();
         game.player.gold += 18;
         const art = grantRandomArtifact(game);
-        const items = art ? [`💍 Артефакт: ${art.name} (${art.desc})`] : [];
+        const items = formatArtifactReward(art);
         game.eventRewards = {
             gold: 18,
             items: items,
@@ -237,7 +237,7 @@ export function resolveEventOption(game, optionId) {
         if (game.player.hp <= 6) return;
         game.player.hp -= 6;
         const art = grantRandomArtifact(game);
-        const items = art ? [`💍 Артефакт: ${art.name} (${art.desc})`] : [];
+        const items = formatArtifactReward(art);
         game.eventRewards = {
             gold: 0,
             items: items,
@@ -312,7 +312,7 @@ export function resolveEventOption(game, optionId) {
         if (game.player.gold < 20) return;
         game.player.gold -= 20;
         const art = grantRandomArtifact(game);
-        const items = art ? [`💍 Артефакт: ${art.name} (${art.desc})`] : [];
+        const items = formatArtifactReward(art);
         game.eventRewards = {
             gold: 0,
             items: items,
@@ -478,4 +478,8 @@ export function pickItemByRarity(items, floor = 0, minRarity = null) {
     }
 
     return RNG.choice(items);
+}
+
+function formatArtifactReward(art) {
+    return art ? [`💍 [${art.rarity}] Артефакт: ${art.name} (${art.desc})`] : [];
 }

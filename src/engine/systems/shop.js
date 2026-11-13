@@ -67,6 +67,7 @@ export function setupShop(game) {
     }, {
         id: w.id,
         kind: "weapon",
+        rarity: w.rarity,
         item: w,
         name: `⚔️ [${w.rarity}] ${w.name} (${w.desc})`,
         cost: w.cost,
@@ -74,6 +75,7 @@ export function setupShop(game) {
     }, {
         id: a.id,
         kind: "armor",
+        rarity: a.rarity,
         item: a,
         name: `🛡️ [${a.rarity}] ${a.name} (${a.desc})`,
         cost: a.cost,
@@ -92,6 +94,7 @@ export function setupShop(game) {
         game.shopOffers.push({
             id: art.id,
             kind: "artifact",
+            rarity: art.rarity,
             item: art,
             name: `💍 [${art.rarity}] Артефакт: ${art.name} (${art.desc})`,
             cost: art.cost,

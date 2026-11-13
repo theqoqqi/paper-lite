@@ -2,6 +2,7 @@ import { el } from "../utils/dom.js";
 import { game } from "../engine/game.js";
 import { isMuted, playSound, toggleMute } from "../utils/audio.js";
 import { openCharacterModal, openSaveManagerModal } from "./modals.js";
+import { renderItemLabelChildren } from "./rarity.js";
 
 export function renderStatsPanel(playerFxList = []) {
     const p = game.player;
@@ -90,7 +91,9 @@ export function renderEquipmentComparison(pendingEquip, onResolved) {
     if (!pendingEquip) return null;
     const { type, item } = pendingEquip;
     const current = type === "weapon" ? game.player.inventory.weapon : game.player.inventory.armor;
-    const currentName = current ? `${current.name} (${current.desc})` : (type === "weapon" ? "Кулаки" : "Лохмотья");
+    const currentChildren = current
+        ? renderItemLabelChildren("Надето: ", current)
+        : [`Надето: ${type === "weapon" ? "Кулаки" : "Лохмотья"}`];
     const oldRefund = (current && current.cost) ? Math.max(1, Math.floor(current.cost * 0.25)) : 0;
     const salvageGain = (item && item.cost) ? Math.max(1, Math.floor(item.cost * 0.25)) : 0;
     const typeLabel = type === "weapon" ? "Оружие" : "Броня";
@@ -109,12 +112,10 @@ export function renderEquipmentComparison(pendingEquip, onResolved) {
         }),
         el("div", {
             style: { fontSize: "12px", marginBottom: "4px" },
-            text: `Надето: ${currentName}`,
-        }),
+        }, currentChildren),
         el("div", {
             style: { fontSize: "12px", color: "#81c784", marginBottom: "8px" },
-            text: `Найдено: [${item.rarity}] ${item.name} (${item.desc})`,
-        }),
+        }, renderItemLabelChildren("Найдено: ", item)),
         el("div", { className: "flex-row" }, [
             el("button", {
                 className: "btn-primary",

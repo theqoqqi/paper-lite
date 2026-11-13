@@ -2,6 +2,7 @@ import { el } from "../../utils/dom.js";
 import { game } from "../../engine/game.js";
 import { playSound } from "../../utils/audio.js";
 import { renderStatsPanel, renderEquipmentComparison } from "../components.js";
+import { renderTextWithRarity } from "../rarity.js";
 
 const activeRowMap = new Map();
 
@@ -57,7 +58,11 @@ export function renderBattleScreen(render) {
                 text: "Найденные трофеи:",
             }));
             game.battleRewards.items.forEach(it => {
-                rewardBox.appendChild(el("div", { style: { color: "#ffd54f", fontSize: "13px" }, text: `• ${it}` }));
+                rewardBox.appendChild(el(
+                    "div",
+                    { style: { color: "#ffd54f", fontSize: "13px" } },
+                    renderTextWithRarity(`• ${it}`),
+                ));
             });
         }
 

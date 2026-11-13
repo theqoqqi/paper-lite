@@ -3,6 +3,7 @@ import { game } from "../../engine/game.js";
 import { GAME_DATA } from "../../data/index.js";
 import { playSound } from "../../utils/audio.js";
 import { renderStatsPanel, renderEquipmentComparison } from "../components.js";
+import { renderTextWithRarity, renderItemLabelChildren } from "../rarity.js";
 
 export function renderLevelUpScreen(render) {
     if (!game._levelUpSoundPlayed) {
@@ -107,8 +108,7 @@ export function renderEventRewardsScreen(render) {
         rewards.items.forEach(it => {
             box.appendChild(el("div", {
                 style: { color: "#ffd54f", fontSize: "13px" },
-                text: `• ${it}`,
-            }));
+            }, renderTextWithRarity(`• ${it}`)));
         });
     }
 
@@ -283,6 +283,7 @@ export function renderShopScreen(render) {
             }));
         }
 
+        const offerRarity = offer.rarity || offer.item?.rarity || null;
         const btnChildren = [
             el("div", {
                 className: "stats-line",
@@ -291,7 +292,7 @@ export function renderShopScreen(render) {
                     marginBottom: "0",
                 },
             }, [
-                el("span", { style: { flex: "1" }, text: offer.name }),
+                el("span", { style: { flex: "1" } }, renderTextWithRarity(offer.name, offerRarity)),
                 el("div", {
                     style: {
                         display: "flex",
@@ -374,7 +375,9 @@ export function renderShopScreen(render) {
 function renderShopEquipmentComparison(offer, offerIndex, render) {
     const isWeapon = offer.kind === "weapon";
     const current = isWeapon ? game.player.inventory.weapon : game.player.inventory.armor;
-    const currentName = current ? `${current.name} (${current.desc})` : (isWeapon ? "Кулаки" : "Лохмотья");
+    const currentChildren = current
+        ? renderItemLabelChildren("Надето: ", current)
+        : [`Надето: ${isWeapon ? "Кулаки" : "Лохмотья"}`];
     const oldRefund = (current && current.cost) ? Math.max(1, Math.floor(current.cost * 0.25)) : 0;
     const item = offer.item;
 
@@ -391,12 +394,10 @@ function renderShopEquipmentComparison(offer, offerIndex, render) {
     }, [
         el("div", {
             style: { fontSize: "12px", marginBottom: "4px" },
-            text: `Надето: ${currentName}`,
-        }),
+        }, currentChildren),
         el("div", {
             style: { fontSize: "12px", color: "#81c784", marginBottom: "8px" },
-            text: `В лавке: [${item.rarity}] ${item.name} (${item.desc})`,
-        }),
+        }, renderItemLabelChildren("В лавке: ", item)),
         el("div", { className: "flex-row" }, [
             el("button", {
                 className: "btn-primary",
