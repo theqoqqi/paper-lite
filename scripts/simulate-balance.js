@@ -10,12 +10,13 @@
  * - Группировка по факторам под контролем игрока: стили атак и ротации (Fast Spam, Execute, Pierce, Whirlwind, Tank, Smart).
  * 
  * Использование:
- *   node scripts/simulate-balance.js                  # Быстрый прогон всех 104 сущностей (~10-15 сек)
- *   node scripts/simulate-balance.js --full           # Глубокий аудит с увеличенной выборкой (~35 сек)
+ *   node scripts/simulate-balance.js                  # Быстрый прогон всех 104 сущностей по всем 4 этажам
+ *   node scripts/simulate-balance.js --full           # Глубокий аудит с увеличенной выборкой
  *   node scripts/simulate-balance.js --colorize       # Мгновенное обновление цветов в docs/items-and-perks-balance.md
  *   node scripts/simulate-balance.js --id p35         # Анализ конкретного перка / предмета
  *   node scripts/simulate-balance.js --category perks # Анализ только категории (perks/weapons/armors/artifacts/potions)
  *   node scripts/simulate-balance.js --class assassin # Анализ только по одному классу
+ *   node scripts/simulate-balance.js --floor 2        # Анализ только одного стартового этажа (1..4)
  *   node scripts/simulate-balance.js --no-report      # Без записи в docs/balance-report.md
  */
 
@@ -76,6 +77,7 @@ const isColorizeOnly = args.includes("--colorize") || args.includes("--colorize-
 const targetIdArg = getArgValue(args, "--id");
 const targetCatArg = getArgValue(args, "--category");
 const targetClassArg = getArgValue(args, "--class");
+const targetFloorArg = parseInt(getArgValue(args, "--floor"), 10);
 const customRunsArg = parseInt(getArgValue(args, "--runs"), 10);
 const skipReport = args.includes("--no-report");
 
@@ -90,41 +92,119 @@ function getArgValue(argList, flag) {
 
 // 4. Длинная лестница боёв с плавным нарастанием силы врагов (Progression Gauntlet)
 const GAUNTLET_STEPS = [
-    // Этаж 0: Заброшенные Катакомбы (плавный разгон и развитие персонажа)
-    { name: "Склеп: Разминка", floor: 0, room: 1, mode: "normal" },
-    { name: "Склеп: Обычный пак 1", floor: 0, room: 2, mode: "normal" },
-    { name: "Склеп: Обычный пак 2", floor: 0, room: 3, mode: "normal" },
+    // Этаж 0: Заброшенные Катакомбы (5 боёв: 3 normal + 1 elite + 1 boss)
+    { name: "Склеп: Разминка", floor: 0, room: 2, mode: "normal" },
+    { name: "Склеп: Основной зал", floor: 0, room: 2, mode: "normal" },
     { name: "Склеп: Усиленный пак", floor: 0, room: 4, mode: "normal" },
-    { name: "Склеп: Ветеранский пак", floor: 0, room: 5, mode: "normal" },
-    { name: "Склеп: Элита", floor: 0, room: 6, mode: "elite" },
-    { name: "Склеп: Босс Король Ворт", floor: 0, room: 8, mode: "boss" },
+    { name: "Склеп: Элита", floor: 0, room: 7, mode: "elite" },
+    { name: "Склеп: Босс Король Ворт", floor: 0, room: 9, mode: "boss" },
 
-    // Этаж 1: Грибные Пещеры и Топи
+    // Этаж 1: Грибные Пещеры и Топи (7 боёв: 4 normal + 2 elite + 1 boss)
     { name: "Топи: Дозор болот", floor: 1, room: 2, mode: "normal" },
-    { name: "Топи: Споровый пак", floor: 1, room: 3, mode: "normal" },
-    { name: "Топи: Глубокая трясина", floor: 1, room: 4, mode: "normal" },
-    { name: "Топи: Засада чудовищ", floor: 1, room: 5, mode: "normal" },
-    { name: "Топи: Элита", floor: 1, room: 6, mode: "elite" },
-    { name: "Топи: Босс Агарик", floor: 1, room: 8, mode: "boss" },
+    { name: "Топи: Споровый пак", floor: 1, room: 4, mode: "normal" },
+    { name: "Топи: Элита 1", floor: 1, room: 6, mode: "elite" },
+    { name: "Топи: Глубокая трясина", floor: 1, room: 8, mode: "normal" },
+    { name: "Топи: Засада чудовищ", floor: 1, room: 10, mode: "normal" },
+    { name: "Топи: Элита 2", floor: 1, room: 11, mode: "elite" },
+    { name: "Топи: Босс Агарик", floor: 1, room: 12, mode: "boss" },
 
-    // Этаж 2: Кузня Железного Культа
+    // Этаж 2: Кузня Железного Культа (8 боёв: 5 normal + 2 elite + 1 boss)
     { name: "Кузня: Патруль автоматонов", floor: 2, room: 2, mode: "normal" },
     { name: "Кузня: Шлаковый забой", floor: 2, room: 4, mode: "normal" },
-    { name: "Кузня: Огненный цех", floor: 2, room: 5, mode: "normal" },
-    { name: "Кузня: Элита", floor: 2, room: 6, mode: "elite" },
-    { name: "Кузня: Босс Вулкан", floor: 2, room: 8, mode: "boss" },
+    { name: "Кузня: Литейный зал", floor: 2, room: 6, mode: "normal" },
+    { name: "Кузня: Элита 1", floor: 2, room: 7, mode: "elite" },
+    { name: "Кузня: Огненный цех", floor: 2, room: 9, mode: "normal" },
+    { name: "Кузня: Горнило культа", floor: 2, room: 11, mode: "normal" },
+    { name: "Кузня: Элита 2", floor: 2, room: 12, mode: "elite" },
+    { name: "Кузня: Босс Вулкан", floor: 2, room: 14, mode: "boss" },
 
-    // Этаж 3: Цитадель Пустоты
-    { name: "Цитадель: Тени бездны", floor: 3, room: 2, mode: "normal" },
-    { name: "Цитадель: Астральный дозор", floor: 3, room: 4, mode: "normal" },
-    { name: "Цитадель: Элита", floor: 3, room: 6, mode: "elite" },
-    { name: "Цитадель: Финальный Босс Малкор", floor: 3, room: 8, mode: "boss" },
+    // Этаж 3: Цитадель Пустоты (9 боёв: 6 normal + 2 elite + 1 boss)
+    { name: "Цитадель: Внешний рубеж", floor: 3, room: 2, mode: "normal" },
+    { name: "Цитадель: Тени бездны", floor: 3, room: 4, mode: "normal" },
+    { name: "Цитадель: Астральный дозор", floor: 3, room: 6, mode: "normal" },
+    { name: "Цитадель: Элита 1", floor: 3, room: 8, mode: "elite" },
+    { name: "Цитадель: Зал ритуалов", floor: 3, room: 10, mode: "normal" },
+    { name: "Цитадель: Пустотный караул", floor: 3, room: 12, mode: "normal" },
+    { name: "Цитадель: Сердце башни", floor: 3, room: 13, mode: "normal" },
+    { name: "Цитадель: Элита 2", floor: 3, room: 14, mode: "elite" },
+    { name: "Цитадель: Финальный Босс Малкор", floor: 3, room: 16, mode: "boss" },
 
     // Пост-гейм (Endless Abyss)
-    { name: "Бездна: Волна 1", floor: 3, room: 10, mode: "normal" },
-    { name: "Бездна: Волна 2 (Элита)", floor: 3, room: 12, mode: "elite" },
-    { name: "Бездна: Волна 3 (Архи-Босс)", floor: 3, room: 16, mode: "boss" },
+    { name: "Бездна: Волна 1", floor: 3, room: 18, mode: "normal", abyssTier: 1 },
+    { name: "Бездна: Волна 2 (Элита)", floor: 3, room: 20, mode: "elite", abyssTier: 1 },
+    { name: "Бездна: Волна 3 (Архи-Босс)", floor: 3, room: 22, mode: "boss", abyssTier: 1 },
+    { name: "Бездна: Волна 4", floor: 3, room: 24, mode: "normal", abyssTier: 1 },
+    { name: "Бездна: Волна 5", floor: 3, room: 26, mode: "normal", abyssTier: 2 },
+    { name: "Бездна: Волна 6 (Элита)", floor: 3, room: 28, mode: "elite", abyssTier: 2 },
+    { name: "Бездна: Волна 7 (Архи-Босс)", floor: 3, room: 30, mode: "boss", abyssTier: 2 },
+    { name: "Бездна: Волна 8", floor: 3, room: 32, mode: "normal", abyssTier: 2 },
+    { name: "Бездна: Волна 9", floor: 3, room: 34, mode: "normal", abyssTier: 3 },
+    { name: "Бездна: Волна 10 (Элита)", floor: 3, room: 36, mode: "elite", abyssTier: 3 },
+    { name: "Бездна: Волна 11 (Архи-Босс)", floor: 3, room: 38, mode: "boss", abyssTier: 3 },
+    { name: "Бездна: Волна 12", floor: 3, room: 40, mode: "normal", abyssTier: 3 },
+    { name: "Бездна: Волна 13", floor: 3, room: 42, mode: "normal", abyssTier: 4 },
+    { name: "Бездна: Волна 14 (Элита)", floor: 3, room: 44, mode: "elite", abyssTier: 4 },
+    { name: "Бездна: Волна 15 (Архи-Босс)", floor: 3, room: 46, mode: "boss", abyssTier: 4 },
 ];
+
+const FLOOR_PROFILES = [
+    {
+        id: "f1",
+        floorNum: 1,
+        floor: 0,
+        label: "Э1",
+        name: "Этаж 1 (Склеп — голый старт)",
+        startStepIndex: 0,
+        bonusHp: 0,
+        bonusAtk: 0,
+        bonusDef: 0,
+        bonusEn: 0,
+        startLevel: 1,
+    },
+    {
+        id: "f2",
+        floorNum: 2,
+        floor: 1,
+        label: "Э2",
+        name: "Этаж 2 (Топи — статовый затар)",
+        startStepIndex: 5,
+        bonusHp: 50,
+        bonusAtk: 9,
+        bonusDef: 3,
+        bonusEn: 2,
+        startLevel: 3,
+    },
+    {
+        id: "f3",
+        floorNum: 3,
+        floor: 2,
+        label: "Э3",
+        name: "Этаж 3 (Кузня — статовый затар)",
+        startStepIndex: 12,
+        bonusHp: 128,
+        bonusAtk: 21,
+        bonusDef: 5,
+        bonusEn: 3,
+        startLevel: 5,
+    },
+    {
+        id: "f4",
+        floorNum: 4,
+        floor: 3,
+        label: "Э4",
+        name: "Этаж 4 (Цитадель — статовый затар)",
+        startStepIndex: 20,
+        bonusHp: 265,
+        bonusAtk: 35,
+        bonusDef: 8,
+        bonusEn: 4,
+        startLevel: 7,
+    },
+];
+
+const ACTIVE_FLOOR_PROFILES = FLOOR_PROFILES.filter(
+    fp => !Number.isFinite(targetFloorArg) || fp.floorNum === targetFloorArg
+);
 
 const CLASSES = ["wanderer", "assassin", "crusader"].filter(c => !targetClassArg || targetClassArg === c);
 const ALL_SKILLS = ["fast", "heavy", "pierce", "whirlwind", "defend", "concentrate"];
@@ -265,9 +345,12 @@ function chooseAction(game, playstyleId) {
     const canWhirl = aliveCount >= 1 && BattleSystem.canUseSkill(game, "whirlwind", 2);
     const canConc = BattleSystem.canUseSkill(game, "concentrate", 0);
     const heavyThreat = hasIncomingHeavyAttack(game);
+    const maxHp = p.getTotalMaxHp();
+    const lowHpThreshold = Math.max(8, Math.floor(maxHp * 0.34));
+    const safeConcHp = Math.max(10, Math.floor(maxHp * 0.25));
 
     if (playstyleId === "fast_spam") {
-        if (p.hp <= 8 && heavyThreat && canDef) return "defend";
+        if (p.hp <= lowHpThreshold && heavyThreat && canDef) return "defend";
         return "fast";
     }
 
@@ -279,7 +362,7 @@ function chooseAction(game, playstyleId) {
 
     if (playstyleId === "pierce_focus") {
         if (canPrc && (target.shield > 0 || target.def >= 1 || p.en >= 2)) return "pierce";
-        if (p.en < 2 && canConc && p.hp > 10) return "concentrate";
+        if (p.en < 2 && canConc && p.hp > safeConcHp) return "concentrate";
         return "fast";
     }
 
@@ -291,14 +374,14 @@ function chooseAction(game, playstyleId) {
 
     if (playstyleId === "tank_focus") {
         if (canDef) return "defend";
-        if (canConc && p.hp < p.getTotalMaxHp() * 0.8) return "concentrate";
+        if (canConc && p.hp < maxHp * 0.8) return "concentrate";
         if (target && target.currentHp <= execDmg && canExec) return "heavy";
         if (aliveCount >= 2 && canWhirl) return "whirlwind";
         return "fast";
     }
 
     // Default: Smart (Адаптивный)
-    if ((heavyThreat || p.hp <= 8) && canDef) return "defend";
+    if ((heavyThreat || p.hp <= lowHpThreshold) && canDef) return "defend";
     if (target && target.currentHp <= execDmg && canExec) return "heavy";
     if (aliveCount >= 2 && canWhirl) return "whirlwind";
     if (target && (target.shield >= 4 || target.def >= 2) && canPrc) return "pierce";
@@ -326,10 +409,22 @@ function createMetricsContainer() {
     return metrics;
 }
 
-function simulateFloorRun(classId, itemDef, playstyleId, runIndex, metrics) {
+function simulateFloorRun(classId, itemDef, playstyleId, runIndex, metrics, floorProfile = FLOOR_PROFILES[0]) {
     const game = new Game();
     game.init();
     game.startRun(classId);
+
+    if (floorProfile) {
+        const p = game.player;
+        p.baseMaxHp += floorProfile.bonusHp || 0;
+        p.baseAtk += floorProfile.bonusAtk || 0;
+        p.baseDef += floorProfile.bonusDef || 0;
+        p.baseMaxEn += floorProfile.bonusEn || 0;
+        p.level = floorProfile.startLevel || 1;
+        p._simBaseForgeLvl = floorProfile.floor || 0;
+        p.hp = p.getTotalMaxHp();
+        p.en = p.getTotalMaxEn();
+    }
 
     if (itemDef) {
         const p = game.player;
@@ -350,9 +445,11 @@ function simulateFloorRun(classId, itemDef, playstyleId, runIndex, metrics) {
 
     let runDamage = 0;
     let roomsCleared = 0;
+    let roomsSinceCampfire = 0;
     let totalTurns = 0;
 
-    for (let sIdx = 0; sIdx < GAUNTLET_STEPS.length; sIdx++) {
+    const startStep = floorProfile ? floorProfile.startStepIndex : 0;
+    for (let sIdx = startStep; sIdx < GAUNTLET_STEPS.length; sIdx++) {
         const step = GAUNTLET_STEPS[sIdx];
         if (game.player.hp <= 0) break;
 
@@ -361,6 +458,15 @@ function simulateFloorRun(classId, itemDef, playstyleId, runIndex, metrics) {
         const currentHp = game.player.hp;
         setSeed(getRoomSeed(playstyleId, classId, runIndex, sIdx));
         BattleSystem.setupBattle(game, step.mode);
+        if (step.abyssTier) {
+            const abyssHpScale = Math.pow(1.4, step.abyssTier);
+            const abyssAtkBonus = step.abyssTier * 3;
+            for (const en of game.enemies) {
+                en.hp = Math.round(en.hp * abyssHpScale);
+                en.currentHp = en.hp;
+                en.atkBonus = (en.atkBonus || 0) + abyssAtkBonus;
+            }
+        }
         game.player.hp = Math.min(game.player.getTotalMaxHp(), currentHp);
 
         // Боевой цикл комнаты
@@ -411,7 +517,8 @@ function simulateFloorRun(classId, itemDef, playstyleId, runIndex, metrics) {
         const roomWon = game.battleFinished && game.enemies.every(e => e.currentHp <= 0);
         if (roomWon) {
             roomsCleared++;
-            processIntermission(game, step, roomsCleared);
+            roomsSinceCampfire++;
+            roomsSinceCampfire = processIntermission(game, step, roomsSinceCampfire);
         } else {
             break;
         }
@@ -426,9 +533,9 @@ function simulateFloorRun(classId, itemDef, playstyleId, runIndex, metrics) {
     return { runDamage, roomsCleared, totalTurns };
 }
 
-function processIntermission(game, step, roomsCleared) {
+function processIntermission(game, step, roomsSinceCampfire) {
     const p = game.player;
-    if (p.hp <= 0) return;
+    if (p.hp <= 0) return roomsSinceCampfire;
 
     // 1. Сброс временных боевых статусов между комнатами
     p.poison = 0;
@@ -459,7 +566,8 @@ function processIntermission(game, step, roomsCleared) {
     }
 
     // 4. Привал / Костер (каждые 3 комнаты или после босса)
-    const isCampfire = step.mode === "boss" || (roomsCleared > 0 && roomsCleared % 3 === 0);
+    let nextCampfireCounter = roomsSinceCampfire;
+    const isCampfire = step.mode === "boss" || roomsSinceCampfire >= 3;
     if (isCampfire) {
         const healPct = p.perks.includes("p28") ? 0.70 : 0.45;
         if (p.perks.includes("p28")) {
@@ -467,6 +575,7 @@ function processIntermission(game, step, roomsCleared) {
         }
         p.heal(Math.ceil(p.getTotalMaxHp() * healPct));
         p.en = p.getTotalMaxEn();
+        nextCampfireCounter = 0;
     }
 
     // Имитация покупки зелья лечения/аптечки при ранении
@@ -477,40 +586,35 @@ function processIntermission(game, step, roomsCleared) {
     }
 
     // 5. Детерминированный псевдо-магазин (конвертация набранного золота в боевые параметры)
-    // Каждые 14G накопленного золота игрок получает стабильное усиление экипировки
-    while (p.gold >= 14) {
-        p.gold -= 14;
-        const upgradeStep = (p._simUpgradesDone || 0) % 3;
+    const baseForgeLvl = p._simBaseForgeLvl || 0;
+    while (true) {
+        const upgradeStep = (p._simUpgradesDone || 0) % 2;
+        const nextCost = upgradeStep === 0
+            ? 14 + (p.weaponUpgradeLvl + baseForgeLvl) * 10
+            : 14 + (p.armorUpgradeLvl + baseForgeLvl) * 10;
+        if (p.gold < nextCost) break;
+
+        p.gold -= nextCost;
         p._simUpgradesDone = (p._simUpgradesDone || 0) + 1;
 
         if (upgradeStep === 0) {
             p.weaponUpgradeLvl += 1;
-        } else if (upgradeStep === 1) {
-            p.armorUpgradeLvl += 1;
         } else {
-            p.baseMaxHp += 3;
-            p.heal(8);
+            p.armorUpgradeLvl += 1;
+            p.heal(3);
         }
     }
+
+    return nextCampfireCounter;
 }
 
-// 7. Расчёт базовой линии («голый» персонаж)
-function calculateFloorBaseline() {
-    process.stdout.write("⏳ Расчёт базовой линии прогрессии (без предметов)... ");
-    const baseline = {
-        avgDamage: 0,
-        avgRooms: 0,
-        avgTurns: 0,
-        byPlaystyle: {},
-        skillDpc: {},
-        skillEdpc: {},
-    };
-
+// 7. Расчёт базовых линий (по всем активным этажам)
+function runFloorSample(itemDef, floorProfile, metricsA, metricsB = null) {
     let totalAllDamage = 0;
     let totalAllRooms = 0;
+    let totalAllTurns = 0;
     let totalAllRuns = 0;
-
-    const globalMetrics = createMetricsContainer();
+    const byPlaystyle = {};
 
     for (const style of PLAYSTYLES) {
         let styleDamage = 0;
@@ -519,74 +623,186 @@ function calculateFloorBaseline() {
 
         for (const cls of CLASSES) {
             for (let i = 0; i < RUNS_PER_PLAYSTYLE; i++) {
-                const res = simulateFloorRun(cls, null, style.id, i, globalMetrics);
+                const res = simulateFloorRun(cls, itemDef, style.id, i, metricsA, floorProfile);
                 styleDamage += res.runDamage;
                 styleRooms += res.roomsCleared;
+                totalAllTurns += res.totalTurns;
                 styleRuns++;
+
+                if (metricsB) {
+                    metricsB.totalDamageDealt += res.runDamage;
+                    metricsB.roomsCleared += res.roomsCleared;
+                    metricsB.turnsSurvived += res.totalTurns;
+                }
             }
         }
 
-        const avgDmg = Math.round((styleDamage / styleRuns) * 10) / 10;
-        const avgRms = Math.round((styleRooms / styleRuns) * 10) / 10;
-        baseline.byPlaystyle[style.id] = { avgDamage: avgDmg, avgRooms: avgRms };
+        byPlaystyle[style.id] = {
+            avgDamage: Math.round((styleDamage / styleRuns) * 10) / 10,
+            avgRooms: Math.round((styleRooms / styleRuns) * 10) / 10,
+        };
 
         totalAllDamage += styleDamage;
         totalAllRooms += styleRooms;
         totalAllRuns += styleRuns;
     }
 
-    baseline.avgDamage = Math.round((totalAllDamage / totalAllRuns) * 10) / 10;
-    baseline.avgRooms = Math.round((totalAllRooms / totalAllRuns) * 10) / 10;
-    baseline.avgTurns = Math.round((globalMetrics.turnsSurvived / totalAllRuns) * 10) / 10;
-
-    for (const sk of ALL_SKILLS) {
-        baseline.skillDpc[sk] = globalMetrics.skillCasts[sk] > 0
-            ? Math.round((globalMetrics.skillDamage[sk] / globalMetrics.skillCasts[sk]) * 10) / 10
-            : 0;
-        baseline.skillEdpc[sk] = globalMetrics.skillCasts[sk] > 0
-            ? Math.round((globalMetrics.skillDefense[sk] / globalMetrics.skillCasts[sk]) * 10) / 10
-            : 0;
-    }
-
-    console.log(`[Готово: Комнаты: ${baseline.avgRooms}/${GAUNTLET_STEPS.length}.0, Урон: ${baseline.avgDamage}, DPC Fast: ${baseline.skillDpc.fast}]`);
-    return baseline;
+    return {
+        avgDamage: Math.round((totalAllDamage / totalAllRuns) * 10) / 10,
+        avgRooms: Math.round((totalAllRooms / totalAllRuns) * 10) / 10,
+        avgTurns: Math.round((totalAllTurns / totalAllRuns) * 10) / 10,
+        byPlaystyle,
+    };
 }
 
-// 8. Оценка предмета
-function evaluateFloorItem(itemDef, baseline) {
-    const itemMetrics = createMetricsContainer();
-    const styleBreakdown = {};
+function calcSkillMetrics(metricsObj) {
+    const skillDpc = {};
+    const skillEdpc = {};
+    for (const sk of ALL_SKILLS) {
+        skillDpc[sk] = metricsObj.skillCasts[sk] > 0
+            ? Math.round((metricsObj.skillDamage[sk] / metricsObj.skillCasts[sk]) * 10) / 10
+            : 0;
+        skillEdpc[sk] = metricsObj.skillCasts[sk] > 0
+            ? Math.round((metricsObj.skillDefense[sk] / metricsObj.skillCasts[sk]) * 10) / 10
+            : 0;
+    }
+    return { skillDpc, skillEdpc };
+}
 
-    let totalAllDamage = 0;
-    let totalAllRooms = 0;
-    let totalAllRuns = 0;
+function calculateFloorBaselines(activeFloors = ACTIVE_FLOOR_PROFILES) {
+    console.log("⏳ Расчёт базовых линий прогрессии по этажам (без тестируемых предметов)...");
+    const byFloor = {};
+    const aggMetrics = createMetricsContainer();
+
+    let sumRooms = 0;
+    let sumDamage = 0;
+    let sumTurns = 0;
+
+    for (const fp of activeFloors) {
+        const floorMetrics = createMetricsContainer();
+        const sample = runFloorSample(null, fp, floorMetrics);
+
+        for (const sk of ALL_SKILLS) {
+            aggMetrics.skillCasts[sk] += floorMetrics.skillCasts[sk];
+            aggMetrics.skillDamage[sk] += floorMetrics.skillDamage[sk];
+            aggMetrics.skillDefense[sk] += floorMetrics.skillDefense[sk];
+        }
+
+        const { skillDpc, skillEdpc } = calcSkillMetrics(floorMetrics);
+        byFloor[fp.id] = {
+            profile: fp,
+            ...sample,
+            skillDpc,
+            skillEdpc,
+        };
+
+        sumRooms += sample.avgRooms;
+        sumDamage += sample.avgDamage;
+        sumTurns += sample.avgTurns;
+
+        const statsTag = `+${fp.bonusHp} HP, +${fp.bonusAtk} ATK, +${fp.bonusDef} DEF, +${fp.bonusEn} EN, Lvl ${fp.startLevel}`;
+        console.log(`   [${fp.label} | ${statsTag}] Комнаты: ${sample.avgRooms}/${GAUNTLET_STEPS.length - fp.startStepIndex}.0, Урон: ${sample.avgDamage}, Ходы: ${sample.avgTurns}, DPC Fast: ${skillDpc.fast}`);
+    }
+
+    const { skillDpc, skillEdpc } = calcSkillMetrics(aggMetrics);
+    const count = activeFloors.length || 1;
+    return {
+        avgRooms: Math.round((sumRooms / count) * 10) / 10,
+        avgDamage: Math.round((sumDamage / count) * 10) / 10,
+        avgTurns: Math.round((sumTurns / count) * 10) / 10,
+        byFloor,
+        skillDpc,
+        skillEdpc,
+    };
+}
+
+// 8. Оценка предмета по всем активным этажам
+function evaluateFloorItem(itemDef, baselines, activeFloors = ACTIVE_FLOOR_PROFILES) {
+    const aggMetrics = createMetricsContainer();
+    const cost = itemDef.cost || null;
+    const byFloor = {};
+
+    const styleMultSum = {};
+    const styleDeltaDmgSum = {};
+    const styleDeltaRmsSum = {};
+    const styleAvgDmgSum = {};
+    for (const style of PLAYSTYLES) {
+        styleMultSum[style.id] = 0;
+        styleDeltaDmgSum[style.id] = 0;
+        styleDeltaRmsSum[style.id] = 0;
+        styleAvgDmgSum[style.id] = 0;
+    }
+
+    let sumAvgDamage = 0;
+    let sumDeltaDamage = 0;
+    let sumDeltaDamagePct = 0;
+    let sumAvgRooms = 0;
+    let sumDeltaRooms = 0;
+    let sumDeltaRoomsPct = 0;
+    let maxFloorStyleMult = 0;
+    let maxFloorBestStyleDeltaRms = 0;
+
+    for (const fp of activeFloors) {
+        const base = baselines.byFloor[fp.id];
+        const sample = runFloorSample(itemDef, fp, aggMetrics);
+
+        const deltaDamage = Math.max(0, Math.round((sample.avgDamage - base.avgDamage) * 10) / 10);
+        const deltaDamagePct = base.avgDamage > 0 ? Math.max(0, Math.round((deltaDamage / base.avgDamage) * 100)) : 0;
+        const deltaRooms = Math.max(0, Math.round((sample.avgRooms - base.avgRooms) * 10) / 10);
+        const deltaRoomsPct = base.avgRooms > 0 ? Math.max(0, Math.round((deltaRooms / base.avgRooms) * 100)) : 0;
+        const roi = cost && cost > 0 ? Math.max(0, Math.round((deltaRoomsPct / cost) * 10) / 10) : null;
+
+        for (const style of PLAYSTYLES) {
+            const curS = sample.byPlaystyle[style.id];
+            const baseS = base.byPlaystyle[style.id] || { avgDamage: 1, avgRooms: 1 };
+            const sDeltaDmg = Math.max(0, curS.avgDamage - baseS.avgDamage);
+            const sDeltaRms = Math.max(0, curS.avgRooms - baseS.avgRooms);
+            const sMult = baseS.avgDamage > 0 ? Math.max(1.0, curS.avgDamage / baseS.avgDamage) : 1.0;
+
+            styleMultSum[style.id] += sMult;
+            styleDeltaDmgSum[style.id] += sDeltaDmg;
+            styleDeltaRmsSum[style.id] += sDeltaRms;
+            styleAvgDmgSum[style.id] += curS.avgDamage;
+
+            if (sMult > maxFloorStyleMult) maxFloorStyleMult = sMult;
+            if (sDeltaRms > maxFloorBestStyleDeltaRms) maxFloorBestStyleDeltaRms = sDeltaRms;
+        }
+
+        byFloor[fp.id] = {
+            avgRooms: sample.avgRooms,
+            deltaRooms,
+            deltaRoomsPct,
+            avgDamage: sample.avgDamage,
+            deltaDamage,
+            deltaDamagePct,
+            roi,
+        };
+
+        sumAvgDamage += sample.avgDamage;
+        sumDeltaDamage += deltaDamage;
+        sumDeltaDamagePct += deltaDamagePct;
+        sumAvgRooms += sample.avgRooms;
+        sumDeltaRooms += deltaRooms;
+        sumDeltaRoomsPct += deltaRoomsPct;
+    }
+
+    const floorCount = activeFloors.length || 1;
+    const overallAvgDamage = Math.round((sumAvgDamage / floorCount) * 10) / 10;
+    const deltaDmgVal = Math.round((sumDeltaDamage / floorCount) * 10) / 10;
+    const deltaDmgPctVal = Math.round(sumDeltaDamagePct / floorCount);
+    const overallAvgRooms = Math.round((sumAvgRooms / floorCount) * 10) / 10;
+    const deltaRmsVal = Math.round((sumDeltaRooms / floorCount) * 10) / 10;
+    const deltaRmsPctVal = Math.round(sumDeltaRoomsPct / floorCount);
 
     let bestPlaystyle = null;
     let maxStyleMult = 0;
-
+    const styleBreakdown = {};
     for (const style of PLAYSTYLES) {
-        let styleDamage = 0;
-        let styleRooms = 0;
-        let styleRuns = 0;
-
-        for (const cls of CLASSES) {
-            for (let i = 0; i < RUNS_PER_PLAYSTYLE; i++) {
-                const res = simulateFloorRun(cls, itemDef, style.id, i, itemMetrics);
-                styleDamage += res.runDamage;
-                styleRooms += res.roomsCleared;
-                styleRuns++;
-            }
-        }
-
-        const avgDmg = Math.round((styleDamage / styleRuns) * 10) / 10;
-        const avgRms = Math.round((styleRooms / styleRuns) * 10) / 10;
-
-        const baseStyle = baseline.byPlaystyle[style.id] || { avgDamage: 1, avgRooms: 1 };
-        const deltaDmg = Math.max(0, Math.round((avgDmg - baseStyle.avgDamage) * 10) / 10);
-        const deltaRms = Math.max(0, Math.round((avgRms - baseStyle.avgRooms) * 10) / 10);
-        const mult = baseStyle.avgDamage > 0 ? Math.max(1.0, Math.round((avgDmg / baseStyle.avgDamage) * 100) / 100) : 1.0;
-
-        styleBreakdown[style.id] = { avgDmg, avgRms, deltaDmg, deltaRms, mult };
+        const mult = Math.round((styleMultSum[style.id] / floorCount) * 100) / 100;
+        const avgDmg = Math.round((styleAvgDmgSum[style.id] / floorCount) * 10) / 10;
+        const deltaDmg = Math.round((styleDeltaDmgSum[style.id] / floorCount) * 10) / 10;
+        const deltaRms = Math.round((styleDeltaRmsSum[style.id] / floorCount) * 10) / 10;
+        styleBreakdown[style.id] = { avgDmg, deltaDmg, deltaRms, mult };
 
         if (mult > maxStyleMult) {
             maxStyleMult = mult;
@@ -599,19 +815,7 @@ function evaluateFloorItem(itemDef, baseline) {
                 avgDmg,
             };
         }
-
-        totalAllDamage += styleDamage;
-        totalAllRooms += styleRooms;
-        totalAllRuns += styleRuns;
     }
-
-    const overallAvgDamage = Math.round((totalAllDamage / totalAllRuns) * 10) / 10;
-    const overallAvgRooms = Math.round((totalAllRooms / totalAllRuns) * 10) / 10;
-
-    const deltaDamage = Math.max(0, Math.round((overallAvgDamage - baseline.avgDamage) * 10) / 10);
-    const deltaDamagePct = baseline.avgDamage > 0 ? Math.max(0, Math.round((deltaDamage / baseline.avgDamage) * 100)) : 0;
-    const deltaRooms = Math.max(0, Math.round((overallAvgRooms - baseline.avgRooms) * 10) / 10);
-    const deltaRoomsPct = baseline.avgRooms > 0 ? Math.max(0, Math.round((deltaRooms / baseline.avgRooms) * 100)) : 0;
 
     // Расчёт Value Per Cast
     const itemDpc = {};
@@ -621,36 +825,29 @@ function evaluateFloorItem(itemDef, baseline) {
     let maxSkillMult = 1.0;
 
     for (const sk of ALL_SKILLS) {
-        const dpc = itemMetrics.skillCasts[sk] > 0
-            ? Math.round((itemMetrics.skillDamage[sk] / itemMetrics.skillCasts[sk]) * 10) / 10
+        const dpc = aggMetrics.skillCasts[sk] > 0
+            ? Math.round((aggMetrics.skillDamage[sk] / aggMetrics.skillCasts[sk]) * 10) / 10
             : 0;
-        const edpc = itemMetrics.skillCasts[sk] > 0
-            ? Math.round((itemMetrics.skillDefense[sk] / itemMetrics.skillCasts[sk]) * 10) / 10
+        const edpc = aggMetrics.skillCasts[sk] > 0
+            ? Math.round((aggMetrics.skillDefense[sk] / aggMetrics.skillCasts[sk]) * 10) / 10
             : 0;
 
         itemDpc[sk] = dpc;
         itemEdpc[sk] = edpc;
 
-        const baseVal = ["defend", "concentrate"].includes(sk) ? baseline.skillEdpc[sk] : baseline.skillDpc[sk];
+        const baseVal = ["defend", "concentrate"].includes(sk) ? baselines.skillEdpc[sk] : baselines.skillDpc[sk];
         const curVal = ["defend", "concentrate"].includes(sk) ? edpc : dpc;
         dpcDeltas[sk] = Math.round((curVal - baseVal) * 10) / 10;
 
         if (baseVal > 0) {
             const mult = curVal / baseVal;
-            if (mult > maxSkillMult && itemMetrics.skillCasts[sk] >= 10) {
+            if (mult > maxSkillMult && aggMetrics.skillCasts[sk] >= 10) {
                 maxSkillMult = mult;
                 bestSynergySkill = { skill: sk, mult: Math.round(mult * 100) / 100, delta: dpcDeltas[sk] };
             }
         }
     }
 
-    const cost = itemDef.cost || null;
-    const deltaDmgVal = deltaDamage;
-    const deltaDmgPctVal = deltaDamagePct;
-    const deltaRmsVal = deltaRooms;
-    const deltaRmsPctVal = deltaRoomsPct;
-
-    // Классификатор вердиктов по дальности выживания и прогрессу комнат
     let verdict = "Баланс";
     let icon = "✅";
 
@@ -669,9 +866,6 @@ function evaluateFloorItem(itemDef, baseline) {
     } else if (deltaRmsPctVal <= 8 && deltaRmsVal <= 0.25) {
         verdict = "Слабо / Мусор";
         icon = "💤";
-    } else {
-        verdict = "Баланс";
-        icon = "✅";
     }
 
     const roi = cost && cost > 0
@@ -691,6 +885,7 @@ function evaluateFloorItem(itemDef, baseline) {
         avgRooms: overallAvgRooms,
         deltaRooms: deltaRmsVal,
         deltaRoomsPct: deltaRmsPctVal,
+        byFloor,
         bestPlaystyle,
         styleBreakdown,
         itemDpc,
@@ -732,44 +927,64 @@ function buildItemPool() {
 }
 
 // 10. Форматирование консольного вывода и Markdown
-function formatConsoleRow(res) {
+function formatConsoleRow(res, activeFloors = ACTIVE_FLOOR_PROFILES) {
     const dRms = `+${res.deltaRooms} (+${res.deltaRoomsPct}%)`;
-    const dDmg = `+${res.deltaDamage}`;
     const costStr = res.cost !== null ? `${res.cost}G`.padEnd(6) : "—".padEnd(6);
-    const roiStr = res.roi !== null ? `+${res.roi}`.padEnd(8) : "—".padEnd(8);
+    const roiStr = res.roi !== null ? `+${res.roi}`.padEnd(6) : "—".padEnd(6);
     const idPad = res.id.padEnd(5);
     const namePad = res.name.slice(0, 20).padEnd(21);
-    const catPad = res.category.padEnd(10);
-    const rmsPad = `${res.avgRooms} (${dRms})`.padEnd(22);
-    const dmgPad = `${res.avgDamage} (${dDmg})`.padEnd(16);
-    const bestStylePad = res.bestPlaystyle ? `${res.bestPlaystyle.name} (x${res.bestPlaystyle.mult})`.slice(0, 24).padEnd(25) : "-".padEnd(25);
+    const catPad = res.category.padEnd(9);
+    const floorCols = activeFloors.map(fp => {
+        const fRes = res.byFloor[fp.id];
+        return (fRes ? `+${fRes.deltaRoomsPct}%` : "—").padEnd(6);
+    }).join(" | ");
+    const rmsPad = `${res.avgRooms} (${dRms})`.padEnd(18);
+    const bestStylePad = res.bestPlaystyle ? `${res.bestPlaystyle.name} (x${res.bestPlaystyle.mult})`.slice(0, 23).padEnd(24) : "-".padEnd(24);
     const verdPad = `${res.icon} ${res.verdict}`;
 
-    return `${idPad} | ${namePad} | ${catPad} | ${costStr} | ${roiStr} | ${rmsPad} | ${dmgPad} | ${bestStylePad} | ${verdPad}`;
+    return `${idPad} | ${namePad} | ${catPad} | ${costStr} | ${roiStr} | ${floorCols} | ${rmsPad} | ${bestStylePad} | ${verdPad}`;
 }
 
-function generateMarkdownReport(results, baseline) {
+function generateMarkdownReport(results, baselines, activeFloors = ACTIVE_FLOOR_PROFILES) {
     const reportPath = path.resolve("./docs/balance-report.md");
     let md = "";
 
-    md += "# Автоматический отчёт баланса: Дальность комнат, стили атак и экономика\n\n";
+    md += "# Автоматический отчёт баланса: Дальность комнат, этажные срезы и экономика\n\n";
     md += `* **Дата генерации:** ${new Date().toLocaleString("ru-RU")}\n`;
-    md += `* **Конфигурация:** ${RUNS_PER_PLAYSTYLE} забегов на стиль, классы: ${CLASSES.join(", ")}\n`;
-    md += `* **Стандартный полигон:** 20-комнатная лестница прогрессии (Склеп -> Топи -> Кузня -> Цитадель -> Бездна)\n`;
-    md += `* **Базовая линия («голый» персонаж):** Комнат пройдено: **${baseline.avgRooms} / ${GAUNTLET_STEPS.length}.0**, Средний урон: **${baseline.avgDamage}**, Раундов прожито: **${baseline.avgTurns}**\n`;
-    md += `* **Базовая отдача способностей (DPC / EDPC):** Fast: **${baseline.skillDpc.fast}**, Heavy: **${baseline.skillDpc.heavy}**, Pierce: **${baseline.skillDpc.pierce}**, Whirl: **${baseline.skillDpc.whirlwind}**, Def: **${baseline.skillEdpc.defend}**, Conc: **${baseline.skillEdpc.concentrate}**\n\n`;
+    md += `* **Конфигурация:** ${RUNS_PER_PLAYSTYLE} забегов на стиль, классы: ${CLASSES.join(", ")}, этажи: ${activeFloors.map(f => f.label).join(", ")}\n`;
+    md += `* **Стандартный полигон:** ${GAUNTLET_STEPS.length}-шаговая лестница прогрессии (Склеп -> Топи -> Кузня -> Цитадель -> Бездна)\n`;
+    md += `* **Средняя отдача способностей (DPC / EDPC):** Fast: **${baselines.skillDpc.fast}**, Heavy: **${baselines.skillDpc.heavy}**, Pierce: **${baselines.skillDpc.pierce}**, Whirl: **${baselines.skillDpc.whirlwind}**, Def: **${baselines.skillEdpc.defend}**, Conc: **${baselines.skillEdpc.concentrate}**\n\n`;
+
+    md += "### Базовые линии по этажам (статовый затар, слоты пустые)\n\n";
+    md += "| Этаж | Статовый затар | Уровень | Комнаты базы | Ср. урон | Ходов | DPC Fast | Heavy | Pierce | Whirl | EDPC Def | Conc |\n";
+    md += "| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n";
+    for (const fp of activeFloors) {
+        const b = baselines.byFloor[fp.id];
+        const statsTag = fp.floor === 0
+            ? "Голый старт (без бонусов)"
+            : `+${fp.bonusHp} HP, +${fp.bonusAtk} ATK, +${fp.bonusDef} DEF, +${fp.bonusEn} EN`;
+        const maxAvail = GAUNTLET_STEPS.length - fp.startStepIndex;
+        md += `| **${fp.label}** (${fp.name.split(" (")[0]}) | ${statsTag} | ${fp.startLevel} | **${b.avgRooms} / ${maxAvail}.0** | ${b.avgDamage} | ${b.avgTurns} | ${b.skillDpc.fast} | ${b.skillDpc.heavy} | ${b.skillDpc.pierce} | ${b.skillDpc.whirlwind} | ${b.skillEdpc.defend} | ${b.skillEdpc.concentrate} |\n`;
+    }
+    md += "\n";
 
     const imbaList = results.filter(r => r.verdict === "Универсальная имба");
     const superRoiList = results.filter(r => r.verdict === "Сверхвыгодно (Высокий ROI)");
     const overpriceList = results.filter(r => r.verdict === "Оверпрайс / Ловушка");
     const synergyList = results.filter(r => r.verdict === "Сломанная синергия");
     const weakList = results.filter(r => r.verdict === "Слабо / Мусор");
+    const lateScalingList = results.filter(r => {
+        const f1 = r.byFloor.f1?.deltaRoomsPct ?? 0;
+        const f4 = r.byFloor.f4?.deltaRoomsPct ?? 0;
+        return r.byFloor.f1 && r.byFloor.f4 && (f4 - f1) >= 10;
+    });
 
     md += "## 1. Сводка критических отклонений баланса\n\n";
     md += `* 🚨 **Универсальная имба (${imbaList.length}):** ${imbaList.map(r => `\`${r.id}\` **${r.name}** (+${r.deltaRoomsPct}% комнат, +${r.deltaRooms} комнат)`).join(", ") || "Нет"}\n`;
     md += `* 💎 **Сверхвыгодные предметы магазина (Высокий ROI, ${superRoiList.length}):** ${superRoiList.map(r => `\`${r.id}\` **${r.name}** (${r.cost}G, ROI: +${r.roi})`).join(", ") || "Нет"}\n`;
     md += `* 💸 **Оверпрайс / Ловушки для игрока (${overpriceList.length}):** ${overpriceList.map(r => `\`${r.id}\` **${r.name}** (${r.cost}G, +${r.deltaRoomsPct}% комнат)`).join(", ") || "Нет"}\n`;
     md += `* ⚡ **Мощные синергии стилей (${synergyList.length}):** ${synergyList.map(r => `\`${r.id}\` **${r.name}** (${r.bestPlaystyle ? r.bestPlaystyle.name + " x" + r.bestPlaystyle.mult : ""})`).join(", ") || "Нет"}\n`;
+    md += `* 📈 **Сильнее в лейте, чем на старте (Э4 ≥ Э1 + 10% п.п., ${lateScalingList.length}):** ${lateScalingList.map(r => `\`${r.id}\` ${r.name} (+${r.byFloor.f1.deltaRoomsPct}% → +${r.byFloor.f4.deltaRoomsPct}%)`).join(", ") || "Нет"}\n`;
     md += `* 💤 **Слабый / Мёртвый груз (${weakList.length}):** ${weakList.map(r => `\`${r.id}\` ${r.name} (+${r.deltaRoomsPct}% комнат)`).join(", ") || "Нет"}\n\n`;
 
     const categories = [
@@ -780,23 +995,29 @@ function generateMarkdownReport(results, baseline) {
         { key: "potions", title: "Зелья (10)" },
     ];
 
+    const floorHeaders = activeFloors.map(fp => fp.label).join(" | ");
+    const floorAligns = activeFloors.map(() => ":---:").join(" | ");
+
     for (const cat of categories) {
         const catResults = sortByIdNatural(results.filter(r => r.category === cat.key));
         if (catResults.length === 0) continue;
 
         md += `## 2. ${cat.title}\n\n`;
-        md += "| ID | Название | Цена | Эффект | Комнаты | Δ Дальность | Урон забега | ROI (Комн/G) | Лучший стиль игры игрока | Вердикт |\n";
-        md += "| :--- | :--- | :---: | :--- | :---: | :---: | :---: | :---: | :--- | :--- |\n";
+        md += `| ID | Название | Цена | Эффект | ${floorHeaders} | Ср. Δ% | ROI (%/G) | Лучший стиль | Вердикт |\n`;
+        md += `| :--- | :--- | :---: | :--- | ${floorAligns} | :---: | :---: | :--- | :--- |\n`;
 
         for (const r of catResults) {
             const costStr = r.cost !== null ? `${r.cost}G` : "— *(LvlUp)*";
             const roiStr = r.roi !== null ? `**+${r.roi}**` : "—";
-            const dRmsStr = `+${r.deltaRooms} (+${r.deltaRoomsPct}%)`;
-            const dDmgStr = `${r.avgDamage} (+${r.deltaDamage})`;
+            const floorCells = activeFloors.map(fp => {
+                const fr = r.byFloor[fp.id];
+                return fr ? `**+${fr.deltaRoomsPct}%** (+${fr.deltaRooms})` : "—";
+            }).join(" | ");
+            const dRmsStr = `+${r.deltaRoomsPct}% (+${r.deltaRooms})`;
             const styleStr = r.bestPlaystyle ? `**${r.bestPlaystyle.name}** (x${r.bestPlaystyle.mult})` : "-";
             const descEscaped = r.desc.replace(/\|/g, "\\|");
 
-            md += `| \`${r.id}\` | **${r.name}** | ${costStr} | ${descEscaped} | ${r.avgRooms} | **${dRmsStr}** | ${dDmgStr} | ${roiStr} | ${styleStr} | ${r.icon} ${r.verdict} |\n`;
+            md += `| \`${r.id}\` | **${r.name}** | ${costStr} | ${descEscaped} | ${floorCells} | **${dRmsStr}** | ${roiStr} | ${styleStr} | ${r.icon} ${r.verdict} |\n`;
         }
         md += "\n";
     }
@@ -857,6 +1078,46 @@ function calculateItemValueScore(id, pct, itemCostMap) {
     return Math.max(0, Math.round((pct / expected) * 100));
 }
 
+function parseReportMetrics(reportPath) {
+    const metrics = new Map();
+    if (!fs.existsSync(reportPath)) return metrics;
+
+    const reportContent = fs.readFileSync(reportPath, "utf8");
+    const floorColMap = new Map();
+    let avgColIdx = -1;
+
+    for (const line of reportContent.split(/\r?\n/)) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith("|")) continue;
+        const cols = trimmed.split("|").map(c => c.trim()).slice(1, -1);
+
+        if (cols[0] === "ID" && cols.includes("Ср. Δ%")) {
+            floorColMap.clear();
+            for (const fp of FLOOR_PROFILES) {
+                const idx = cols.indexOf(fp.label);
+                if (idx !== -1) floorColMap.set(fp.id, idx);
+            }
+            avgColIdx = cols.indexOf("Ср. Δ%");
+            continue;
+        }
+        if (trimmed.includes(":---")) continue;
+
+        const idMatch = cols[0] ? cols[0].match(/`([a-z0-9]+)`/) : null;
+        if (idMatch && avgColIdx >= 0 && cols[avgColIdx]) {
+            const id = idMatch[1];
+            const avgMatch = cols[avgColIdx].match(/\+?([0-9.]+)%/);
+            const avgPct = avgMatch ? parseFloat(avgMatch[1]) : 0;
+            const byFloor = {};
+            for (const [fId, colIdx] of floorColMap.entries()) {
+                const fMatch = cols[colIdx] ? cols[colIdx].match(/\+?([0-9.]+)%/) : null;
+                if (fMatch) byFloor[fId] = parseFloat(fMatch[1]);
+            }
+            metrics.set(id, { avgPct, byFloor });
+        }
+    }
+    return metrics;
+}
+
 function colorizeAuditMarkdown(simResults = null) {
     const auditPath = path.resolve("./docs/items-and-perks-balance.md");
     const reportPath = path.resolve("./docs/balance-report.md");
@@ -877,17 +1138,17 @@ function colorizeAuditMarkdown(simResults = null) {
 
     if (Array.isArray(simResults) && simResults.length > 0) {
         for (const r of simResults) {
-            metrics.set(r.id, r.deltaRoomsPct || 0);
-        }
-    } else if (fs.existsSync(reportPath)) {
-        const reportContent = fs.readFileSync(reportPath, "utf8");
-        for (const line of reportContent.split(/\r?\n/)) {
-            const m = line.match(/^\|\s*`([a-z0-9]+)`\s*\|\s*\*\*([^*]+)\*\*\s*\|\s*([^|]+)\|\s*([^|]+)\|\s*([0-9.]+)\s*\|\s*\*\*\+([0-9.]+)\s*\(\+?([0-9.]+)%\)\*\*/);
-            if (m) {
-                const id = m[1];
-                const pct = parseFloat(m[7] || 0);
-                metrics.set(id, pct);
+            const byFloor = {};
+            for (const fp of FLOOR_PROFILES) {
+                if (r.byFloor && r.byFloor[fp.id] !== undefined) {
+                    byFloor[fp.id] = r.byFloor[fp.id].deltaRoomsPct || 0;
+                }
             }
+            metrics.set(r.id, { avgPct: r.deltaRoomsPct || 0, byFloor });
+        }
+    } else {
+        for (const [k, v] of parseReportMetrics(reportPath).entries()) {
+            metrics.set(k, v);
         }
     }
 
@@ -897,7 +1158,9 @@ function colorizeAuditMarkdown(simResults = null) {
     let powerColIdx = -1;
     let rawColIdx = -1;
     let costColIdx = -1;
-    let currentTableHasRaw = false;
+    let floorColIndices = [];
+    let insertRawPos = -1;
+    let insertFloorPos = -1;
     let modifiedCount = 0;
     const outputLines = [];
 
@@ -908,57 +1171,65 @@ function colorizeAuditMarkdown(simResults = null) {
         if (trimmed.startsWith("|")) {
             const cols = trimmed.split("|").map(c => c.trim()).slice(1, -1);
             if (cols.includes("Оценка силы")) {
-                currentTableHasRaw = cols.includes("Сырой прирост");
-                costColIdx = cols.indexOf("Цена");
-                if (!currentTableHasRaw) {
-                    const pIdx = cols.indexOf("Оценка силы");
-                    cols.splice(pIdx, 0, "Сырой прирост");
-                    rawColIdx = pIdx;
-                    powerColIdx = pIdx + 1;
-                } else {
-                    rawColIdx = cols.indexOf("Сырой прирост");
-                    powerColIdx = cols.indexOf("Оценка силы");
+                insertRawPos = -1;
+                insertFloorPos = -1;
+
+                if (!cols.includes("Сырой прирост")) {
+                    insertRawPos = cols.indexOf("Оценка силы");
+                    cols.splice(insertRawPos, 0, "Сырой прирост");
                 }
+                if (!cols.includes(FLOOR_PROFILES[0].label)) {
+                    insertFloorPos = cols.indexOf("Сырой прирост");
+                    cols.splice(insertFloorPos, 0, ...FLOOR_PROFILES.map(fp => fp.label));
+                }
+
+                costColIdx = cols.indexOf("Цена");
+                rawColIdx = cols.indexOf("Сырой прирост");
+                powerColIdx = cols.indexOf("Оценка силы");
+                floorColIndices = FLOOR_PROFILES.map(fp => ({
+                    id: fp.id,
+                    idx: cols.indexOf(fp.label),
+                }));
+
                 outputLines.push(`| ${cols.join(" | ")} |`);
                 continue;
             }
             if (trimmed.includes(":---")) {
-                if (!currentTableHasRaw) {
-                    cols.splice(rawColIdx, 0, ":---:");
-                    outputLines.push(`| ${cols.join(" | ")} |`);
-                } else {
-                    outputLines.push(line);
-                }
+                if (insertRawPos >= 0) cols.splice(insertRawPos, 0, ":---:");
+                if (insertFloorPos >= 0) cols.splice(insertFloorPos, 0, ...FLOOR_PROFILES.map(() => ":---:"));
+                outputLines.push(`| ${cols.join(" | ")} |`);
                 continue;
             }
 
             const idMatch = cols[0] ? cols[0].match(/`([a-z0-9]+)`/) : null;
             if (idMatch && powerColIdx >= 0) {
+                if (insertRawPos >= 0) cols.splice(insertRawPos, 0, "");
+                if (insertFloorPos >= 0) cols.splice(insertFloorPos, 0, ...FLOOR_PROFILES.map(() => ""));
+
                 const id = idMatch[1];
                 const cost = itemCostMap.get(id);
                 const fallbackPct = cost ? cost * GOLD_EXPECTED_PCT_PER_G : PERK_EXPECTED_PCT;
-                const pct = metrics.get(id) ?? fallbackPct;
+                const entry = metrics.get(id);
+                const pct = entry ? entry.avgPct : fallbackPct;
                 const score = calculateItemValueScore(id, pct, itemCostMap);
 
                 const scoreHue = calculateScoreHue(score);
                 const scoreHex = hslToHex(scoreHue, 85, 54);
-
                 const rawHue = calculateRawPctHue(pct);
                 const rawHex = hslToHex(rawHue, 85, 54);
 
-                const rawCell = `<span style="color: ${rawHex}">**+${pct}%**</span>`;
-                const scoreCell = `<span style="color: ${scoreHex}">**${score}**</span>`;
+                for (const fc of floorColIndices) {
+                    if (fc.idx < 0) continue;
+                    const fPct = entry && entry.byFloor[fc.id] !== undefined ? entry.byFloor[fc.id] : pct;
+                    const fHex = hslToHex(calculateRawPctHue(fPct), 85, 54);
+                    cols[fc.idx] = `<span style="color: ${fHex}">**+${fPct}%**</span>`;
+                }
+
+                cols[rawColIdx] = `<span style="color: ${rawHex}">**+${pct}%**</span>`;
+                cols[powerColIdx] = `<span style="color: ${scoreHex}">**${score}**</span>`;
 
                 if (costColIdx >= 0 && cost !== null && cost !== undefined) {
                     cols[costColIdx] = String(cost);
-                }
-
-                if (!currentTableHasRaw) {
-                    cols[powerColIdx - 1] = scoreCell;
-                    cols.splice(rawColIdx, 0, rawCell);
-                } else {
-                    cols[rawColIdx] = rawCell;
-                    cols[powerColIdx] = scoreCell;
                 }
 
                 outputLines.push(`| ${cols.join(" | ")} |`);
@@ -973,11 +1244,11 @@ function colorizeAuditMarkdown(simResults = null) {
     let resultMd = outputLines.join("\n");
 
     const legendBlock = [
-        "> **Шкала оценок эффективности (Две шкалы):**",
-        "> 1. **Сырой прирост (растянутая шкала прироста дальности комнат от $+0\\%$ до $+180\\%+$):**  ",
+        "> **Шкала оценок эффективности (Две шкалы, 4 этажа Э1–Э4 + среднее):**",
+        "> 1. **Э1–Э4 и Сырой прирост (растянутая шкала прироста дальности комнат от $+0\\%$ до $+180\\%+$):**  ",
         `>    <span style="color: ${hslToHex(calculateRawPctHue(0), 85, 54)}">**+0% (база)**</span> $\\to$ <span style="color: ${hslToHex(calculateRawPctHue(35), 85, 54)}">**+35% (норма)**</span> $\\to$ <span style="color: ${hslToHex(calculateRawPctHue(56), 85, 54)}">**+56% (сильно)**</span> $\\to$ <span style="color: ${hslToHex(calculateRawPctHue(75), 85, 54)}">**+75% (алый)**</span> $\\to$ <span style="color: ${hslToHex(calculateRawPctHue(125), 85, 54)}">**+125% (мощно)**</span> $\\to$ <span style="color: ${hslToHex(calculateRawPctHue(180), 85, 54)}">**+180%+ (пурпур)**</span>`,
-        "> 2. **Оценка силы / Value Score (справедливая ценность к стоимости, эталон — 100):**  ",
-        ">    *Ориентир 100 означает: $+3.5\\%$ дальности на $1G$ цены предмета, либо $+35\\%$ дальности на слот бесплатного перка (для перков обе колонки окрашены идентично).*  ",
+        "> 2. **Оценка силы / Value Score (справедливая ценность среднего прироста к стоимости, эталон — 100):**  ",
+        ">    *Ориентир 100 означает: $+3.5\\%$ средней дальности на $1G$ цены предмета, либо $+35\\%$ на слот бесплатного перка (для перков обе колонки окрашены идентично).*  ",
         `>    <span style="color: ${hslToHex(calculateScoreHue(0), 85, 54)}">**0 (мусор)**</span> $\\to$ <span style="color: ${hslToHex(calculateScoreHue(50), 85, 54)}">**50 (слабо)**</span> $\\to$ <span style="color: ${hslToHex(calculateScoreHue(100), 85, 54)}">**100 (идеал)**</span> $\\to$ <span style="color: ${hslToHex(calculateScoreHue(130), 85, 54)}">**130 (лайм)**</span> $\\to$ <span style="color: ${hslToHex(calculateScoreHue(160), 85, 54)}">**160 (янтарь)**</span> $\\to$ <span style="color: ${hslToHex(calculateScoreHue(215), 85, 54)}">**215 (алый)**</span> $\\to$ <span style="color: ${hslToHex(calculateScoreHue(350), 85, 54)}">**350 (малина)**</span> $\\to$ <span style="color: ${hslToHex(calculateScoreHue(500), 85, 54)}">**500+ (пурпур)**</span>`,
     ].join("\n");
 
@@ -991,7 +1262,7 @@ function colorizeAuditMarkdown(simResults = null) {
     }
 
     fs.writeFileSync(auditPath, resultMd, "utf8");
-    console.log(`🎨 Добавлена колонка Сырой прирост и обновлен Value Score (${modifiedCount} шт.) в ${auditPath}`);
+    console.log(`🎨 Обновлены колонки Э1–Э4, Сырой прирост и Value Score (${modifiedCount} шт.) в ${auditPath}`);
 }
 
 // 11. Точка входа
@@ -1004,36 +1275,46 @@ async function main() {
         return;
     }
     const startTime = Date.now();
+    const activeFloors = ACTIVE_FLOOR_PROFILES;
+    const isFilteredRun = Boolean(targetIdArg || targetCatArg || targetClassArg || Number.isFinite(targetFloorArg));
+
     console.log("==========================================================================================");
-    console.log("🎮 Headless Balance Simulator — Paper-Lite (Gauntlet Survival & Economy Progression)");
-    console.log(`Параметры: запусков/стиль=${RUNS_PER_PLAYSTYLE}, классы=[${CLASSES.join(", ")}], фильтр ID=${targetIdArg || "все"}`);
+    console.log("🎮 Headless Balance Simulator — Paper-Lite (Multi-Floor Survival & Economy Progression)");
+    console.log(`Параметры: запусков/стиль=${RUNS_PER_PLAYSTYLE}, классы=[${CLASSES.join(", ")}], этажи=[${activeFloors.map(f => f.label).join(", ")}], фильтр ID=${targetIdArg || "все"}`);
     console.log("==========================================================================================\n");
 
-    const baseline = calculateFloorBaseline();
+    const baselines = calculateFloorBaselines(activeFloors);
     const itemPool = buildItemPool();
 
     console.log(`\nЗапуск оценки пула сущностей: ${itemPool.length} шт...\n`);
-    console.log("ID    | Название                | Категория  | Цена   | ROI    | Комнаты (Δ)            | Урон (Δ)         | Лучший стиль игры (xMult)   | Вердикт");
-    console.log("------+-------------------------+------------+--------+--------+------------------------+------------------+-----------------------------+-----------------------");
+    const floorColsHeader = activeFloors.map(fp => fp.label.padEnd(6)).join(" | ");
+    const floorColsRule = activeFloors.map(() => "--------").join("+");
+    const tableRule = `------+-------------------------+-----------+--------+--------+${floorColsRule}+--------------------+--------------------------+-----------------------`;
+    console.log(`ID    | Название                | Катег.    | Цена   | ROI    | ${floorColsHeader} | Ср.Комн (Δ)        | Лучший стиль (xMult)     | Вердикт`);
+    console.log(tableRule);
 
     const results = [];
     for (const item of itemPool) {
         try {
-            const res = evaluateFloorItem(item, baseline);
+            const res = evaluateFloorItem(item, baselines, activeFloors);
             results.push(res);
-            console.log(formatConsoleRow(res));
+            console.log(formatConsoleRow(res, activeFloors));
         } catch (err) {
             console.error(`❌ Ошибка симуляции для ${item.id} (${item.name}):`, err.message);
         }
     }
 
     const elapsed = Math.round((Date.now() - startTime) / 100) / 10;
-    console.log("------+-------------------------+------------+------------------------+----------------+-----------------------------+-----------------------");
+    console.log(tableRule);
     console.log(`\n✨ Симуляция завершена за ${elapsed}s. Обработано сущностей: ${results.length}/${itemPool.length}.`);
 
     if (!skipReport && results.length > 0) {
-        generateMarkdownReport(results, baseline);
-        colorizeAuditMarkdown(results);
+        if (isFilteredRun) {
+            console.log("ℹ️ Фильтрованный прогон: файлы отчётов не перезаписаны (запустите без фильтров для полного обновления).");
+        } else {
+            generateMarkdownReport(results, baselines, activeFloors);
+            colorizeAuditMarkdown(results);
+        }
     }
 }
 
