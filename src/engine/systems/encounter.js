@@ -1,15 +1,13 @@
 import { RNG } from "../../utils/rng.js";
-import { GAME_DATA } from "../../data/index.js";
+import { GAME_DATA, ABYSS_START_FLOOR } from "../../data/index.js";
 
 export function checkLevelUpOrFinishRoom(game) {
     const req = game.player.getRequiredXp();
     if (game.player.xp >= req) {
         generatePerkChoices(game);
-        if (game.selectedPerkChoices.length > 0) {
-            game.state = "LEVELUP";
-            game.saveGame("autosave");
-            return;
-        }
+        game.state = "LEVELUP";
+        game.saveGame("autosave");
+        return;
     }
     finishRoom(game);
 }
@@ -133,18 +131,22 @@ export function finishRoom(game) {
     game.shopMergedNotice = null;
 
     if (roomObj && roomObj.type === "boss") {
-        game.player.heal(game.player.getTotalMaxHp());
-        game.player.en = game.player.getTotalMaxEn();
-        if (game.floor < 3) {
+        if (game.floor < ABYSS_START_FLOOR - 1) {
+            game.player.heal(game.player.getTotalMaxHp());
+            game.player.en = game.player.getTotalMaxEn();
             game.state = "MAP";
+        } else if (game.floor === ABYSS_START_FLOOR - 1) {
+            game.meta.malkorDefeated = true;
+            game.recordProgress(game.floor + 1);
+            game.state = "ABYSS_CHOICE";
         } else {
-            game.calculateSouls();
-            game.state = "VICTORY";
+            game.recordProgress(game.floor + 1);
+            game.state = "MAP";
         }
     } else {
         game.state = "MAP";
     }
-    if (game.state !== "VICTORY") {
+    if (game.state !== "VICTORY" && game.state !== "GAMEOVER") {
         game.saveGame("autosave");
     }
 }
@@ -165,7 +167,9 @@ export function choosePerk(game, perkId) {
     const req = game.player.getRequiredXp();
     game.player.xp = Math.max(0, game.player.xp - req);
     game.player.level++;
-    game.player.addPerk(perkId, game.floor);
+    if (perkId) {
+        game.player.addPerk(perkId, game.floor);
+    }
 
     game.player.baseMaxHp += 3;
     game.player.heal(6);
@@ -545,8 +549,7 @@ export function triggerCorridorRoom(game) {
 
 export function leaveCorridorRoom(game) {
     if (game.player.hp <= 0) {
-        game.calculateSouls();
-        game.state = "GAMEOVER";
+        game.finalizeRun("GAMEOVER");
         return;
     }
     game.currentCorridorResult = null;

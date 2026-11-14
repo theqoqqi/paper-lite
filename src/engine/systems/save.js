@@ -1,4 +1,5 @@
 import { Player } from "../player.js";
+import { ABYSS_START_FLOOR } from "../../data/index.js";
 
 const META_STORAGE_KEY = "roguelite_meta_v4";
 const SLOT_PREFIX = "roguelite_slot_";
@@ -27,6 +28,7 @@ export function serializeState(game) {
         floor: game.floor,
         room: game.room,
         state: game.state,
+        enteredAbyss: Boolean(game.enteredAbyss),
         enemies: game.enemies,
         selectedTargetIndex: game.selectedTargetIndex,
         battleTurn: game.battleTurn,
@@ -82,10 +84,11 @@ export function loadGame(game, slotKeyOrJson = "autosave") {
         game.floor = data.floor || 0;
         game.room = data.room || 1;
         game.state = data.state || "MAP";
+        game.enteredAbyss = Boolean(data.enteredAbyss || game.floor >= ABYSS_START_FLOOR);
         game.enemies = data.enemies || [];
         game.selectedTargetIndex = data.selectedTargetIndex || 0;
         game.battleTurn = data.battleTurn || 1;
-        game.enrageAnnounced = Boolean(data.enrageAnnounced || game.battleTurn >= 11);
+        game.enrageAnnounced = Boolean(data.enrageAnnounced || game.battleTurn >= 11 || game.floor >= ABYSS_START_FLOOR);
         game.battleFinished = Boolean(data.battleFinished);
         game.battleRewards = data.battleRewards || { xp: 0, gold: 0, items: [] };
         game.isProcessingTurn = false;
@@ -130,7 +133,11 @@ export function getSlotSummary(slotKey) {
         }) : "";
         const clearedCount = d.dungeonRooms ? Object.values(d.dungeonRooms).filter(r => r.cleared && r.type !== "corridor").length : (d.room || 1);
         const totalCount = d.dungeonRooms ? Object.values(d.dungeonRooms).filter(r => r.type !== "corridor").length : 10;
-        return `${d.player.className} (Ур.${d.player.level}) | Этаж ${d.floor + 1} (${clearedCount}/${totalCount} комн.) | 💰${d.player.gold}G [${dateStr}]`;
+        const floorNum = (d.floor || 0) + 1;
+        const locationText = d.state === "ABYSS_CHOICE"
+            ? "Развилка после Малкора"
+            : `${(d.floor || 0) >= ABYSS_START_FLOOR ? "Бездна: " : ""}Этаж ${floorNum} (${clearedCount}/${totalCount} комн.)`;
+        return `${d.player.className} (Ур.${d.player.level}) | ${locationText} | 💰${d.player.gold}G [${dateStr}]`;
     } catch (e) {
         return null;
     }

@@ -1,12 +1,13 @@
 import { RNG } from "../../utils/rng.js";
-import { GAME_DATA } from "../../data/index.js";
+import { GAME_DATA, ABYSS_START_FLOOR, getMetaUpgradeCap } from "../../data/index.js";
 import { pickItemByRarity } from "./encounter.js";
 
 export function buyMetaUpgrade(game, key) {
     const upg = GAME_DATA.metaUpgrades.find(u => u.key === key);
     if (!upg) return;
     const currentLvl = game.meta[key] || 0;
-    if (currentLvl >= upg.max) return;
+    const cap = getMetaUpgradeCap(upg, game.meta);
+    if (currentLvl >= cap) return;
     const cost = upg.costs[currentLvl];
     if (game.meta.souls >= cost) {
         game.meta.souls -= cost;
@@ -43,11 +44,12 @@ export function setupShop(game) {
     const pot2Pool = pot1 ? GAME_DATA.items.potions.filter(p => p.id !== pot1.id) : GAME_DATA.items.potions;
     const pot2 = pickItemByRarity(pot2Pool, game.floor) || pot1;
 
-    const forgeWeaponCost = 14 + game.player.weaponUpgradeLvl * 10;
-    const forgeArmorCost = 14 + game.player.armorUpgradeLvl * 10;
+    const forgeWeaponCost = scaleShopCost(14 + game.player.weaponUpgradeLvl * 10, game.floor);
+    const forgeArmorCost = scaleShopCost(14 + game.player.armorUpgradeLvl * 10, game.floor);
+    const healCost = scaleShopCost(5, game.floor);
 
     game.shopOffers = [{
-        id: "heal_service", kind: "service_heal", name: "🩹 Аптечка хирурга (+12 HP)", cost: 5, bought: false,
+        id: "heal_service", kind: "service_heal", name: "🩹 Аптечка хирурга (+12 HP)", cost: healCost, bought: false,
     }, {
         id: "forge_weapon",
         kind: "forge_w",
@@ -66,7 +68,7 @@ export function setupShop(game) {
         rarity: pot1.rarity,
         item: pot1,
         name: `🧪 [${pot1.rarity}] ${pot1.name} — ${pot1.desc}`,
-        cost: pot1.cost,
+        cost: scaleShopCost(pot1.cost, game.floor),
         bought: false,
     }, {
         id: pot2.id,
@@ -74,7 +76,7 @@ export function setupShop(game) {
         rarity: pot2.rarity,
         item: pot2,
         name: `🧪 [${pot2.rarity}] ${pot2.name} — ${pot2.desc}`,
-        cost: pot2.cost,
+        cost: scaleShopCost(pot2.cost, game.floor),
         bought: false,
     }, {
         id: w.id,
@@ -82,7 +84,7 @@ export function setupShop(game) {
         rarity: w.rarity,
         item: w,
         name: `⚔️ [${w.rarity}] ${w.name} (${w.desc})`,
-        cost: w.cost,
+        cost: scaleShopCost(w.cost, game.floor),
         bought: false,
     }, {
         id: a.id,
@@ -90,7 +92,7 @@ export function setupShop(game) {
         rarity: a.rarity,
         item: a,
         name: `🛡️ [${a.rarity}] ${a.name} (${a.desc})`,
-        cost: a.cost,
+        cost: scaleShopCost(a.cost, game.floor),
         bought: false,
     }];
 
@@ -118,16 +120,20 @@ export function setupShop(game) {
             rarity: art.rarity,
             item: art,
             name: `💍 [${art.rarity}] Артефакт: ${art.name} (${art.desc})`,
-            cost: art.cost,
+            cost: scaleShopCost(art.cost, game.floor),
             bought: false,
         });
     });
 }
 
+export function getBaseRerollCost(floor = 0) {
+    return scaleShopCost(5, floor);
+}
+
 export function rerollShop(game) {
     if (game.player.gold < game.rerollCost) return;
     game.player.gold -= game.rerollCost;
-    game.rerollCost += 4;
+    game.rerollCost += scaleShopCost(4, game.floor);
     game.previewShopOfferIndex = null;
     game.shopMergedNotice = null;
     setupShop(game);
@@ -171,9 +177,20 @@ export function buyShopOffer(game, index) {
 }
 
 export function calculateSouls(game) {
-    const earned = Math.floor(game.player.totalRunXp * 0.8) + (game.floor * 12) + Math.floor(game.player.gold / 5);
+    const abyssDepth = Math.max(0, (game.floor || 0) - (ABYSS_START_FLOOR - 1));
+    const abyssSoulBonus = abyssDepth > 0 ? abyssDepth * 20 + abyssDepth * (abyssDepth + 1) * 4 : 0;
+    const earned = Math.floor(game.player.totalRunXp * 0.8) + (game.floor * 12) + Math.floor(game.player.gold / 5) + abyssSoulBonus;
     game.lastEarnedSouls = Math.max(1, earned);
     game.meta.souls += game.lastEarnedSouls;
     game.saveMeta();
     localStorage.removeItem("roguelite_slot_autosave");
+}
+
+function getAbyssPriceMultiplier(floor = 0) {
+    const abyssDepth = Math.max(0, (floor || 0) - (ABYSS_START_FLOOR - 1));
+    return 1 + abyssDepth * 0.4;
+}
+
+function scaleShopCost(baseCost, floor = 0) {
+    return Math.max(1, Math.round(baseCost * getAbyssPriceMultiplier(floor)));
 }

@@ -1,5 +1,5 @@
 import { RNG } from "../../utils/rng.js";
-import { GAME_DATA } from "../../data/index.js";
+import { GAME_DATA, ABYSS_START_FLOOR, getEnemyNativeFloor, getFloorMeta } from "../../data/index.js";
 import { playSound } from "../../utils/audio.js";
 import { pickItemByRarity } from "./encounter.js";
 
@@ -7,19 +7,56 @@ const FLOOR_HP_MULTIPLIERS = [1.0, 1.5, 2.15, 3.0];
 const FLOOR_ATK_BONUSES = [0, 2, 4, 7];
 const MUTATION_CHANCE_NORMAL = [10, 30, 50, 70];
 const MUTATION_CHANCE_ELITE = [0, 30, 60, 90];
+const TIER_HP_NORMALIZE = [2.8, 2.0, 1.4, 1.0];
+const TIER_ATK_NORMALIZE_SHIFT = [4, 3, 1, 0];
 
 export function createEnemyInstance(game, enemyKey, applyMutation = false) {
     const template = GAME_DATA.enemies[enemyKey];
     const e = JSON.parse(JSON.stringify(template));
 
-    const floorIdx = Math.min(3, Math.max(0, game.floor || 0));
-    const depthMult = FLOOR_HP_MULTIPLIERS[floorIdx];
-    const atkDepthBonus = FLOOR_ATK_BONUSES[floorIdx];
+    const floor = Math.max(0, game.floor || 0);
+    const isAbyss = floor >= ABYSS_START_FLOOR;
     const cursedCfg = GAME_DATA.cursedConfig;
     const fountainAtkBonus = (game.fountainCursesCount || 0) * (cursedCfg ? cursedCfg.fountainEnemyAtkStep : 1);
     const eclipseCount = game.fountainEclipseCount || 0;
     const eclipseAtkBonus = eclipseCount * (cursedCfg ? cursedCfg.eclipseEnemyAtkStep : 2);
     const eclipseHpMult = 1 + eclipseCount * ((cursedCfg ? cursedCfg.eclipseEnemyHpPctStep : 25) / 100);
+
+    let depthMult;
+    let atkDepthBonus;
+
+    if (isAbyss) {
+        const abyssDepth = floor - (ABYSS_START_FLOOR - 1);
+        const nativeFloor = getEnemyNativeFloor(enemyKey);
+        const tierHpNorm = TIER_HP_NORMALIZE[nativeFloor] || 1.0;
+        const tierAtkShift = TIER_ATK_NORMALIZE_SHIFT[nativeFloor] || 0;
+        const atkMult = Math.pow(1.22, abyssDepth);
+        const shieldMult = tierHpNorm * Math.pow(1.18, abyssDepth);
+
+        depthMult = FLOOR_HP_MULTIPLIERS[3] * tierHpNorm * Math.pow(1.48, abyssDepth);
+        atkDepthBonus = 0;
+
+        e.xp = Math.round((e.xp || 3) * tierHpNorm * (1 + abyssDepth * 0.25));
+        if (e.shield) {
+            e.shield = Math.max(1, Math.round(e.shield * shieldMult));
+        }
+        if (Array.isArray(e.pattern)) {
+            e.pattern = e.pattern.map(step => {
+                const next = { ...step };
+                if (next.val > 0) {
+                    next.val = Math.max(1, Math.round((next.val + tierAtkShift + FLOOR_ATK_BONUSES[3]) * atkMult));
+                }
+                if (next.shield > 0) {
+                    next.shield = Math.max(1, Math.round(next.shield * shieldMult));
+                }
+                return next;
+            });
+        }
+    } else {
+        const floorIdx = Math.min(3, floor);
+        depthMult = FLOOR_HP_MULTIPLIERS[floorIdx];
+        atkDepthBonus = FLOOR_ATK_BONUSES[floorIdx];
+    }
 
     e.hp = Math.round(e.hp * depthMult * eclipseHpMult);
     e.currentHp = e.hp;
@@ -58,29 +95,44 @@ export function setupBattle(game, mode = "normal") {
     game._victorySoundPlayed = false;
     game.battleRewards = { xp: 0, gold: 0, items: [] };
 
-    const floorIdx = Math.min(3, Math.max(0, game.floor || 0));
-    const floorData = GAME_DATA.floors[floorIdx];
+    const floor = Math.max(0, game.floor || 0);
+    const isAbyss = floor >= ABYSS_START_FLOOR;
+    const floorIdx = Math.min(3, floor);
+    const floorData = getFloorMeta(floor);
 
     if (mode === "boss") {
         playSound("bossEncounter");
-        game.enemies.push(createEnemyInstance(game, floorData.boss));
-        game.battleLog = ["👑 БИТВА С БОССОМ ЭТАЖА!"];
+        const bossKey = isAbyss ? RNG.choice(floorData.bosses) : floorData.boss;
+        game.enemies.push(createEnemyInstance(game, bossKey));
+        game.battleLog = [isAbyss ? "👑 ХРАНИТЕЛЬ ГЛУБИН БЕЗДНЫ!" : "👑 БИТВА С БОССОМ ЭТАЖА!"];
     } else if (mode === "elite") {
         playSound("battleStart");
         const eliteKey = RNG.choice(floorData.elite);
-        const mutateElite = RNG.chance(MUTATION_CHANCE_ELITE[floorIdx]);
+        const mutateElite = isAbyss ? true : RNG.chance(MUTATION_CHANCE_ELITE[floorIdx]);
         game.enemies.push(createEnemyInstance(game, eliteKey, mutateElite));
+        if (isAbyss) {
+            const abyssDepth = floor - (ABYSS_START_FLOOR - 1);
+            const escortChance = Math.min(75, Math.max(0, (abyssDepth - 1) * 25));
+            if (escortChance > 0 && RNG.chance(escortChance)) {
+                const escortKey = RNG.choice(floorData.enemies);
+                game.enemies.push(createEnemyInstance(game, escortKey, true));
+            }
+        }
         game.battleLog = ["💀 Встречен Элитный противник!"];
     } else if (mode === "mimic") {
         playSound("battleStart");
-        game.enemies.push(createEnemyInstance(game, "mimic", game.floor >= 1));
+        game.enemies.push(createEnemyInstance(game, "mimic", floor >= 1));
         game.battleLog = ["📦 Сундук оказался Алчным Мимиком!"];
     } else {
         playSound("battleStart");
-        const mutChance = MUTATION_CHANCE_NORMAL[floorIdx];
-        let budget = Math.min(7, 2 + Math.floor(game.room / 3) + game.floor);
+        const mutChance = isAbyss ? 100 : MUTATION_CHANCE_NORMAL[floorIdx];
+        const abyssDepth = isAbyss ? floor - (ABYSS_START_FLOOR - 1) : 0;
+        let budget = isAbyss
+            ? Math.min(12, 7 + abyssDepth + Math.floor(game.room / 4))
+            : Math.min(7, 2 + Math.floor(game.room / 3) + floor);
+        const maxEnemies = isAbyss ? 4 : 3;
         let attempts = 0;
-        while (budget > 0 && game.enemies.length < 3 && attempts < 18) {
+        while (budget > 0 && game.enemies.length < maxEnemies && attempts < 24) {
             attempts++;
             const enemyKey = RNG.choice(floorData.enemies);
             const template = GAME_DATA.enemies[enemyKey];
@@ -91,13 +143,19 @@ export function setupBattle(game, mode = "normal") {
             }
         }
         if (game.enemies.length === 0) {
-            game.enemies.push(createEnemyInstance(game, floorData.enemies[0]));
+            const fallbackKey = isAbyss ? RNG.choice(floorData.enemies) : floorData.enemies[0];
+            game.enemies.push(createEnemyInstance(game, fallbackKey, isAbyss));
         }
         game.battleLog = [`⚔️ Бой начался! Комната #${game.room}.`];
     }
 
     game.selectedTargetIndex = 0;
     game.battleTurn = 1;
+    const startEnrage = getAbyssEnrageBonus(game);
+    if (startEnrage > 0) {
+        game.enrageAnnounced = true;
+        game.battleLog.unshift(`🔥 Ярость Бездны активна с 1-го раунда (+${startEnrage} к атакам врагов)!`);
+    }
     game.player.en = Math.min(game.player.getTotalMaxEn(), game.player.en);
     if (game.player.hasArtifact("art2")) {
         game.player.en += 2;
@@ -584,7 +642,7 @@ export function runEnemyTurnSequence(game, onStepRender) {
             game.battleLog.unshift(`☠️ Яд наносит вам ${game.player.poison} урона.`);
             game.player.poison--;
         }
-        const enrageBonus = game.battleTurn >= 11 ? (game.battleTurn - 10) * 2 : 0;
+        const enrageBonus = getAbyssEnrageBonus(game);
         if (enrageBonus > 0) {
             game.battleLog.unshift(`🔥 Ярость Бездны (Раунд ${game.battleTurn}): враги получают +${enrageBonus} к урону!`);
         }
@@ -649,7 +707,7 @@ export function runEnemyTurnSequence(game, onStepRender) {
         game.player.damageReductionPct = 0;
         game.player.steelScaleUsed = false;
         game.battleTurn++;
-        if (game.battleTurn >= 11 && !game.enrageAnnounced) {
+        if (getAbyssEnrageBonus(game) > 0 && !game.enrageAnnounced) {
             game.enrageAnnounced = true;
             game.addBattleFx({
                 target: "player",
@@ -690,8 +748,7 @@ export function runEnemyTurnSequence(game, onStepRender) {
 
             if (game.player.hp <= 0) {
                 game.isProcessingTurn = false;
-                game.calculateSouls();
-                game.state = "GAMEOVER";
+                game.finalizeRun("GAMEOVER");
                 if (onStepRender) onStepRender();
                 return;
             }
@@ -713,7 +770,7 @@ export function runEnemyTurnSequence(game, onStepRender) {
 }
 
 export function executeSingleEnemyTurn(game, en) {
-    const enrageBonus = game.battleTurn >= 11 ? (game.battleTurn - 10) * 2 : 0;
+    const enrageBonus = getAbyssEnrageBonus(game);
 
     const hitPlayer = (val, isPierce = false) => {
         const shieldBefore = game.player.shield;
@@ -1142,4 +1199,12 @@ function consumePotionCritRoll(game) {
     }
     if (bonus > 0) return game.player.rollCrit(bonus);
     return false;
+}
+
+export function getAbyssEnrageBonus(game) {
+    const turn = game.battleTurn || 1;
+    if ((game.floor || 0) >= ABYSS_START_FLOOR) {
+        return turn * 2;
+    }
+    return turn >= 11 ? (turn - 10) * 2 : 0;
 }

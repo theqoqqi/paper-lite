@@ -11,13 +11,24 @@ import * as BattleSystem from "./systems/battle.js";
 export class Game {
     constructor() {
         this.defaultMeta = {
-            souls: 0, hp: 0, atk: 0, def: 0, en: 0, gold: 0, potions: 0, unlockedClasses: ["wanderer"],
+            souls: 0,
+            hp: 0,
+            atk: 0,
+            def: 0,
+            en: 0,
+            gold: 0,
+            potions: 0,
+            unlockedClasses: ["wanderer"],
+            malkorDefeated: false,
+            bestFloor: 0,
+            bestClass: null,
         };
         this.meta = JSON.parse(JSON.stringify(this.defaultMeta));
         this.player = null;
         this.floor = 0;
         this.room = 1;
         this.state = "MENU";
+        this.enteredAbyss = false;
 
         this.enemies = [];
         this.selectedTargetIndex = 0;
@@ -108,10 +119,40 @@ export class Game {
         ShopSystem.calculateSouls(this);
     }
 
+    recordProgress(reachedFloor = this.floor + 1) {
+        if (reachedFloor > (this.meta.bestFloor || 0)) {
+            this.meta.bestFloor = reachedFloor;
+            this.meta.bestClass = this.player ? this.player.className : (this.meta.bestClass || null);
+        }
+        this.saveMeta();
+    }
+
+    enterAbyssFromChoice() {
+        if (this.state !== "ABYSS_CHOICE") return;
+        this.enteredAbyss = true;
+        this.floor++;
+        this.generateFloorMap();
+        this.recordProgress(this.floor + 1);
+        this.state = "MAP";
+        this.saveGame("autosave");
+    }
+
+    finalizeRun(outcomeState = "GAMEOVER") {
+        if (this.state === "VICTORY" || this.state === "GAMEOVER") return;
+        if (this.player) {
+            this.recordProgress(this.floor + 1);
+            this.calculateSouls();
+        }
+        this.state = outcomeState;
+    }
+
     startRun(classKey) {
         this.player = new Player(classKey, this.meta);
         this.floor = 0;
         this.room = 1;
+        this.enteredAbyss = false;
+        this.enrageAnnounced = false;
+        this.lastEarnedSouls = 0;
         this.pendingEquipment = null;
         this.pendingArtifact = null;
         this.fountainCursesCount = 0;
@@ -313,7 +354,7 @@ export class Game {
             }
         } else if (roomObj.type === "shop") {
             if (!roomObj.cleared) {
-                this.rerollCost = 5;
+                this.rerollCost = ShopSystem.getBaseRerollCost(this.floor);
                 this.shopMergedNotice = null;
                 this.setupShop();
                 roomObj.cleared = true;
@@ -457,6 +498,10 @@ export class Game {
 
     proceedAfterBattle() {
         BattleSystem.proceedAfterBattle(this);
+    }
+
+    getAbyssEnrageBonus() {
+        return BattleSystem.getAbyssEnrageBonus(this);
     }
 
     addBattleFx(fx) {

@@ -16,7 +16,8 @@
  *   node scripts/simulate-balance.js --id p35         # Анализ конкретного перка / предмета
  *   node scripts/simulate-balance.js --category perks # Анализ только категории (perks/weapons/armors/artifacts/potions)
  *   node scripts/simulate-balance.js --class assassin # Анализ только по одному классу
- *   node scripts/simulate-balance.js --floor 2        # Анализ только одного стартового этажа (1..4)
+ *   node scripts/simulate-balance.js --floor 2        # Анализ только одного стартового этажа (1..4+)
+ *   node scripts/simulate-balance.js --abyss          # Проверка механик и прогон кривой сложности Бездны (5+)
  *   node scripts/simulate-balance.js --no-report      # Без записи в docs/balance-report.md
  */
 
@@ -41,7 +42,16 @@ global.clearTimeout = () => {};
 // 2. Импорт систем игры
 const { Game } = await import("../src/engine/game.js");
 const BattleSystem = await import("../src/engine/systems/battle.js");
+const EncounterSystem = await import("../src/engine/systems/encounter.js");
+const ShopSystem = await import("../src/engine/systems/shop.js");
+const { DungeonGenerator } = await import("../src/engine/dungeon-generator.js");
 const { DATA_PERKS, DATA_ITEMS } = await import("../src/data/items.js");
+const {
+    GAME_DATA,
+    ABYSS_START_FLOOR,
+    getFloorMeta,
+    getMetaUpgradeCap,
+} = await import("../src/data/index.js");
 const fs = await import("fs");
 const path = await import("path");
 
@@ -80,6 +90,7 @@ const targetClassArg = getArgValue(args, "--class");
 const targetFloorArg = parseInt(getArgValue(args, "--floor"), 10);
 const customRunsArg = parseInt(getArgValue(args, "--runs"), 10);
 const skipReport = args.includes("--no-report");
+const isAbyssMode = args.includes("--abyss");
 
 const RUNS_PER_PLAYSTYLE = Number.isFinite(customRunsArg)
     ? customRunsArg
@@ -202,9 +213,42 @@ const FLOOR_PROFILES = [
     },
 ];
 
-const ACTIVE_FLOOR_PROFILES = FLOOR_PROFILES.filter(
-    fp => !Number.isFinite(targetFloorArg) || fp.floorNum === targetFloorArg
-);
+function buildDynamicAbyssProfile(floorNum) {
+    const floorIdx = floorNum - 1;
+    const abyssDepth = Math.max(1, floorIdx - 3);
+    const customSteps = [];
+    for (let i = 1; i <= 15; i++) {
+        const mode = i === 15 ? "boss" : ([4, 8, 11, 14].includes(i) ? "elite" : "normal");
+        customSteps.push({
+            name: `Бездна Э${floorNum}: Комната ${i} (${mode})`,
+            floor: floorIdx,
+            room: i,
+            mode,
+            isAbyss: true,
+            allowCampfireAfter: i === 7,
+        });
+    }
+    return {
+        id: `f${floorNum}`,
+        floorNum,
+        floor: floorIdx,
+        label: `Э${floorNum}`,
+        name: `Этаж ${floorNum} (Бездна глуб.${abyssDepth})`,
+        startStepIndex: 0,
+        bonusHp: 265 + abyssDepth * 30,
+        bonusAtk: 35 + abyssDepth * 4,
+        bonusDef: 8 + Math.floor(abyssDepth / 2),
+        bonusEn: 4,
+        startLevel: 7 + abyssDepth,
+        customSteps,
+    };
+}
+
+const ACTIVE_FLOOR_PROFILES = Number.isFinite(targetFloorArg) && targetFloorArg >= 5
+    ? [buildDynamicAbyssProfile(targetFloorArg)]
+    : FLOOR_PROFILES.filter(
+        fp => !Number.isFinite(targetFloorArg) || fp.floorNum === targetFloorArg
+    );
 
 const CLASSES = ["wanderer", "assassin", "crusader"].filter(c => !targetClassArg || targetClassArg === c);
 const ALL_SKILLS = ["fast", "heavy", "pierce", "whirlwind", "defend", "concentrate"];
@@ -498,9 +542,10 @@ function simulateFloorRun(classId, itemDef, playstyleId, runIndex, metrics, floo
     let roomsSinceCampfire = 0;
     let totalTurns = 0;
 
-    const startStep = floorProfile ? floorProfile.startStepIndex : 0;
-    for (let sIdx = startStep; sIdx < GAUNTLET_STEPS.length; sIdx++) {
-        const step = GAUNTLET_STEPS[sIdx];
+    const stepsSource = floorProfile && floorProfile.customSteps ? floorProfile.customSteps : GAUNTLET_STEPS;
+    const startStep = floorProfile && !floorProfile.customSteps ? floorProfile.startStepIndex : 0;
+    for (let sIdx = startStep; sIdx < stepsSource.length; sIdx++) {
+        const step = stepsSource[sIdx];
         if (game.player.hp <= 0) break;
 
         game.floor = step.floor;
@@ -608,7 +653,9 @@ function processIntermission(game, step, roomsSinceCampfire) {
     }
 
     // 2. Базовая передышка между комнатами (имитация коридорного отдыха: 20% Max HP, мин. 5 HP)
-    p.heal(Math.max(5, Math.ceil(p.getTotalMaxHp() * 0.20)));
+    if (!step.isAbyss) {
+        p.heal(Math.max(5, Math.ceil(p.getTotalMaxHp() * 0.20)));
+    }
 
     // 3. Прокачка уровней от накопленного XP (Level Up)
     while (p.xp >= p.getRequiredXp()) {
@@ -621,7 +668,7 @@ function processIntermission(game, step, roomsSinceCampfire) {
 
     // 4. Привал / Костер (каждые 3 комнаты или после босса)
     let nextCampfireCounter = roomsSinceCampfire;
-    const isCampfire = step.mode === "boss" || roomsSinceCampfire >= 3;
+    const isCampfire = step.isAbyss ? Boolean(step.allowCampfireAfter) : (step.mode === "boss" || roomsSinceCampfire >= 3);
     if (isCampfire) {
         const healPct = p.perks.includes("p28") ? 0.70 : 0.45;
         if (p.perks.includes("p28")) {
@@ -1454,6 +1501,10 @@ async function main() {
         colorizeAuditMarkdown();
         return;
     }
+    if (isAbyssMode) {
+        runAbyssAudit();
+        return;
+    }
     const startTime = Date.now();
     const activeFloors = ACTIVE_FLOOR_PROFILES;
     const isFilteredRun = Boolean(targetIdArg || targetCatArg || targetClassArg || Number.isFinite(targetFloorArg));
@@ -1496,6 +1547,321 @@ async function main() {
             colorizeAuditMarkdown(results);
         }
     }
+}
+
+function runAbyssAudit() {
+    const startTime = Date.now();
+    console.log("==========================================================================================");
+    console.log("🌌 Headless Abyss Audit — Paper-Lite (Этаж 5+ / Задача 013)");
+    console.log(`Параметры: запусков/класс=${Math.max(RUNS_PER_PLAYSTYLE, 6)}, классы=[${CLASSES.join(", ")}]`);
+    console.log("==========================================================================================\n");
+
+    const passedContracts = verifyAbyssContracts();
+    console.log(`✅ Контракты Бездны пройдены: ${passedContracts}/${passedContracts}\n`);
+
+    const runsPerClass = Math.max(RUNS_PER_PLAYSTYLE, 6);
+    console.log("Класс      | Ср.Этаж | Ср.Комнат | Прош.Э5 | Прош.Э6 | Прош.Э7 | Прош.Э8 | Ср.Души");
+    console.log("-----------+---------+-----------+---------+---------+---------+---------+--------");
+
+    for (const cls of CLASSES) {
+        const stats = [];
+        for (let i = 0; i < runsPerClass; i++) {
+            stats.push(simulateAbyssDeepRun(cls, i));
+        }
+        const avgFloor = (stats.reduce((s, r) => s + r.maxFloor, 0) / runsPerClass).toFixed(2);
+        const avgRooms = (stats.reduce((s, r) => s + r.roomsCleared, 0) / runsPerClass).toFixed(1);
+        const pct = (minCleared) => `${Math.round((stats.filter(r => r.clearedAbyssFloors >= minCleared).length / runsPerClass) * 100)}%`;
+        const avgSouls = Math.round(stats.reduce((s, r) => s + r.souls, 0) / runsPerClass);
+        console.log(
+            `${cls.padEnd(10)} | ${String(avgFloor).padEnd(7)} | ${String(avgRooms).padEnd(9)} | ` +
+            `${pct(1).padEnd(7)} | ${pct(2).padEnd(7)} | ${pct(3).padEnd(7)} | ${pct(4).padEnd(7)} | ${avgSouls}`
+        );
+    }
+
+    restoreRandom();
+    localStorage.clear();
+    const elapsed = Math.round((Date.now() - startTime) / 100) / 10;
+    console.log("-----------+---------+-----------+---------+---------+---------+---------+--------");
+    console.log(`\n✨ Проверка Бездны завершена за ${elapsed}s.`);
+}
+
+function verifyAbyssContracts() {
+    let checks = 0;
+    localStorage.clear();
+    setSeed(13001);
+
+    const metaF5 = getFloorMeta(ABYSS_START_FLOOR);
+    const metaF8 = getFloorMeta(ABYSS_START_FLOOR + 3);
+    checks += assertAbyss(Boolean(metaF5 && metaF5.isAbyss && metaF5.name === "Бездна Истощения"), "getFloorMeta(4) returns Floor 5 metadata");
+    checks += assertAbyss(Boolean(metaF8 && metaF8.id === 7 && Array.isArray(metaF8.bosses) && metaF8.bosses.length === 4), "getFloorMeta(7) mixes all 4 bosses");
+
+    for (const f of [ABYSS_START_FLOOR, ABYSS_START_FLOOR + 1]) {
+        const gen = DungeonGenerator.generate(f);
+        const list = Object.values(gen.rooms);
+        checks += assertAbyss(list.length === 22, `Floor ${f + 1} generates 22 rooms (got ${list.length})`);
+        checks += assertAbyss(list.filter(r => r.type === "corridor").length === 0, `Floor ${f + 1} has 0 corridors`);
+        checks += assertAbyss(list.filter(r => r.type === "campfire").length === 1, `Floor ${f + 1} has 1 campfire`);
+        checks += assertAbyss(list.filter(r => r.type === "shop").length === 1, `Floor ${f + 1} has 1 shop`);
+        checks += assertAbyss(list.filter(r => r.type === "fountain").length === 1, `Floor ${f + 1} has 1 fountain`);
+        checks += assertAbyss(list.filter(r => r.type === "elite").length === 4, `Floor ${f + 1} has 4 elites`);
+        checks += assertAbyss(list.filter(r => r.type === "boss").length === 1, `Floor ${f + 1} has 1 boss`);
+    }
+
+    const shopGame = new Game();
+    shopGame.init();
+    shopGame.startRun("wanderer");
+    shopGame.floor = 3;
+    ShopSystem.setupShop(shopGame);
+    const healF4 = shopGame.shopOffers.find(o => o.kind === "service_heal");
+    checks += assertAbyss(healF4 && healF4.cost === 5, `Floor 4 service_heal cost is 5 (got ${healF4 ? healF4.cost : "?"})`);
+    checks += assertAbyss(ShopSystem.getBaseRerollCost(3) === 5, `Floor 4 base reroll cost is 5 (got ${ShopSystem.getBaseRerollCost(3)})`);
+
+    shopGame.floor = 4;
+    ShopSystem.setupShop(shopGame);
+    const healF5 = shopGame.shopOffers.find(o => o.kind === "service_heal");
+    checks += assertAbyss(healF5 && healF5.cost === 7, `Floor 5 service_heal cost is 7 (got ${healF5 ? healF5.cost : "?"})`);
+    checks += assertAbyss(ShopSystem.getBaseRerollCost(4) === 7, `Floor 5 base reroll cost is 7 (got ${ShopSystem.getBaseRerollCost(4)})`);
+
+    shopGame.floor = 5;
+    ShopSystem.setupShop(shopGame);
+    const healF6 = shopGame.shopOffers.find(o => o.kind === "service_heal");
+    checks += assertAbyss(healF6 && healF6.cost === 9, `Floor 6 service_heal cost is 9 (got ${healF6 ? healF6.cost : "?"})`);
+    checks += assertAbyss(ShopSystem.getBaseRerollCost(5) === 9, `Floor 6 base reroll cost is 9 (got ${ShopSystem.getBaseRerollCost(5)})`);
+
+    const hpUpg = GAME_DATA.metaUpgrades.find(u => u.key === "hp");
+    checks += assertAbyss(getMetaUpgradeCap(hpUpg, { malkorDefeated: false }) === 10, "Pre-Malkor HP meta cap is 10");
+    checks += assertAbyss(getMetaUpgradeCap(hpUpg, { malkorDefeated: true }) === 14, "Post-Malkor HP meta cap is 14");
+
+    localStorage.clear();
+    const gMeta = new Game();
+    gMeta.init();
+    gMeta.meta.souls = 2000;
+    gMeta.meta.hp = 10;
+    gMeta.meta.malkorDefeated = false;
+    gMeta.buyMetaUpgrade("hp");
+    checks += assertAbyss(gMeta.meta.hp === 10, "Pre-Malkor meta HP upgrade stops at 10");
+    gMeta.meta.malkorDefeated = true;
+    gMeta.buyMetaUpgrade("hp");
+    checks += assertAbyss(gMeta.meta.hp === 11, "Post-Malkor meta HP upgrade reaches 11");
+
+    localStorage.clear();
+    const gWin = new Game();
+    gWin.init();
+    gWin.startRun("wanderer");
+    gWin.floor = 3;
+    gWin.generateFloorMap();
+    const [winBx, winBy] = gWin.bossRoomId.split(",").map(Number);
+    gWin.playerPos = { x: winBx, y: winBy };
+    gWin.enemies = [];
+    gWin.player.hp = 42;
+    gWin.player.en = 2;
+    gWin.player.xp = 0;
+    EncounterSystem.finishRoom(gWin);
+    checks += assertAbyss(gWin.state === "ABYSS_CHOICE", "Defeating Floor 4 boss enters ABYSS_CHOICE");
+    checks += assertAbyss(gWin.meta.malkorDefeated === true, "Defeating Floor 4 boss unlocks malkorDefeated");
+    checks += assertAbyss(gWin.meta.bestFloor >= 4, "Defeating Floor 4 boss records bestFloor >= 4");
+    checks += assertAbyss(gWin.player.hp === 42 && gWin.player.en === 2, "ABYSS_CHOICE preserves HP and EN");
+    checks += assertAbyss(gWin.lastEarnedSouls === 0, "ABYSS_CHOICE defers soul payout");
+    checks += assertAbyss(Boolean(localStorage.getItem("roguelite_slot_autosave")), "ABYSS_CHOICE keeps autosave");
+
+    gWin.finalizeRun("VICTORY");
+    checks += assertAbyss(gWin.state === "VICTORY" && gWin.lastEarnedSouls > 0, "Victory branch pays souls");
+
+    localStorage.clear();
+    const gAbyss = new Game();
+    gAbyss.init();
+    gAbyss.startRun("crusader");
+    gAbyss.floor = 3;
+    gAbyss.generateFloorMap();
+    const [abBx, abBy] = gAbyss.bossRoomId.split(",").map(Number);
+    gAbyss.playerPos = { x: abBx, y: abBy };
+    gAbyss.enemies = [];
+    gAbyss.player.hp = 42;
+    gAbyss.player.en = 2;
+    gAbyss.player.xp = 0;
+    gAbyss.player.totalRunXp = 50;
+    gAbyss.player.gold = 25;
+    EncounterSystem.finishRoom(gAbyss);
+    gAbyss.enterAbyssFromChoice();
+    checks += assertAbyss(gAbyss.enteredAbyss === true && gAbyss.floor === ABYSS_START_FLOOR && gAbyss.state === "MAP", "enterAbyssFromChoice starts Floor 5");
+    checks += assertAbyss(gAbyss.player.hp === 42 && gAbyss.player.en === 2, "enterAbyssFromChoice keeps HP and EN unhealed");
+    checks += assertAbyss(gAbyss.meta.bestFloor >= 5, "Entering Floor 5 updates bestFloor >= 5");
+
+    const [f5Bx, f5By] = gAbyss.bossRoomId.split(",").map(Number);
+    gAbyss.playerPos = { x: f5Bx, y: f5By };
+    gAbyss.enemies = [];
+    EncounterSystem.finishRoom(gAbyss);
+    checks += assertAbyss(gAbyss.state === "MAP" && gAbyss.player.hp === 42 && gAbyss.player.en === 2, "Floor 5 boss clear does not restore HP/EN");
+
+    const expectedSouls = Math.max(1, Math.floor(50 * 0.8) + (4 * 12) + Math.floor(25 / 5) + 28);
+    const soulsBefore = gAbyss.meta.souls;
+    gAbyss.finalizeRun("GAMEOVER");
+    checks += assertAbyss(gAbyss.lastEarnedSouls === expectedSouls, `Floor 5 death applies +28 depth bonus (${gAbyss.lastEarnedSouls} vs ${expectedSouls})`);
+    checks += assertAbyss(gAbyss.meta.souls === soulsBefore + expectedSouls, "finalizeRun credits souls to meta");
+    gAbyss.finalizeRun("GAMEOVER");
+    checks += assertAbyss(gAbyss.meta.souls === soulsBefore + expectedSouls, "Repeated finalizeRun does not double-pay souls");
+
+    const gOverflow = new Game();
+    gOverflow.init();
+    gOverflow.startRun("assassin");
+    DATA_PERKS.forEach(p => {
+        if (!gOverflow.player.perks.includes(p.id)) gOverflow.player.perks.push(p.id);
+    });
+    gOverflow.player.hp = 10;
+    const maxHpBefore = gOverflow.player.getTotalMaxHp();
+    gOverflow.player.xp = gOverflow.player.getRequiredXp();
+    EncounterSystem.checkLevelUpOrFinishRoom(gOverflow);
+    checks += assertAbyss(gOverflow.state === "LEVELUP" && gOverflow.selectedPerkChoices.length === 0, "Empty perk pool still opens LEVELUP");
+    gOverflow.choosePerk(null);
+    checks += assertAbyss(gOverflow.state !== "LEVELUP", "choosePerk(null) exits empty LEVELUP cleanly");
+    checks += assertAbyss(gOverflow.player.getTotalMaxHp() === maxHpBefore + 3 && gOverflow.player.hp >= 16, "Empty LEVELUP grants +3 MAX HP and at least +6 HP");
+
+    const gBattle = new Game();
+    gBattle.init();
+    gBattle.startRun("wanderer");
+    gBattle.floor = ABYSS_START_FLOOR;
+    BattleSystem.setupBattle(gBattle, "normal");
+    checks += assertAbyss(BattleSystem.getAbyssEnrageBonus(gBattle) === 2, "Abyss enrage starts at +2 on turn 1");
+    checks += assertAbyss(gBattle.enemies.length >= 1 && gBattle.enemies.every(e => Boolean(e.mutationId)), "Floor 5 normal enemies have 100% mutation");
+    BattleSystem.setupBattle(gBattle, "elite");
+    checks += assertAbyss(gBattle.enemies.some(e => e.isElite && Boolean(e.mutationId)), "Floor 5 elite has mutation");
+
+    restoreRandom();
+    localStorage.clear();
+    return checks;
+}
+
+function simulateAbyssDeepRun(classId, runIndex) {
+    localStorage.clear();
+    const game = new Game();
+    game.init();
+    game.meta.malkorDefeated = true;
+    game.meta.hp = 10;
+    game.meta.atk = 8;
+    game.meta.def = 4;
+    game.meta.en = 3;
+    game.meta.gold = 5;
+    game.meta.potions = 2;
+    game.startRun(classId);
+
+    const p = game.player;
+    p.baseMaxHp += 265;
+    p.baseAtk += 35;
+    p.baseDef += 8;
+    p.baseMaxEn += 4;
+    p.level = 7;
+    p.weaponUpgradeLvl = 2;
+    p.armorUpgradeLvl = 2;
+    p.gold += 100;
+    p.hp = p.getTotalMaxHp();
+    p.en = p.getTotalMaxEn();
+    game.enteredAbyss = true;
+
+    let roomsCleared = 0;
+    let clearedAbyssFloors = 0;
+
+    for (let floor = ABYSS_START_FLOOR; floor <= ABYSS_START_FLOOR + 4; floor++) {
+        game.floor = floor;
+        const abyssDepth = floor - (ABYSS_START_FLOOR - 1);
+        const priceMult = 1 + abyssDepth * 0.4;
+        let shopHealUsedThisFloor = false;
+
+        for (let r = 1; r <= 15; r++) {
+            if (p.hp <= 0) break;
+            game.room = r;
+            const mode = r === 15 ? "boss" : ([4, 8, 11, 14].includes(r) ? "elite" : "normal");
+            setSeed(getRoomSeed("abyss", classId, runIndex, floor * 100 + r));
+            BattleSystem.setupBattle(game, mode);
+            assertAbyss(BattleSystem.getAbyssEnrageBonus(game) === game.battleTurn * 2, "Enrage matches turn * 2 in Abyss combat");
+            if (mode !== "boss") {
+                assertAbyss(game.enemies.every(e => Boolean(e.mutationId)), "All non-boss enemies in Abyss carry a mutation");
+            }
+
+            while (game.state === "BATTLE" && !game.battleFinished && p.hp > 0 && game.battleTurn <= 40) {
+                tryUsePotions(game);
+                if (game.battleFinished || p.hp <= 0) break;
+                game.selectedTargetIndex = selectTarget(game);
+                BattleSystem.ensureValidTarget(game);
+                const action = chooseAction(game, "smart");
+                BattleSystem.playerAction(game, action);
+            }
+
+            const roomWon = game.battleFinished && game.enemies.every(e => e.currentHp <= 0) && p.hp > 0;
+            if (!roomWon) {
+                p.hp = 0;
+                break;
+            }
+
+            roomsCleared++;
+            p.poison = 0;
+            p.bleed = 0;
+            p.shield = 0;
+            p.tempSpikes = 0;
+            p.battleSpikes = 0;
+            p.battleAtk = 0;
+            p.battleBannerAtk = 0;
+            p.damageReductionPct = 0;
+            p.steelScaleUsed = false;
+            p.forceCritNext = false;
+            p.critBonusNext = 0;
+            p.concentrateBonus = 0;
+            p.en = Math.min(p.getTotalMaxEn(), p.en + 1);
+            if (p.cooldowns) {
+                for (const k in p.cooldowns) p.cooldowns[k] = 0;
+            }
+
+            while (p.xp >= p.getRequiredXp()) {
+                p.xp -= p.getRequiredXp();
+                p.level++;
+                p.baseMaxHp += 3;
+                p.heal(6);
+            }
+
+            if (r === 7) {
+                p.heal(Math.ceil(p.getTotalMaxHp() * 0.45));
+                p.en = p.getTotalMaxEn();
+            }
+
+            const healCost = Math.max(1, Math.round(5 * priceMult));
+            if (!shopHealUsedThisFloor && p.hp < p.getTotalMaxHp() * 0.65 && p.gold >= healCost) {
+                p.gold -= healCost;
+                p.heal(12);
+                shopHealUsedThisFloor = true;
+            }
+
+            while (true) {
+                const upgradeStep = (p._simAbyssUpgrades || 0) % 2;
+                const lvl = upgradeStep === 0 ? p.weaponUpgradeLvl : p.armorUpgradeLvl;
+                const nextCost = Math.max(1, Math.round((14 + lvl * 10) * priceMult));
+                if (p.gold < nextCost) break;
+                p.gold -= nextCost;
+                p._simAbyssUpgrades = (p._simAbyssUpgrades || 0) + 1;
+                if (upgradeStep === 0) p.weaponUpgradeLvl += 1;
+                else p.armorUpgradeLvl += 1;
+            }
+
+            if (r === 15) {
+                clearedAbyssFloors++;
+            }
+        }
+
+        if (p.hp <= 0) break;
+    }
+
+    game.finalizeRun("GAMEOVER");
+    return {
+        maxFloor: game.floor + 1,
+        clearedAbyssFloors,
+        roomsCleared,
+        souls: game.lastEarnedSouls,
+    };
+}
+
+function assertAbyss(condition, message) {
+    if (!condition) {
+        throw new Error(`Abyss contract failed: ${message}`);
+    }
+    return 1;
 }
 
 main().catch(err => {

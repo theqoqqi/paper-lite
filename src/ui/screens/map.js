@@ -1,10 +1,10 @@
 import { el } from "../../utils/dom.js";
 import { game } from "../../engine/game.js";
-import { GAME_DATA } from "../../data/index.js";
+import { GAME_DATA, getFloorMeta, ABYSS_START_FLOOR } from "../../data/index.js";
 import { renderStatsPanel } from "../components.js";
 
 export function renderMapScreen(render) {
-    const floorData = GAME_DATA.floors[game.floor];
+    const floorData = getFloorMeta(game.floor);
     const roomTypes = {
         start: { icon: "🚪", name: "Вход" },
         battle: { icon: "⚔️", name: "Бой" },
@@ -376,7 +376,8 @@ export function renderMapScreen(render) {
 
     const actionButtons = [];
 
-    if (currentRoom.type === "boss" && currentRoom.cleared && game.floor < 3) {
+    if (currentRoom.type === "boss" && currentRoom.cleared && game.floor !== ABYSS_START_FLOOR - 1) {
+        const isDeepAbyss = game.floor >= ABYSS_START_FLOOR;
         actionButtons.push(el("button", {
             className: "btn-center",
             style: {
@@ -385,9 +386,10 @@ export function renderMapScreen(render) {
                 borderColor: "#4caf50",
                 fontWeight: "bold",
             },
-            text: `⬇️ Спуститься на Этаж ${game.floor + 2}`,
+            text: `⬇️ Спуститься на Этаж ${game.floor + 2}${isDeepAbyss ? " (Без восстановления)" : ""}`,
             onClick: () => {
                 game.floor++;
+                game.recordProgress(game.floor + 1);
                 game.generateFloorMap();
                 game.state = "MAP";
                 game.saveGame("autosave");

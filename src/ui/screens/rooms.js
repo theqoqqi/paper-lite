@@ -17,13 +17,29 @@ export function renderLevelUpScreen(render) {
         playSound("levelUp");
         game._levelUpSoundPlayed = true;
     }
+    const isEmpty = game.selectedPerkChoices.length === 0;
     const wrap = el("div", {}, [
         el("h2", { text: `⬆️ Уровень ${game.player.level + 1}!` }),
         el("p", {
             style: { marginBottom: "10px", textAlign: "center" },
-            text: "Получено +3 MAX HP и +6 HP. Выберите 1 перк:",
+            text: isEmpty
+                ? "Получено +3 MAX HP и +6 HP. Все перки уже изучены."
+                : "Получено +3 MAX HP и +6 HP. Выберите 1 перк:",
         }),
     ]);
+
+    if (isEmpty) {
+        wrap.appendChild(el("button", {
+            className: "btn-center btn-primary",
+            text: "Продолжить ➡️",
+            onClick: () => {
+                game._levelUpSoundPlayed = false;
+                game.choosePerk(null);
+                render();
+            },
+        }));
+        return wrap;
+    }
 
     game.selectedPerkChoices.forEach(perk => {
         wrap.appendChild(el("button", {

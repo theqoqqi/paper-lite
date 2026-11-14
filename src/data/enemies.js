@@ -14,6 +14,8 @@ export const DATA_MUTATIONS = [
     { id: "undying", prefix: "Бессмертный", hpBonus: 8, defBonus: 1, atkBonus: 0, regen: 4, xpBonus: 3 },
 ];
 
+export const ABYSS_START_FLOOR = 4;
+
 export const DATA_FLOORS = [
     {
         id: 0,
@@ -774,3 +776,47 @@ export const DATA_ENEMIES = {
         ],
     },
 };
+
+let nativeFloorCache = null;
+
+export function getEnemyNativeFloor(enemyKey) {
+    if (!nativeFloorCache) {
+        nativeFloorCache = buildNativeFloorMap();
+    }
+    return nativeFloorCache[enemyKey] !== undefined ? nativeFloorCache[enemyKey] : 2;
+}
+
+export function getFloorMeta(floor = 0) {
+    if (floor >= ABYSS_START_FLOOR) {
+        return buildAbyssFloorMeta(floor);
+    }
+    const idx = Math.min(Math.max(0, floor || 0), DATA_FLOORS.length - 1);
+    return DATA_FLOORS[idx];
+}
+
+function buildNativeFloorMap() {
+    const map = {};
+    DATA_FLOORS.forEach(floorObj => {
+        floorObj.enemies.forEach(id => {
+            map[id] = floorObj.id;
+        });
+        floorObj.elite.forEach(id => {
+            map[id] = floorObj.id;
+        });
+        if (floorObj.boss) {
+            map[floorObj.boss] = floorObj.id;
+        }
+    });
+    return map;
+}
+
+function buildAbyssFloorMeta(floor) {
+    return {
+        id: floor,
+        name: "Бездна Истощения",
+        isAbyss: true,
+        enemies: DATA_FLOORS.flatMap(f => f.enemies),
+        elite: DATA_FLOORS.flatMap(f => f.elite),
+        bosses: DATA_FLOORS.map(f => f.boss),
+    };
+}

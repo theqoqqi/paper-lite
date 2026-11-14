@@ -1,5 +1,5 @@
-import { DATA_CLASSES, DATA_SKILLS, DATA_META_UPGRADES } from "./classes.js";
-import { DATA_MUTATIONS, DATA_FLOORS, DATA_ENEMIES } from "./enemies.js";
+import { DATA_CLASSES, DATA_SKILLS, DATA_META_UPGRADES, getMetaUpgradeCap } from "./classes.js";
+import { DATA_MUTATIONS, DATA_FLOORS, DATA_ENEMIES, ABYSS_START_FLOOR, getEnemyNativeFloor, getFloorMeta } from "./enemies.js";
 import {
     DATA_PERKS,
     DATA_ITEMS,
@@ -27,4 +27,11 @@ export const GAME_DATA = {
     events: DATA_EVENTS,
     corridorRooms: DATA_CORRIDOR_ROOMS,
     corridorOutcomes: DATA_CORRIDOR_OUTCOMES,
+};
+
+export {
+    ABYSS_START_FLOOR,
+    getEnemyNativeFloor,
+    getFloorMeta,
+    getMetaUpgradeCap,
 };

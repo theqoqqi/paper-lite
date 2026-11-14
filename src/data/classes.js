@@ -113,10 +113,58 @@ export const DATA_SKILLS = [
 ];
 
 export const DATA_META_UPGRADES = [
-    { key: "hp", name: "Живучесть", desc: "+4 MAX HP на старте", max: 10, costs: [5, 10, 15, 20, 25, 30, 35, 40, 45, 50] },
-    { key: "atk", name: "Сила крови", desc: "+1 ATK на старте", max: 8, costs: [15, 30, 45, 60, 75, 90, 105, 120] },
-    { key: "def", name: "Каменная кожа", desc: "+1 DEF на старте", max: 4, costs: [30, 70, 130, 210] },
-    { key: "en", name: "Запас дыхания", desc: "+1 MAX EN на старте", max: 3, costs: [25, 60, 110] },
-    { key: "gold", name: "Кошель наследия", desc: "+8 Золота на старте", max: 5, costs: [8, 16, 24, 32, 40] },
-    { key: "potions", name: "Пояс алхимика", desc: "+1 Слот зелий и случайное зелье на старте", max: 2, costs: [20, 50] },
+    {
+        key: "hp",
+        name: "Живучесть",
+        desc: "+4 MAX HP на старте",
+        baseMax: 10,
+        max: 14,
+        costs: [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 90, 130, 180, 240],
+    },
+    {
+        key: "atk",
+        name: "Сила крови",
+        desc: "+1 ATK на старте",
+        baseMax: 8,
+        max: 12,
+        costs: [15, 30, 45, 60, 75, 90, 105, 120, 170, 230, 310, 400],
+    },
+    {
+        key: "def",
+        name: "Каменная кожа",
+        desc: "+1 DEF на старте",
+        baseMax: 4,
+        max: 6,
+        costs: [30, 70, 130, 210, 340, 520],
+    },
+    {
+        key: "en",
+        name: "Запас дыхания",
+        desc: "+1 MAX EN на старте",
+        baseMax: 3,
+        max: 4,
+        costs: [25, 60, 110, 280],
+    },
+    {
+        key: "gold",
+        name: "Кошель наследия",
+        desc: "+8 Золота на старте",
+        baseMax: 5,
+        max: 8,
+        costs: [8, 16, 24, 32, 40, 70, 110, 160],
+    },
+    {
+        key: "potions",
+        name: "Пояс алхимика",
+        desc: "+1 Слот зелий и случайное зелье на старте",
+        baseMax: 2,
+        max: 3,
+        costs: [20, 50, 160],
+    },
 ];
+
+export function getMetaUpgradeCap(upg, meta) {
+    if (!upg) return 0;
+    if (meta && meta.malkorDefeated) return upg.max;
+    return upg.baseMax !== undefined ? upg.baseMax : upg.max;
+}

@@ -11,6 +11,7 @@ import {
     renderMenuScreen,
     renderMetaShopScreen,
     renderClassSelectScreen,
+    renderAbyssChoiceScreen,
     renderEndScreen,
 } from "./ui/screens/menu.js";
 import { renderMapScreen } from "./ui/screens/map.js";
@@ -59,6 +60,8 @@ export function render() {
         container.appendChild(renderFountainScreen(render));
     } else if (game.state === "SHOP") {
         container.appendChild(renderShopScreen(render));
+    } else if (game.state === "ABYSS_CHOICE") {
+        container.appendChild(renderAbyssChoiceScreen(render));
     } else if (game.state === "GAMEOVER" || game.state === "VICTORY") {
         container.appendChild(renderEndScreen(render));
     }

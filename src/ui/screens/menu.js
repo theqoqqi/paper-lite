@@ -1,15 +1,31 @@
 import { el } from "../../utils/dom.js";
 import { game } from "../../engine/game.js";
-import { GAME_DATA } from "../../data/index.js";
+import { GAME_DATA, ABYSS_START_FLOOR, getMetaUpgradeCap } from "../../data/index.js";
 import { playSound } from "../../utils/audio.js";
 
 export function renderMenuScreen(render) {
     const autoSummary = game.getSlotSummary("autosave");
+    const bestClassName = game.meta.bestClass && GAME_DATA.classes[game.meta.bestClass]
+        ? GAME_DATA.classes[game.meta.bestClass].name
+        : "";
+    const metaPanelChildren = [
+        el("div", { text: `Накоплено Очков Душ: 🔮 ${game.meta.souls}` }),
+    ];
+    if (game.meta.bestFloor > 0) {
+        metaPanelChildren.push(el("div", {
+            style: { marginTop: "4px" },
+            text: `🏆 Рекорд: Этаж ${game.meta.bestFloor}${bestClassName ? ` (${bestClassName})` : ""}`,
+        }));
+    }
+    if (game.meta.malkorDefeated) {
+        metaPanelChildren.push(el("div", {
+            style: { marginTop: "4px", color: "#cfa8ff" },
+            text: "💀 Владыка Малкор повержен — Бездна и расширение Алтаря открыты",
+        }));
+    }
     return el("div", {}, [
         el("h1", { text: "ХРОНИКИ КЛЕТЧАТОЙ БЕЗДНЫ" }),
-        el("div", { className: "panel text-center" }, [
-            el("div", { text: `Накоплено Очков Душ: 🔮 ${game.meta.souls}` }),
-        ]),
+        el("div", { className: "panel text-center" }, metaPanelChildren),
         autoSummary ? el("button", {
             className: "btn-center btn-primary",
             text: `▶️ Продолжить (${autoSummary})`,
@@ -46,7 +62,9 @@ export function renderMetaShopScreen(render) {
 
     GAME_DATA.metaUpgrades.forEach(upg => {
         const curLvl = game.meta[upg.key] || 0;
-        const isMax = curLvl >= upg.max;
+        const cap = getMetaUpgradeCap(upg, game.meta);
+        const isLockedByMalkor = !game.meta.malkorDefeated && curLvl >= cap && cap < upg.max;
+        const isMax = curLvl >= cap;
         const cost = isMax ? 0 : upg.costs[curLvl];
         const canBuy = !isMax && game.meta.souls >= cost;
 
@@ -58,8 +76,8 @@ export function renderMetaShopScreen(render) {
             },
         }, [
             el("div", { className: "stats-line" }, [
-                el("b", { text: `${upg.name} (${curLvl}/${upg.max})` }),
-                el("span", { text: isMax ? "МАКС" : `${cost} Душ` }),
+                el("b", { text: `${upg.name} (${curLvl}/${cap})` }),
+                el("span", { text: isLockedByMalkor ? "🔒 ПОСЛЕ МАЛКОРА" : (isMax ? "МАКС" : `${cost} Душ`) }),
             ]),
             el("small", { text: upg.desc }),
         ]));
@@ -131,24 +149,77 @@ export function renderClassSelectScreen(render) {
     return wrap;
 }
 
+export function renderAbyssChoiceScreen(render) {
+    if (!game._abyssChoiceSoundPlayed) {
+        playSound("victory");
+        game._abyssChoiceSoundPlayed = true;
+    }
+    const p = game.player;
+    return el("div", {}, [
+        el("h2", { text: "⚡ ВЛАДЫКА МАЛКОР ПОВЕРЖЕН!" }),
+        el("div", { className: "panel text-center" }, [
+            el("p", { text: "Цитадель пала, но под троном разверзлась Бездна — бесконечный спуск на истощение." }),
+            el("p", {
+                style: { marginTop: "8px" },
+                text: `Текущее состояние: ❤️ ${p.hp}/${p.getTotalMaxHp()} | ⚡ ${p.en}/${p.getTotalMaxEn()}`,
+            }),
+            el("p", {
+                style: { marginTop: "8px", color: "#cfa8ff" },
+                text: "В Бездне (Этаж 5+) HP и энергия не восстанавливаются между этажами, враги с 1-го раунда впадают в Ярость, цены растут, а забег длится до гибели.",
+            }),
+        ]),
+        el("button", {
+            className: "btn-center btn-primary",
+            text: "🏆 Завершить забег с Победой и забрать Души",
+            onClick: () => {
+                game._abyssChoiceSoundPlayed = false;
+                game._endSoundPlayed = false;
+                game.finalizeRun("VICTORY");
+                render();
+            },
+        }),
+        el("button", {
+            className: "btn-center",
+            style: { marginTop: "8px", background: "#3a1f36", borderColor: "#b84dff", fontWeight: "bold" },
+            text: "🕳️ Спуститься в Бездну (Этаж 5)",
+            onClick: () => {
+                game._abyssChoiceSoundPlayed = false;
+                game.enterAbyssFromChoice();
+                render();
+            },
+        }),
+    ]);
+}
+
 export function renderEndScreen(render) {
     const isWin = game.state === "VICTORY";
+    const isAbyssRun = game.enteredAbyss || game.floor >= ABYSS_START_FLOOR;
     if (!game._endSoundPlayed) {
         playSound(isWin ? "victory" : "gameOver");
         game._endSoundPlayed = true;
     }
+    const resultText = isWin
+        ? "Вы сокрушили Владыку Малкора и вышли победителем!"
+        : (isAbyssRun
+            ? `Вы пали в Бездне на Этаже ${game.floor + 1}.`
+            : `Вы пали на Этаже ${game.floor + 1}.`);
     return el("div", {}, [
         el("h2", { text: isWin ? "🏆 ПОБЕДА!" : "💀 ВЫ ПОГИБЛИ" }),
         el("div", { className: "panel text-center" }, [
-            el("p", { text: isWin ? "Вы сокрушили Владыку Малкора и прошли Бездну!" : `Вы пали на Этаже ${game.floor + 1}.` }),
+            el("p", { text: resultText }),
             el("p", { style: { marginTop: "8px" }, text: `Заработано Очков Душ: 🔮 +${game.lastEarnedSouls}` }),
             el("p", { text: `Всего Душ в Алтаре: 🔮 ${game.meta.souls}` }),
+            game.meta.bestFloor > 0 ? el("p", {
+                style: { marginTop: "6px" },
+                text: `🏆 Лучший достигнутый этаж: ${game.meta.bestFloor}`,
+            }) : null,
         ]),
         el("button", {
             className: "btn-center btn-primary",
             text: "🔮 Перейти в Алтарь Душ",
             onClick: () => {
                 game._endSoundPlayed = false;
+                game._abyssChoiceSoundPlayed = false;
                 game.state = "META_SHOP";
                 render();
             },
@@ -158,6 +229,7 @@ export function renderEndScreen(render) {
             text: "В главное меню",
             onClick: () => {
                 game._endSoundPlayed = false;
+                game._abyssChoiceSoundPlayed = false;
                 game.state = "MENU";
                 render();
             },

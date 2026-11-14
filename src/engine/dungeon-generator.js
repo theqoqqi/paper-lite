@@ -1,4 +1,5 @@
 import { RNG } from "../utils/rng.js";
+import { ABYSS_START_FLOOR } from "../data/index.js";
 
 export class DungeonGenerator {
     static generate(floor = 0) {
@@ -23,8 +24,9 @@ export class DungeonGenerator {
             revealed: true,
         };
 
-        const majorCount = 11 + floor * 2;
-        const corridorCount = 3 + floor;
+        const isAbyss = floor >= ABYSS_START_FLOOR;
+        const majorCount = isAbyss ? 22 : (11 + floor * 2);
+        const corridorCount = isAbyss ? 0 : (3 + floor);
         const targetCount = majorCount + corridorCount;
         const startDir = RNG.choice(dirs);
         const firstKey = `${startDir.dx},${startDir.dy}`;
@@ -136,12 +138,12 @@ export class DungeonGenerator {
             pool.pop().type = "fountain";
         }
 
-        const campfiresCount = floor >= 2 ? 2 : 1;
+        const campfiresCount = isAbyss ? 1 : (floor >= 2 ? 2 : 1);
         for (let i = 0; i < campfiresCount && pool.length > 0; i++) {
             pool.pop().type = "campfire";
         }
 
-        const elitesCount = floor >= 1 ? 2 : 1;
+        const elitesCount = isAbyss ? 4 : (floor >= 1 ? 2 : 1);
         for (let i = 0; i < elitesCount && pool.length > 0; i++) {
             pool.pop().type = "elite";
         }
@@ -150,9 +152,10 @@ export class DungeonGenerator {
             pool.pop().type = "corridor";
         }
 
+        const eventChance = isAbyss ? 15 : 40;
         while (pool.length > 0) {
             const r = pool.pop();
-            r.type = RNG.chance(40) ? "event" : "battle";
+            r.type = RNG.chance(eventChance) ? "event" : "battle";
         }
 
         for (const dir of dirs) {
