@@ -281,60 +281,60 @@
             }
 
             .mut-poison .enemy-sprite-art {
-                filter: sepia(1) saturate(4) hue-rotate(68deg) brightness(0.96) contrast(1.1);
+                filter: sepia(0.24) saturate(1.6) hue-rotate(68deg) brightness(0.98) contrast(1.03);
             }
 
             .mut-poison::after {
-                background: radial-gradient(circle, transparent 48%, rgba(102, 187, 106, 0.34) 100%);
-                box-shadow: inset 0 0 12px rgba(76, 175, 80, 0.45);
-                animation: mut-aura-pulse 2.4s ease-in-out infinite;
+                background: radial-gradient(circle, transparent 62%, rgba(102, 187, 106, 0.1) 100%);
+                box-shadow: inset 0 0 8px rgba(76, 175, 80, 0.14);
+                animation: mut-aura-pulse 3.4s ease-in-out infinite;
             }
 
             .mut-blood .enemy-sprite-art {
-                filter: sepia(1) saturate(4.5) hue-rotate(-38deg) brightness(0.95) contrast(1.15);
+                filter: sepia(0.25) saturate(1.7) hue-rotate(-38deg) brightness(0.98) contrast(1.04);
             }
 
             .mut-blood::after {
-                background: radial-gradient(circle, transparent 48%, rgba(229, 57, 53, 0.36) 100%);
-                box-shadow: inset 0 0 12px rgba(229, 57, 53, 0.48);
-                animation: mut-aura-pulse 1.9s ease-in-out infinite;
+                background: radial-gradient(circle, transparent 62%, rgba(229, 57, 53, 0.11) 100%);
+                box-shadow: inset 0 0 8px rgba(229, 57, 53, 0.15);
+                animation: mut-aura-pulse 3s ease-in-out infinite;
             }
 
             .mut-regen .enemy-sprite-art {
-                filter: sepia(1) saturate(3.2) hue-rotate(128deg) brightness(1) contrast(1.1);
+                filter: sepia(0.22) saturate(1.5) hue-rotate(128deg) brightness(1) contrast(1.03);
             }
 
             .mut-regen::after {
-                background: radial-gradient(circle, transparent 46%, rgba(38, 198, 218, 0.34) 100%);
-                box-shadow: inset 0 0 12px rgba(38, 198, 218, 0.45);
-                animation: mut-aura-pulse 2.6s ease-in-out infinite;
+                background: radial-gradient(circle, transparent 62%, rgba(38, 198, 218, 0.1) 100%);
+                box-shadow: inset 0 0 8px rgba(38, 198, 218, 0.14);
+                animation: mut-aura-pulse 3.6s ease-in-out infinite;
             }
 
             .mut-armor .enemy-sprite-art {
-                filter: sepia(1) saturate(2.2) hue-rotate(172deg) brightness(1.05) contrast(1.25);
+                filter: sepia(0.16) saturate(1.3) hue-rotate(172deg) brightness(1.02) contrast(1.06);
             }
 
             .mut-armor::after {
-                background: radial-gradient(circle, transparent 52%, rgba(144, 164, 174, 0.28) 100%);
-                box-shadow: inset 0 0 0 2px rgba(176, 190, 197, 0.35), inset 0 0 10px rgba(120, 144, 156, 0.4);
+                background: radial-gradient(circle, transparent 64%, rgba(144, 164, 174, 0.08) 100%);
+                box-shadow: inset 0 0 0 1px rgba(176, 190, 197, 0.12), inset 0 0 7px rgba(120, 144, 156, 0.13);
             }
 
             .mut-giant .enemy-sprite-art {
-                transform: scale(1.16);
-                filter: sepia(1) saturate(2.8) hue-rotate(-8deg) contrast(1.25);
+                transform: scale(1.06);
+                filter: sepia(0.2) saturate(1.45) hue-rotate(-8deg) contrast(1.06);
             }
 
             .mut-giant::after {
-                background: radial-gradient(circle, transparent 46%, rgba(255, 167, 38, 0.3) 100%);
-                box-shadow: inset 0 0 14px rgba(255, 152, 0, 0.4);
+                background: radial-gradient(circle, transparent 62%, rgba(255, 167, 38, 0.09) 100%);
+                box-shadow: inset 0 0 9px rgba(255, 152, 0, 0.12);
             }
 
             @keyframes mut-aura-pulse {
                 0%, 100% {
-                    opacity: 0.55;
+                    opacity: 0.45;
                 }
                 50% {
-                    opacity: 1;
+                    opacity: 0.85;
                 }
             }
 
