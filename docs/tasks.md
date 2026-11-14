@@ -19,3 +19,4 @@
 | Отображение случайных наград в событиях | Реализовано | [012-event-random-rewards-display.md](tasks/012-event-random-rewards-display.md) |
 | Бесконечный режим истощения («Бездна») | Реализовано | [013-endless-abyss-mode.md](tasks/013-endless-abyss-mode.md) |
 | Параллелизация, оптимизация и расширение симулятора баланса | Реализовано | [014-parallel-balance-simulator.md](tasks/014-parallel-balance-simulator.md) |
+| Ребаланс сложности, классов, предметов, перков и экономики | Согласовано | [015-hardcore-rebalance.md](tasks/015-hardcore-rebalance.md) |
