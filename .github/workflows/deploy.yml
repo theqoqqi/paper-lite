@@ -27,6 +27,11 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
+      - name: Bump Service Worker cache version
+        run: |
+          sed -i 's/^const CACHE_NAME = ".*";/const CACHE_NAME = "paper-lite-${{ github.sha }}";/' src/sw.js
+          grep -q 'paper-lite-${{ github.sha }}' src/sw.js
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:

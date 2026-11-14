@@ -652,6 +652,49 @@
                 60% { transform: translate(4px, -1px); }
                 75% { transform: translate(-2px, 0); }
             }
+
+            .pwa-update-banner {
+                position: fixed;
+                left: 50%;
+                bottom: 12px;
+                transform: translateX(-50%);
+                width: calc(100% - 24px);
+                max-width: 456px;
+                background: #1d2b22;
+                border: 1px solid #4caf50;
+                border-radius: 6px;
+                padding: 8px 10px;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 8px;
+                z-index: 9999;
+                box-shadow: 0 4px 16px rgba(0, 0, 0, 0.7);
+            }
+
+            .pwa-update-banner[hidden] {
+                display: none;
+            }
+
+            .pwa-update-text {
+                font-size: 12px;
+                color: #e8f5e9;
+            }
+
+            .pwa-update-actions {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                flex-shrink: 0;
+            }
+
+            .pwa-update-actions button {
+                width: auto;
+                margin: 0;
+                padding: 6px 10px;
+                font-size: 12px;
+                text-align: center;
+            }
         </style>
     </head>
     <body>
@@ -661,21 +704,63 @@
             <div id='fx-overlay'></div>
             <div id='global-nav' style='margin-top: 10px; border-top: 1px solid #333; padding-top: 8px;'></div>
         </div>
+        <div id='pwa-update-banner' class='pwa-update-banner' hidden>
+            <span class='pwa-update-text'>🔄 Доступна новая версия игры</span>
+            <div class='pwa-update-actions'>
+                <button id='pwa-update-apply' type='button' style='background: #2e4c38; border-color: #4caf50; font-weight: bold;'>Обновить</button>
+                <button id='pwa-update-dismiss' type='button' aria-label='Закрыть'>✕</button>
+            </div>
+        </div>
 
         <script type='module' src='main.js'></script>
         <script>
             if ("serviceWorker" in navigator) {
                 window.addEventListener("load", () => {
-                    navigator.serviceWorker.register("./sw.js").then((registration) => {
-                        const promptUpdate = (worker) => {
-                            if (window.confirm("Доступна новая версия игры. Обновить сейчас?")) {
-                                worker.postMessage({ type: "SKIP_WAITING" });
-                            }
+                    const hadController = Boolean(navigator.serviceWorker.controller);
+                    let updateAccepted = false;
+                    let refreshing = false;
+                    let lastUpdateCheck = 0;
+
+                    const banner = document.getElementById("pwa-update-banner");
+                    const applyBtn = document.getElementById("pwa-update-apply");
+                    const dismissBtn = document.getElementById("pwa-update-dismiss");
+                    let pendingWorker = null;
+                    const dismissedWorkers = new WeakSet();
+
+                    const showUpdateBanner = (worker) => {
+                        if (!worker || dismissedWorkers.has(worker)) return;
+                        pendingWorker = worker;
+                        if (banner) {
+                            banner.hidden = false;
+                        }
+                    };
+
+                    if (applyBtn) {
+                        applyBtn.addEventListener("click", () => {
+                            if (!pendingWorker) return;
+                            updateAccepted = true;
+                            if (banner) banner.hidden = true;
+                            pendingWorker.postMessage({ type: "SKIP_WAITING" });
+                        });
+                    }
+
+                    if (dismissBtn) {
+                        dismissBtn.addEventListener("click", () => {
+                            if (pendingWorker) dismissedWorkers.add(pendingWorker);
+                            if (banner) banner.hidden = true;
+                        });
+                    }
+
+                    navigator.serviceWorker.register("./sw.js", { updateViaCache: "none" }).then((registration) => {
+                        const checkForUpdate = () => {
+                            const now = Date.now();
+                            if (now - lastUpdateCheck < 15000) return;
+                            lastUpdateCheck = now;
+                            registration.update().catch(() => {});
                         };
 
                         if (registration.waiting) {
-                            promptUpdate(registration.waiting);
-                            return;
+                            showUpdateBanner(registration.waiting);
                         }
 
                         registration.addEventListener("updatefound", () => {
@@ -687,15 +772,22 @@
                                     newWorker.state === "installed" &&
                                     navigator.serviceWorker.controller
                                 ) {
-                                    promptUpdate(newWorker);
+                                    showUpdateBanner(newWorker);
                                 }
                             });
                         });
-                    });
 
-                    let refreshing = false;
+                        document.addEventListener("visibilitychange", () => {
+                            if (document.visibilityState === "visible") {
+                                checkForUpdate();
+                            }
+                        });
+                        window.addEventListener("focus", checkForUpdate);
+                    }).catch(() => {});
+
                     navigator.serviceWorker.addEventListener("controllerchange", () => {
                         if (refreshing) return;
+                        if (!hadController && !updateAccepted) return;
                         refreshing = true;
                         window.location.reload();
                     });
