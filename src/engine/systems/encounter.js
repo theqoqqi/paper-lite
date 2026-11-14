@@ -85,7 +85,7 @@ export function resolvePendingArtifact(game, accept) {
         if (game.state === "BATTLE") {
             if (!game.battleFinished && game.battleTurn === 1) {
                 if (activeArtId === "art39") {
-                    const gained = game.player.addShield(6);
+                    const gained = game.player.addShield(18);
                     if (gained > 0) game.addBattleFx({ target: "player", type: "shield", value: gained });
                 } else if (activeArtId === "art41") {
                     const gained = game.player.addShield(8);

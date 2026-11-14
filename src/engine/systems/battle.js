@@ -129,7 +129,7 @@ export function setupBattle(game, mode = "normal") {
     if (game.player.hasArtifact("art35")) game.player.addShield(8);
     if (game.player.hasArtifact("art36")) game.player.addShield(2);
     if (game.player.hasArtifact("art37")) game.player.addShield(6);
-    if (game.player.hasArtifact("art39")) game.player.addShield(6);
+    if (game.player.hasArtifact("art39")) game.player.addShield(18);
     if (game.player.hasArtifact("art41")) game.player.addShield(8);
     if (game.player.classId === "engineer") game.player.addShield(5);
     if (game.player.inventory.weapon && game.player.inventory.weapon.startShield) {
@@ -660,10 +660,6 @@ export function runEnemyTurnSequence(game, onStepRender) {
         if (game.player.hasArtifact("art36")) {
             const golemShield = game.player.addShield(2);
             if (golemShield > 0) game.addBattleFx({ target: "player", type: "shield", value: golemShield });
-        }
-        if (game.player.hasArtifact("art39")) {
-            const monoShield = game.player.addShield(6);
-            if (monoShield > 0) game.addBattleFx({ target: "player", type: "shield", value: monoShield });
         }
         if (game.player.hasArtifact("art40")) {
             game.player.en = Math.min(game.player.getTotalMaxEn(), game.player.en + 1);

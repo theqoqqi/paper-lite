@@ -904,7 +904,7 @@ export const DATA_ITEMS = {
             type: "artifact",
             rarity: "Проклятое",
             cost: 62,
-            desc: "+4 DEF и +6 Щита в начале раунда; но -25% MAX HP, -1 MAX EN и Костры лечат вдвое слабее.",
+            desc: "+4 DEF и +18 Щита в начале боя; но -25% MAX HP, -1 MAX EN и Костры лечат вдвое слабее.",
         },
         {
             id: "art40",
