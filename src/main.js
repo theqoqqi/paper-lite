@@ -6,7 +6,7 @@ import {
     ELITES_SPRITESHEET_PATH,
     enemySprites,
 } from "./data/enemy-sprites.js";
-import { renderGlobalNav } from "./ui/components.js";
+import { renderGlobalNav, closeSettingsMenu } from "./ui/components.js";
 import {
     renderMenuScreen,
     renderMetaShopScreen,
@@ -85,6 +85,11 @@ function handlePopState() {
     const modal = document.querySelector(".modal-overlay");
     if (modal) {
         modal.remove();
+        return;
+    }
+
+    if (document.querySelector(".settings-popover:not([hidden])")) {
+        closeSettingsMenu();
         return;
     }
 

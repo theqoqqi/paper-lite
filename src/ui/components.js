@@ -4,6 +4,8 @@ import { isMuted, playSound, toggleMute } from "../utils/audio.js";
 import { openCharacterModal, openSaveManagerModal } from "./modals.js";
 import { renderItemLabelChildren } from "./rarity.js";
 
+let outsideSettingsClickHandler = null;
+
 export function renderStatsPanel(playerFxList = []) {
     const p = game.player;
     const maxHp = p.getTotalMaxHp();
@@ -58,32 +60,30 @@ export function renderStatsPanel(playerFxList = []) {
 }
 
 export function renderGlobalNav(render) {
+    closeSettingsMenu();
     const nav = document.getElementById("global-nav");
     nav.replaceChildren();
 
     const row = el("div", { className: "flex-row" });
-    if (game.player && ["MAP", "BATTLE", "SHOP", "EVENT", "CAMPFIRE", "EVENT_REWARDS", "CORRIDOR", "FOUNTAIN"].includes(game.state)) {
+    const hasCharacterButton = game.player
+        && ["MAP", "BATTLE", "SHOP", "EVENT", "CAMPFIRE", "EVENT_REWARDS", "CORRIDOR", "FOUNTAIN"].includes(game.state);
+
+    if (hasCharacterButton) {
         row.appendChild(el("button", {
             className: "btn-center",
             style: { background: "#2b3a4a" },
             text: "👤 Персонаж",
             onClick: () => openCharacterModal(render),
         }));
+    } else {
+        row.appendChild(el("button", {
+            className: "btn-center",
+            text: "💾 Сохранения",
+            onClick: () => openSaveManagerModal(render),
+        }));
     }
-    row.appendChild(el("button", {
-        className: "btn-center",
-        text: "💾 Сохранения",
-        onClick: () => openSaveManagerModal(render),
-    }));
-    row.appendChild(el("button", {
-        className: "btn-center",
-        style: { width: "44px", flex: "0 0 44px", padding: "6px" },
-        text: isMuted() ? "🔇" : "🔊",
-        onClick: () => {
-            toggleMute();
-            render();
-        },
-    }));
+
+    row.appendChild(createSettingsAnchor(render));
     nav.appendChild(row);
 }
 
@@ -183,4 +183,63 @@ export function renderPendingArtifactChoice(pendingArt, onResolved) {
             }),
         ]),
     ]);
+}
+
+function createSettingsAnchor(render) {
+    const soundBtn = el("button", {
+        text: getSoundToggleLabel(),
+        onClick: () => {
+            toggleMute();
+            soundBtn.textContent = getSoundToggleLabel();
+        },
+    });
+    const savesBtn = el("button", {
+        text: "💾 Сохранения",
+        onClick: () => {
+            closeSettingsMenu();
+            openSaveManagerModal(render);
+        },
+    });
+    const popover = el("div", { className: "settings-popover" }, [soundBtn, savesBtn]);
+    popover.hidden = true;
+
+    const anchor = el("div", { className: "settings-anchor" }, [
+        popover,
+        el("button", {
+            className: "btn-center",
+            text: "⚙️",
+            onClick: () => toggleSettingsMenu(popover, anchor),
+        }),
+    ]);
+
+    return anchor;
+}
+
+function toggleSettingsMenu(popover, anchor) {
+    if (!popover.hidden) {
+        closeSettingsMenu();
+        return;
+    }
+
+    closeSettingsMenu();
+    popover.hidden = false;
+    outsideSettingsClickHandler = (event) => {
+        if (!anchor.contains(event.target)) {
+            closeSettingsMenu();
+        }
+    };
+    document.addEventListener("click", outsideSettingsClickHandler);
+}
+
+export function closeSettingsMenu() {
+    const popover = document.querySelector(".settings-popover:not([hidden])");
+    if (popover) popover.hidden = true;
+    if (outsideSettingsClickHandler) {
+        document.removeEventListener("click", outsideSettingsClickHandler);
+        outsideSettingsClickHandler = null;
+    }
+}
+
+function getSoundToggleLabel() {
+    return isMuted() ? "🔇 Звук: Выкл" : "🔊 Звук: Вкл";
 }
