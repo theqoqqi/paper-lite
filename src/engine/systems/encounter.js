@@ -90,21 +90,25 @@ export function finishRoom(game) {
 }
 
 export function generatePerkChoices(game) {
-    const available = GAME_DATA.perks.filter(p => !game.player.perks.includes(p.id));
-    game.selectedPerkChoices = RNG.shuffle(available).slice(0, 3);
+    let pool = GAME_DATA.perks.filter(p => !game.player.perks.includes(p.id));
+    const choices = [];
+    while (choices.length < 3 && pool.length > 0) {
+        const picked = pickItemByRarity(pool, game.floor);
+        if (!picked) break;
+        choices.push(picked);
+        pool = pool.filter(p => p.id !== picked.id);
+    }
+    game.selectedPerkChoices = choices;
 }
 
 export function choosePerk(game, perkId) {
     const req = game.player.getRequiredXp();
     game.player.xp = Math.max(0, game.player.xp - req);
     game.player.level++;
-    game.player.perks.push(perkId);
+    game.player.addPerk(perkId, game.floor);
 
     game.player.baseMaxHp += 3;
     game.player.heal(6);
-    if (perkId === "p23") {
-        game.player.heal(10);
-    }
     checkLevelUpOrFinishRoom(game);
 }
 
@@ -141,9 +145,7 @@ export function resolveEventOption(game, optionId) {
     } else if (optionId === "stash_take") {
         game.player.gold += 10;
         game.player.heal(5);
-        if (game.player.inventory.potions.length < game.player.potionSlots) {
-            game.player.inventory.potions.push({ ...RNG.choice(GAME_DATA.items.potions) });
-        }
+        grantRandomPotion(game);
     } else if (optionId === "chest_open") {
         if (RNG.chance(50)) {
             game.setupBattle("mimic");
@@ -167,7 +169,8 @@ export function resolveEventOption(game, optionId) {
         if (game.player.hp <= 6) return;
         game.player.hp -= 6;
         const available = GAME_DATA.perks.filter(p => !game.player.perks.includes(p.id));
-        if (available.length > 0) game.player.perks.push(RNG.choice(available).id);
+        const picked = pickItemByRarity(available, game.floor);
+        if (picked) game.player.addPerk(picked.id, game.floor);
     } else if (optionId === "gamble_play") {
         if (game.player.gold < 8) return;
         game.player.gold -= 8;
@@ -176,10 +179,9 @@ export function resolveEventOption(game, optionId) {
         if (RNG.chance(50)) {
             wonGold = 20;
             game.player.gold += 20;
-            if (game.player.inventory.potions.length < game.player.potionSlots) {
-                const pot = { ...RNG.choice(GAME_DATA.items.potions) };
-                game.player.inventory.potions.push(pot);
-                wonItems.push(`Зелье: ${pot.name}`);
+            const pot = grantRandomPotion(game);
+            if (pot) {
+                wonItems.push(`🧪 [${pot.rarity}] Зелье: ${pot.name}`);
             }
         }
         game.eventRewards = {
@@ -196,9 +198,7 @@ export function resolveEventOption(game, optionId) {
     } else if (optionId === "lab_potions") {
         game.player.potionSlots += 1;
         for (let i = 0; i < 2; i++) {
-            if (game.player.inventory.potions.length < game.player.potionSlots) {
-                game.player.inventory.potions.push({ ...RNG.choice(GAME_DATA.items.potions) });
-            }
+            grantRandomPotion(game);
         }
     } else if (optionId === "lab_mutagen") {
         game.player.baseMaxHp += 7;
@@ -253,9 +253,7 @@ export function resolveEventOption(game, optionId) {
         game.player.totalRunXp += 8;
     } else if (optionId === "pilgrim_rob") {
         game.player.gold += 15;
-        if (game.player.inventory.potions.length < game.player.potionSlots) {
-            game.player.inventory.potions.push({ ...RNG.choice(GAME_DATA.items.potions) });
-        }
+        grantRandomPotion(game);
     } else if (optionId === "cauldron_drink") {
         if (RNG.chance(50)) {
             game.player.baseMaxHp += 8;
@@ -264,16 +262,15 @@ export function resolveEventOption(game, optionId) {
             game.player.hp = Math.max(1, game.player.hp - 6);
         }
     } else if (optionId === "cauldron_potion") {
-        if (game.player.inventory.potions.length < game.player.potionSlots) {
-            game.player.inventory.potions.push({ ...RNG.choice(GAME_DATA.items.potions) });
-        }
+        grantRandomPotion(game);
     } else if (optionId === "cauldron_gold") {
         game.player.gold += 12;
     } else if (optionId === "monolith_perk") {
         if (game.player.hp <= 7) return;
         game.player.hp -= 7;
         const available = GAME_DATA.perks.filter(p => !game.player.perks.includes(p.id));
-        if (available.length > 0) game.player.perks.push(RNG.choice(available).id);
+        const picked = pickItemByRarity(available, game.floor);
+        if (picked) game.player.addPerk(picked.id, game.floor);
     } else if (optionId === "monolith_pray") {
         game.player.en = game.player.getTotalMaxEn();
         game.player.xp += 15;
@@ -334,9 +331,7 @@ export function resolveEventOption(game, optionId) {
         game.saveMeta();
     } else if (optionId === "nest_loot") {
         game.player.gold += 12;
-        if (game.player.inventory.potions.length < game.player.potionSlots) {
-            game.player.inventory.potions.push({ ...RNG.choice(GAME_DATA.items.potions) });
-        }
+        grantRandomPotion(game);
     } else if (optionId === "nest_hunt") {
         game.player.gold += 15;
         grantRandomArtifact(game);
@@ -351,7 +346,7 @@ export function resolveEventOption(game, optionId) {
 export function resolveCampfire(game, choice) {
     if (choice === "heal") {
         const mult = game.player.perks.includes("p28") ? 0.7 : 0.45;
-        if (game.player.perks.includes("p28")) game.player.gold += 6;
+        if (game.player.perks.includes("p28")) game.player.gold += 8;
         game.player.heal(Math.ceil(game.player.getTotalMaxHp() * mult));
     } else if (choice === "sharpen") {
         game.player.weaponUpgradeLvl += 1;
@@ -482,4 +477,13 @@ export function pickItemByRarity(items, floor = 0, minRarity = null) {
 
 function formatArtifactReward(art) {
     return art ? [`💍 [${art.rarity}] Артефакт: ${art.name} (${art.desc})`] : [];
+}
+
+function grantRandomPotion(game) {
+    if (game.player.inventory.potions.length >= game.player.potionSlots) return null;
+    const pot = pickItemByRarity(GAME_DATA.items.potions, game.floor);
+    if (!pot) return null;
+    const copy = { ...pot };
+    game.player.inventory.potions.push(copy);
+    return copy;
 }

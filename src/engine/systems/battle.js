@@ -1,6 +1,7 @@
 import { RNG } from "../../utils/rng.js";
 import { GAME_DATA } from "../../data/index.js";
 import { playSound } from "../../utils/audio.js";
+import { pickItemByRarity } from "./encounter.js";
 
 const FLOOR_HP_MULTIPLIERS = [1.0, 1.5, 2.15, 3.0];
 const FLOOR_ATK_BONUSES = [0, 2, 4, 7];
@@ -95,12 +96,17 @@ export function setupBattle(game, mode = "normal") {
     if (game.player.hasArtifact("art2")) {
         game.player.en += 2;
     }
-    if (game.player.perks.includes("p33")) {
-        game.player.en += game.enemies.length;
+    if (game.player.perks.includes("p24")) {
+        game.player.en += 1;
     }
 
     game.player.shield = 0;
-    if (game.player.perks.includes("p6")) game.player.addShield(6);
+    if (game.player.perks.includes("p33")) {
+        const thirstCount = game.enemies.length;
+        game.player.en += thirstCount;
+        game.player.addShield(thirstCount * 2);
+    }
+    if (game.player.perks.includes("p6")) game.player.addShield(10);
     if (game.player.hasArtifact("art13")) game.player.addShield(8);
     if (game.player.hasArtifact("art16")) game.player.addShield(5);
     if (game.player.classId === "engineer") game.player.addShield(5);
@@ -117,6 +123,9 @@ export function setupBattle(game, mode = "normal") {
     if (game.player.perks.includes("p27")) {
         game.enemies.forEach(en => { en.poison += 2; });
     }
+    if (game.player.perks.includes("p16")) {
+        game.enemies.forEach(en => { en.poison += 1; });
+    }
 
     game.player.tempSpikes = 0;
     game.player.battleSpikes = 0;
@@ -124,7 +133,9 @@ export function setupBattle(game, mode = "normal") {
     game.player.poison = 0;
     game.player.bleed = 0;
     game.player.forceCritNext = false;
-    game.player.damageReduction50 = false;
+    game.player.critBonusNext = 0;
+    game.player.damageReductionPct = 0;
+    game.player.steelScaleUsed = false;
     game.player.concentrateBonus = game.player.concentrateBonus || 0;
     game.player.cooldowns = { defend: 0, heavy: 0, pierce: 0, whirlwind: 0, concentrate: 0 };
 
@@ -180,79 +191,72 @@ export function usePotion(game, potIndex, onStepRender) {
     if (game.state !== "BATTLE" && !pot.canUseOnMap) return;
 
     const alchBonus = game.player.perks.includes("p21") ? 6 : 0;
+    const totalHeal = (pot.heal || 0) + alchBonus;
 
-    if (pot.id === "pot1") {
-        game.player.heal(12 + alchBonus);
+    if (totalHeal > 0) {
+        game.player.heal(totalHeal);
+        game.addBattleFx({ target: "player", type: "heal", value: totalHeal });
+    }
+    if (pot.cleanse) {
         game.player.poison = 0;
         game.player.bleed = 0;
-        game.addBattleFx({ target: "player", type: "heal", value: 12 + alchBonus });
-        if (game.state === "BATTLE") game.battleLog.unshift(`🧪 Зелье Исцеления (+${12 + alchBonus} HP, очищение).`);
-    } else if (pot.id === "pot2") {
-        game.player.en += 3;
-        game.player.addShield(10);
-        game.player.cooldowns = { defend: 0, heavy: 0, pierce: 0, whirlwind: 0, concentrate: 0 };
-        game.addBattleFx({ target: "player", type: "shield", value: 10 });
-        game.battleLog.unshift("🧪 Эликсир Энергии (+3 EN, +10 Щита, сброс перезарядок!).");
-    } else if (pot.id === "pot3") {
-        game.battleLog.unshift("🧪 Взрывная Колба (20 чистого урона всем)!");
-        game.enemies.forEach(en => {
-            if (en.currentHp > 0) dealDamageToEnemy(game, en, 20, true, false);
-        });
-    } else if (pot.id === "pot4") {
-        game.player.addShield(16);
-        game.player.damageReduction50 = true;
-        game.addBattleFx({ target: "player", type: "shield", value: 16 });
-        game.battleLog.unshift("🧪 Каменный Отвар (+16 Щита, -50% урона в этом раунде).");
-    } else if (pot.id === "pot5") {
-        game.enemies.forEach(en => {
-            if (en.currentHp > 0) {
-                en.poison += 6;
-                en.bleed += 4;
-                game.addBattleFx({ target: "enemy", enemy: en, type: "poison", value: 6 });
-                game.addBattleFx({ target: "enemy", enemy: en, type: "bleed", value: 4 });
-            }
-        });
-        game.battleLog.unshift("🧪 Ядовитый Флакон (+6 Яда и +4 Кровотока всем)!");
-    } else if (pot.id === "pot6") {
-        game.player.heal(12 + alchBonus);
-        game.addBattleFx({ target: "player", type: "heal", value: 12 + alchBonus });
-        if (game.state === "BATTLE") {
-            game.player.battleAtk += 4;
-            game.battleLog.unshift(`🧪 Кровь Дракона (+${12 + alchBonus} HP, +4 ATK до конца боя).`);
-        }
-    } else if (pot.id === "pot7") {
-        game.player.addShield(6);
-        game.player.battleSpikes += 4;
-        game.addBattleFx({ target: "player", type: "shield", value: 6 });
-        game.battleLog.unshift("🧪 Эликсир Железной Кожи (+6 Щита, +4 Шипов до конца боя).");
-    } else if (pot.id === "pot8") {
-        game.player.heal(6 + alchBonus);
-        game.player.poison = 0;
-        game.player.bleed = 0;
-        game.addBattleFx({ target: "player", type: "heal", value: 6 + alchBonus });
-        if (game.state === "BATTLE") {
-            game.player.addShield(5);
-            game.addBattleFx({ target: "player", type: "shield", value: 5 });
-            game.battleLog.unshift(`🧪 Очищающий Бальзам (+${6 + alchBonus} HP, очищение, +5 Щита).`);
-        }
-    } else if (pot.id === "pot9") {
-        game.enemies.forEach(en => {
-            if (en.currentHp > 0) {
-                en.shield = 0;
-                en.def = Math.max(0, en.def - 2);
-                dealDamageToEnemy(game, en, 14, true, false);
-            }
-        });
-        game.battleLog.unshift("🧪 Бутыль с Кислотой (снятие Щитов, -2 DEF и 14 чистого урона всем)!");
-    } else if (pot.id === "pot10") {
-        game.player.en += 3;
-        game.player.concentrateBonus += 8;
-        game.player.forceCritNext = true;
-        game.battleLog.unshift("🧪 Флакон Концентрации (+3 EN, +8 ATK и гарантированный КРИТ на след. удар)!");
     }
 
-    if (game.state === "BATTLE" && game.player.perks.includes("p36")) {
-        game.player.en += 1;
+    if (game.state === "BATTLE") {
+        if (pot.en) {
+            game.player.en += pot.en;
+        }
+        if (pot.shield) {
+            game.player.addShield(pot.shield);
+            game.addBattleFx({ target: "player", type: "shield", value: pot.shield });
+        }
+        if (pot.resetCooldowns) {
+            game.player.cooldowns = { defend: 0, heavy: 0, pierce: 0, whirlwind: 0, concentrate: 0 };
+        } else if (pot.cooldownReduce) {
+            for (const k of Object.keys(game.player.cooldowns)) {
+                game.player.cooldowns[k] = Math.max(0, game.player.cooldowns[k] - pot.cooldownReduce);
+            }
+        }
+        if (pot.dmgReducePct) {
+            game.player.damageReductionPct = Math.max(game.player.damageReductionPct || 0, pot.dmgReducePct);
+        }
+        if (pot.battleAtk) {
+            game.player.battleAtk += pot.battleAtk;
+        }
+        if (pot.battleSpikes) {
+            game.player.battleSpikes += pot.battleSpikes;
+        }
+        if (pot.nextAtk) {
+            game.player.concentrateBonus += pot.nextAtk;
+        }
+        if (pot.critChanceNext >= 100) {
+            game.player.forceCritNext = true;
+        } else if (pot.critChanceNext > 0) {
+            game.player.critBonusNext = (game.player.critBonusNext || 0) + pot.critChanceNext;
+        }
+        if (pot.stripShield || pot.defShred || pot.poison || pot.bleed || pot.damage) {
+            game.enemies.forEach(en => {
+                if (en.currentHp <= 0) return;
+                if (pot.stripShield) en.shield = 0;
+                if (pot.defShred) en.def = Math.max(0, en.def - pot.defShred);
+                if (pot.poison) {
+                    en.poison += pot.poison;
+                    game.addBattleFx({ target: "enemy", enemy: en, type: "poison", value: pot.poison });
+                }
+                if (pot.bleed) {
+                    en.bleed += pot.bleed;
+                    game.addBattleFx({ target: "enemy", enemy: en, type: "bleed", value: pot.bleed });
+                }
+                if (pot.damage) dealDamageToEnemy(game, en, pot.damage, true, false);
+            });
+        }
+        const alchNote = alchBonus > 0 ? ` (+${alchBonus} HP Алхимия)` : "";
+        game.battleLog.unshift(`🧪 [${pot.rarity}] ${pot.name}: ${pot.desc}${alchNote}`);
+        if (game.player.perks.includes("p36")) {
+            game.player.en += 2;
+            game.player.addShield(8);
+            game.addBattleFx({ target: "player", type: "shield", value: 8 });
+        }
     }
 
     game.player.inventory.potions.splice(potIndex, 1);
@@ -274,6 +278,7 @@ export function playerAction(game, actionType, onStepRender) {
     ensureValidTarget(game);
     const target = game.enemies[game.selectedTargetIndex];
 
+    const twoEnCost = game.player.perks.includes("p24") ? 1 : 2;
     if (actionType === "defend" && !canUseSkill(game, "defend", 0)) {
         playSound("error");
         return;
@@ -282,11 +287,11 @@ export function playerAction(game, actionType, onStepRender) {
         playSound("error");
         return;
     }
-    if (actionType === "pierce" && !canUseSkill(game, "pierce", 2)) {
+    if (actionType === "pierce" && !canUseSkill(game, "pierce", twoEnCost)) {
         playSound("error");
         return;
     }
-    if (actionType === "whirlwind" && !canUseSkill(game, "whirlwind", 2)) {
+    if (actionType === "whirlwind" && !canUseSkill(game, "whirlwind", twoEnCost)) {
         playSound("error");
         return;
     }
@@ -303,20 +308,24 @@ export function playerAction(game, actionType, onStepRender) {
     let atkVal = game.player.getTotalAtk();
     if (game.player.hasArtifact("art18")) atkVal += 3;
     if (game.battleTurn === 1 && game.player.perks.includes("p13")) atkVal += 5;
+    const singleAtkBonus = (target && (target.isElite || target.isBoss) && game.player.perks.includes("p25")) ? 3 : 0;
 
     const cdReduction = game.player.perks.includes("p24") ? 1 : 0;
     let extraTurn = false;
 
     if (actionType === "fast") {
         if (!target || target.currentHp <= 0) return;
+        const potionCritBonus = game.player.critBonusNext || 0;
         game.player.forceCritNext = false;
-        const isCrit = game.player.rollCrit(10, forceCrit);
-        let dmg = atkVal + RNG.range(1, 4);
+        game.player.critBonusNext = 0;
+        const fastCritBonus = (game.player.perks.includes("p35") ? 18 : 10) + potionCritBonus;
+        const isCrit = game.player.rollCrit(fastCritBonus, forceCrit);
+        let dmg = atkVal + singleAtkBonus + RNG.range(1, 4);
         if (isCrit) {
-            const critMult = game.player.perks.includes("p35") ? 3.0 : 1.65;
+            const critMult = game.player.perks.includes("p35") ? 2.5 : 1.65;
             dmg = Math.round(dmg * critMult);
             applyCritPlayerBonus(game);
-            if (game.player.perks.includes("p32")) target.def = Math.max(0, target.def - 1);
+            applyCritBreak(game, target);
         }
         applyWeaponEffects(game, target, isCrit);
         if (game.player.perks.includes("p7")) {
@@ -329,12 +338,12 @@ export function playerAction(game, actionType, onStepRender) {
         game.player.concentrateBonus = 0;
 
     } else if (actionType === "defend") {
-        let shieldGain = 3 + game.player.getTotalDef() + (game.player.classId === "crusader" ? 3 : 0) + (game.player.perks.includes("p31") ? 3 : 0);
+        let shieldGain = 3 + game.player.getTotalDef() + (game.player.classId === "crusader" ? 3 : 0) + (game.player.perks.includes("p31") ? 6 : 0);
         if (game.player.classId === "crusader") game.player.tempSpikes += 3;
-        if (game.player.perks.includes("p14")) game.player.tempSpikes += 3;
+        if (game.player.perks.includes("p14")) game.player.tempSpikes += 4;
         game.player.addShield(shieldGain);
         game.addBattleFx({ target: "player", type: "shield", value: shieldGain });
-        game.player.damageReduction50 = true;
+        game.player.damageReductionPct = Math.max(game.player.damageReductionPct || 0, 50);
         game.player.bleed = 0;
         game.player.poison = 0;
         const defCd = Math.max(1, 3 - (game.player.perks.includes("p31") ? 1 : 0));
@@ -345,8 +354,18 @@ export function playerAction(game, actionType, onStepRender) {
         if (!target || target.currentHp <= 0) return;
         if (!spendEn(game, 1)) return;
         playSound("heavy");
-        if (game.player.perks.includes("p15")) target.shield = 0;
-        const execDmg = Math.round(2 + atkVal * 0.5) + (game.player.perks.includes("p1") ? 4 : 0);
+        const isPotionCrit = consumePotionCritRoll(game);
+        const p15Bonus = (game.player.perks.includes("p15") && (target.shield > 0 || target.def >= 2)) ? 8 : 0;
+        let execDmg = Math.round(2 + (atkVal + singleAtkBonus) * 0.5) + (game.player.perks.includes("p1") ? 4 : 0) + p15Bonus;
+        if (isPotionCrit) {
+            execDmg = Math.round(execDmg * 1.65);
+            applyCritPlayerBonus(game);
+            applyCritBreak(game, target);
+        }
+        if (game.player.perks.includes("p8")) {
+            target.bleed += 3;
+            game.addBattleFx({ target: "enemy", enemy: target, type: "bleed", value: 3 });
+        }
         const hpBefore = target.currentHp;
         target.currentHp = Math.max(0, target.currentHp - execDmg);
         const dealtExec = hpBefore - target.currentHp;
@@ -359,32 +378,31 @@ export function playerAction(game, actionType, onStepRender) {
         });
         if (target.currentHp <= 0) {
             onEnemyKilled(game, target);
-            game.battleLog.unshift(`💀 Казнь ${target.name}: ${hpBefore} чистого урона — ДОБИТ! Ход не тратится!`);
+            game.battleLog.unshift(`💀 Казнь ${target.name}${isPotionCrit ? " (КРИТ!)" : ""}: ${hpBefore} чистого урона — ДОБИТ! Ход не тратится!`);
             extraTurn = true;
         } else {
-            game.battleLog.unshift(`💀 Казнь ${target.name}: ${execDmg} чистого урона.`);
+            game.battleLog.unshift(`💀 Казнь ${target.name}${isPotionCrit ? " (КРИТ!)" : ""}: ${execDmg} чистого урона.`);
         }
         game.player.cooldowns.heavy = Math.max(1, 3 - cdReduction);
         game.player.concentrateBonus = 0;
 
     } else if (actionType === "pierce") {
         if (!target || target.currentHp <= 0) return;
-        if (!spendEn(game, 2)) return;
+        if (!spendEn(game, twoEnCost)) return;
         playSound("pierce");
-        if (game.player.perks.includes("p15")) target.shield = 0;
-        const isPotionCrit = Boolean(game.player.forceCritNext);
-        if (isPotionCrit) game.player.forceCritNext = false;
-        let prcRaw = atkVal + RNG.range(3, 7);
+        const isPotionCrit = consumePotionCritRoll(game);
+        let prcRaw = atkVal + singleAtkBonus + RNG.range(3, 7);
         if (isPotionCrit) {
             prcRaw = Math.round(prcRaw * 1.65);
             applyCritPlayerBonus(game);
-            if (game.player.perks.includes("p32")) target.def = Math.max(0, target.def - 1);
+            applyCritBreak(game, target);
         }
         const prcDef = ignoreAllDef ? 0 : Math.max(0, target.def - (game.player.hasArtifact("art3") ? 2 : 0));
-        const prcActual = Math.max(1, prcRaw - prcDef);
+        const p15Bonus = (game.player.perks.includes("p15") && (target.shield > 0 || target.def >= 2)) ? 8 : 0;
+        const prcActual = Math.max(1, prcRaw - prcDef) + p15Bonus;
         if (game.player.perks.includes("p8")) {
-            target.bleed += 2;
-            game.addBattleFx({ target: "enemy", enemy: target, type: "bleed", value: 2 });
+            target.bleed += 3;
+            game.addBattleFx({ target: "enemy", enemy: target, type: "bleed", value: 3 });
         }
         target.currentHp = Math.max(0, target.currentHp - prcActual);
         game.addBattleFx({
@@ -406,12 +424,12 @@ export function playerAction(game, actionType, onStepRender) {
         game.player.concentrateBonus = 0;
 
     } else if (actionType === "whirlwind") {
-        if (!spendEn(game, 2)) return;
+        if (!spendEn(game, twoEnCost)) return;
         playSound("whirlwind");
         const isArcanist = game.player.classId === "arcanist";
-        const isPotionCrit = Boolean(game.player.forceCritNext);
-        if (isPotionCrit) game.player.forceCritNext = false;
-        let dmg = Math.round(atkVal * 0.75) + (isArcanist ? RNG.range(3, 6) : RNG.range(1, 4));
+        const isPotionCrit = consumePotionCritRoll(game);
+        const baseRoll = isArcanist ? RNG.range(3, 6) : RNG.range(1, 4);
+        let dmg = Math.round(atkVal * 0.75) + baseRoll;
         if (isPotionCrit) {
             dmg = Math.round(dmg * 1.65);
             applyCritPlayerBonus(game);
@@ -420,15 +438,18 @@ export function playerAction(game, actionType, onStepRender) {
         game.battleLog.unshift(`🌪️ ${isArcanist ? "Огненный залп" : "Круговой вихрь"}${isPotionCrit ? " (КРИТ!)" : ""} по всем (${dmg} базы)!`);
         game.enemies.forEach(en => {
             if (en.currentHp > 0) {
+                const enAtk = atkVal + ((en.isElite || en.isBoss) && game.player.perks.includes("p25") ? 3 : 0);
+                let enDmg = Math.round(enAtk * 0.75) + baseRoll;
                 if (isPotionCrit) {
-                    if (game.player.perks.includes("p32")) en.def = Math.max(0, en.def - 1);
+                    enDmg = Math.round(enDmg * 1.65);
+                    applyCritBreak(game, en);
                     applyWeaponEffects(game, en, true);
                 }
                 if (game.player.perks.includes("p7")) {
                     en.poison += 1;
                     game.addBattleFx({ target: "enemy", enemy: en, type: "poison", value: 1 });
                 }
-                dealDamageToEnemy(game, en, dmg, isArcanist || ignoreAllDef, isPotionCrit);
+                dealDamageToEnemy(game, en, enDmg, isArcanist || ignoreAllDef, isPotionCrit);
             }
         });
         game.player.concentrateBonus = 0;
@@ -526,7 +547,8 @@ export function runEnemyTurnSequence(game, onStepRender) {
         if (game.player.classId === "arcanist") {
             game.player.en = Math.min(game.player.getTotalMaxEn(), game.player.en + 1);
         }
-        game.player.damageReduction50 = false;
+        game.player.damageReductionPct = 0;
+        game.player.steelScaleUsed = false;
         game.battleTurn++;
         if (game.battleTurn >= 11 && !game.enrageAnnounced) {
             game.enrageAnnounced = true;
@@ -743,13 +765,15 @@ export function dealDamageToEnemy(game, enemy, amount, ignoreDef = false, isCrit
     let actual = ignoreDef ? amount : Math.max(1, amount - enemyDef);
     let shieldAbsorbed = 0;
     if (enemy.shield > 0) {
-        if (enemy.shield >= actual) {
-            shieldAbsorbed = actual;
-            enemy.shield -= actual;
+        const shieldMult = game.player.perks.includes("p15") ? 2 : 1;
+        const shieldCost = Math.ceil(enemy.shield / shieldMult);
+        if (actual <= shieldCost) {
+            shieldAbsorbed = Math.min(enemy.shield, actual * shieldMult);
+            enemy.shield = Math.max(0, enemy.shield - actual * shieldMult);
             actual = 0;
         } else {
             shieldAbsorbed = enemy.shield;
-            actual -= enemy.shield;
+            actual -= shieldCost;
             enemy.shield = 0;
         }
     }
@@ -785,8 +809,8 @@ export function onEnemyKilled(game, enemy) {
     if (game.player.hasArtifact("art12")) xpGain = Math.ceil(xpGain * 1.5);
     let goldGain = RNG.range(2, 5) + game.floor * 2;
     if ((enemy.isElite || enemy.isBoss) && game.player.perks.includes("p25")) {
-        xpGain += 5;
-        goldGain += 8;
+        xpGain += 8;
+        goldGain += 10;
     }
 
     game.player.xp += xpGain;
@@ -807,19 +831,32 @@ export function onEnemyKilled(game, enemy) {
         game.player.heal(game.player.inventory.weapon.vamp);
     }
     if (game.player.perks.includes("p22")) {
-        game.player.en = Math.min(game.player.getTotalMaxEn(), game.player.en + 1);
+        game.player.en += 1;
+        game.player.addShield(2);
+        game.addBattleFx({ target: "player", type: "shield", value: 2 });
     }
-    if (game.player.perks.includes("p17") && (enemy.poison > 0 || enemy.bleed > 0)) {
-        game.player.heal(3);
-        game.player.en = Math.min(game.player.getTotalMaxEn(), game.player.en + 1);
+    if (game.player.perks.includes("p17")) {
+        if (enemy.poison > 0 || enemy.bleed > 0) {
+            game.player.heal(6);
+            game.player.en = Math.min(game.player.getTotalMaxEn(), game.player.en + 1);
+        } else {
+            game.player.heal(4);
+        }
     }
-    if (game.player.perks.includes("p30") && enemy.poison > 0) {
-        game.enemies.forEach(en => {
-            if (en !== enemy && en.currentHp > 0) {
-                dealDamageToEnemy(game, en, 5, true);
-            }
-        });
-        game.battleLog.unshift("💥 Токсичный взрыв наносит 5 чистого урона всем врагам!");
+    if (game.player.perks.includes("p30")) {
+        const isPoisoned = enemy.poison > 0;
+        const boomDmg = isPoisoned ? 10 : 6;
+        const aliveOthers = game.enemies.filter(en => en !== enemy && en.currentHp > 0);
+        if (aliveOthers.length > 0) {
+            aliveOthers.forEach(en => {
+                if (isPoisoned) {
+                    en.poison += 2;
+                    game.addBattleFx({ target: "enemy", enemy: en, type: "poison", value: 2 });
+                }
+                dealDamageToEnemy(game, en, boomDmg, true);
+            });
+            game.battleLog.unshift(`💥 Токсичный взрыв наносит ${boomDmg} чистого урона всем врагам${isPoisoned ? " и накладывает Яд (2)" : ""}!`);
+        }
     }
 }
 
@@ -858,8 +895,12 @@ export function checkBattleEnd(game) {
     game.isProcessingTurn = false;
 
     if (game.player.perks.includes("p10")) {
-        game.player.heal(4);
-        game.battleLog.unshift("💚 Кровь тролля восстанавливает +4 HP.");
+        game.player.heal(6);
+        game.battleLog.unshift("💚 Кровь тролля восстанавливает +6 HP.");
+    }
+    if (game.player.perks.includes("p28")) {
+        game.player.heal(3);
+        game.battleLog.unshift("🍲 Сытный привал восстанавливает +3 HP.");
     }
     if (game.player.hasArtifact("art4")) {
         game.player.heal(3);
@@ -878,9 +919,12 @@ export function checkBattleEnd(game) {
     }
 
     if (RNG.chance(45) && game.player.inventory.potions.length < game.player.potionSlots) {
-        const droppedPot = { ...RNG.choice(GAME_DATA.items.potions) };
-        game.player.inventory.potions.push(droppedPot);
-        game.battleRewards.items.push(`Зелье: ${droppedPot.name}`);
+        const droppedPot = pickItemByRarity(GAME_DATA.items.potions, game.floor);
+        if (droppedPot) {
+            const potCopy = { ...droppedPot };
+            game.player.inventory.potions.push(potCopy);
+            game.battleRewards.items.push(`🧪 [${potCopy.rarity}] Зелье: ${potCopy.name}`);
+        }
     }
 
     const currentKey = `${game.playerPos.x},${game.playerPos.y}`;
@@ -903,7 +947,29 @@ export function proceedAfterBattle(game) {
 function applyCritPlayerBonus(game) {
     game.player.en = Math.min(game.player.getTotalMaxEn(), game.player.en + 1);
     if (game.player.perks.includes("p11")) {
-        game.player.heal(3);
-        game.addBattleFx({ target: "player", type: "heal", value: 3 });
+        game.player.heal(6);
+        game.player.addShield(4);
+        game.addBattleFx({ target: "player", type: "heal", value: 6 });
+        game.addBattleFx({ target: "player", type: "shield", value: 4 });
     }
+}
+
+function applyCritBreak(game, enemy) {
+    if (!game.player.perks.includes("p32") || !enemy || enemy.currentHp <= 0) return;
+    enemy.def = Math.max(0, enemy.def - 2);
+    enemy.currentHp = Math.max(0, enemy.currentHp - 3);
+    game.addBattleFx({ target: "enemy", enemy, type: "damage", value: 3 });
+}
+
+function consumePotionCritRoll(game) {
+    const hadForce = Boolean(game.player.forceCritNext);
+    const bonus = game.player.critBonusNext || 0;
+    game.player.forceCritNext = false;
+    game.player.critBonusNext = 0;
+    if (hadForce) {
+        game.player.pityCritBonus = 0;
+        return true;
+    }
+    if (bonus > 0) return game.player.rollCrit(bonus);
+    return false;
 }

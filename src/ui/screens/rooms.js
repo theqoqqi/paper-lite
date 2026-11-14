@@ -3,7 +3,7 @@ import { game } from "../../engine/game.js";
 import { GAME_DATA } from "../../data/index.js";
 import { playSound } from "../../utils/audio.js";
 import { renderStatsPanel, renderEquipmentComparison } from "../components.js";
-import { renderTextWithRarity, renderItemLabelChildren } from "../rarity.js";
+import { renderTextWithRarity, renderItemLabelChildren, renderRarityTag } from "../rarity.js";
 
 export function renderLevelUpScreen(render) {
     if (!game._levelUpSoundPlayed) {
@@ -26,7 +26,11 @@ export function renderLevelUpScreen(render) {
                 render();
             },
         }, [
-            el("b", { text: perk.name }),
+            el("b", {}, [
+                perk.rarity ? renderRarityTag(perk.rarity) : null,
+                perk.rarity ? " " : "",
+                perk.name,
+            ]),
             el("br"),
             el("small", { text: perk.desc }),
         ]));

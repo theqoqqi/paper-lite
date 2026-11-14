@@ -13,3 +13,4 @@
 | Автономный безголовый симулятор баланса | Реализовано | [007-headless-balance-simulator.md](tasks/007-headless-balance-simulator.md) |
 | Идеи развития и бэклог доработок | Справочник | [improvement-ideas.md](improvement-ideas.md) |
 | Реестр и балансный аудит предметов и перков | Справочник | [items-and-perks-balance.md](items-and-perks-balance.md) |
+| Ребаланс перков и зелий, система редкости | Реализовано | [009-perks-and-potions-rebalance.md](tasks/009-perks-and-potions-rebalance.md) |

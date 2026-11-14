@@ -30,8 +30,9 @@ export function setupShop(game) {
 
     const w = pickItemByRarity(GAME_DATA.items.weapons, game.floor);
     const a = pickItemByRarity(GAME_DATA.items.armors, game.floor);
-    const pot1 = RNG.choice(GAME_DATA.items.potions);
-    const pot2 = RNG.choice(GAME_DATA.items.potions);
+    const pot1 = pickItemByRarity(GAME_DATA.items.potions, game.floor);
+    const pot2Pool = pot1 ? GAME_DATA.items.potions.filter(p => p.id !== pot1.id) : GAME_DATA.items.potions;
+    const pot2 = pickItemByRarity(pot2Pool, game.floor) || pot1;
 
     const forgeWeaponCost = 14 + game.player.weaponUpgradeLvl * 10;
     const forgeArmorCost = 14 + game.player.armorUpgradeLvl * 10;
@@ -53,15 +54,17 @@ export function setupShop(game) {
     }, {
         id: pot1.id,
         kind: "potion",
+        rarity: pot1.rarity,
         item: pot1,
-        name: `🧪 ${pot1.name} — ${pot1.desc}`,
+        name: `🧪 [${pot1.rarity}] ${pot1.name} — ${pot1.desc}`,
         cost: pot1.cost,
         bought: false,
     }, {
         id: pot2.id,
         kind: "potion",
+        rarity: pot2.rarity,
         item: pot2,
-        name: `🧪 ${pot2.name} — ${pot2.desc}`,
+        name: `🧪 [${pot2.rarity}] ${pot2.name} — ${pot2.desc}`,
         cost: pot2.cost,
         bought: false,
     }, {

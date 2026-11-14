@@ -232,14 +232,19 @@ export function renderBattleScreen(render) {
         });
         wrap.appendChild(enemyBox);
 
-        const fastMin = atk + 1;
-        const fastMax = atk + 4;
-        const execDmg = Math.round(2 + atk * 0.5) + (p.perks.includes("p1") ? 4 : 0);
-        const prcMin = atk + 3;
-        const prcMax = atk + 7;
+        const target = p && game.enemies[game.selectedTargetIndex];
+        const eliteAtk = (target && (target.isElite || target.isBoss) && p.perks.includes("p25")) ? 3 : 0;
+        const effAtk = atk + eliteAtk;
+        const p15Bonus = (target && p.perks.includes("p15") && (target.shield > 0 || target.def >= 2)) ? 8 : 0;
+        const twoEnCost = p.perks.includes("p24") ? 1 : 2;
+        const fastMin = effAtk + 1;
+        const fastMax = effAtk + 4;
+        const execDmg = Math.round(2 + effAtk * 0.5) + (p.perks.includes("p1") ? 4 : 0) + p15Bonus;
+        const prcMin = effAtk + 3 + p15Bonus;
+        const prcMax = effAtk + 7 + p15Bonus;
         const whrMin = Math.round(atk * 0.75) + (p.classId === "arcanist" ? 3 : 1);
         const whrMax = Math.round(atk * 0.75) + (p.classId === "arcanist" ? 6 : 4);
-        const defShield = 3 + p.getTotalDef() + (p.classId === "crusader" ? 3 : 0) + (p.perks.includes("p31") ? 3 : 0);
+        const defShield = 3 + p.getTotalDef() + (p.classId === "crusader" ? 3 : 0) + (p.perks.includes("p31") ? 6 : 0);
 
         const formatCd = cd => (cd === 1 ? "[КД: 1 ход]" : `[КД: ${cd} хода]`);
         const defSub = cds.defend > 0 ? formatCd(cds.defend) : `[+${defShield} Щит, -50% ур.]`;
@@ -259,8 +264,8 @@ export function renderBattleScreen(render) {
                 makeActionBtn("🛡️ Защита (0 EN)", defSub, !game.canUseSkill("defend", 0), () => game.playerAction("defend", render)),
             ]),
             el("div", { className: "flex-row" }, [
-                makeActionBtn("🗡️ Пробитие (2 EN)", prcSub, !game.canUseSkill("pierce", 2), () => game.playerAction("pierce", render)),
-                makeActionBtn("🌪️ Вихрь (2 EN)", whrSub, !game.canUseSkill("whirlwind", 2), () => game.playerAction("whirlwind", render)),
+                makeActionBtn(`🗡️ Пробитие (${twoEnCost} EN)`, prcSub, !game.canUseSkill("pierce", twoEnCost), () => game.playerAction("pierce", render)),
+                makeActionBtn(`🌪️ Вихрь (${twoEnCost} EN)`, whrSub, !game.canUseSkill("whirlwind", twoEnCost), () => game.playerAction("whirlwind", render)),
             ]),
             el("div", { className: "flex-row" }, [
                 makeActionBtn("💀 Казнь (1 EN)", heavySub, !game.canUseSkill("heavy", 1), () => game.playerAction("heavy", render)),
@@ -274,14 +279,16 @@ export function renderBattleScreen(render) {
                 el("small", { text: `Зелья (${p.inventory.potions.length}/${p.potionSlots}, не тратят ход):` }),
             ]);
             p.inventory.potions.forEach((pot, pIdx) => {
+                const potText = pot.rarity
+                    ? `🧪 [${pot.rarity}] ${pot.name} — ${pot.desc}`
+                    : `🧪 ${pot.name} — ${pot.desc}`;
                 potRow.appendChild(el("button", {
                     disabled: game.isProcessingTurn,
                     style: { padding: "6px", fontSize: "12px", background: "#243b24" },
-                    text: `🧪 ${pot.name} — ${pot.desc}`,
                     onClick: () => {
                         game.usePotion(pIdx, render);
                     },
-                }));
+                }, renderTextWithRarity(potText, pot.rarity || null)));
             });
             wrap.appendChild(potRow);
         }

@@ -4,6 +4,7 @@
 
 import { RNG } from "../utils/rng.js";
 import { GAME_DATA } from "../data/index.js";
+import { pickItemByRarity } from "./systems/encounter.js";
 
 export class Player {
     constructor(classKey = "wanderer", meta = {}) {
@@ -42,8 +43,10 @@ export class Player {
 
         this.cooldowns = { defend: 0, heavy: 0, pierce: 0, whirlwind: 0, concentrate: 0 };
         this.secondWindAvailable = true;
+        this.steelScaleUsed = false;
         this.forceCritNext = false;
-        this.damageReduction50 = false;
+        this.critBonusNext = 0;
+        this.damageReductionPct = 0;
 
         this.perks = [];
         this.potionSlots = 2 + (meta.potions || 0);
@@ -59,7 +62,10 @@ export class Player {
             this.inventory.potions.push({ ...GAME_DATA.items.potions[0] });
         }
         if ((meta.potions || 0) > 0 && this.inventory.potions.length < this.potionSlots) {
-            this.inventory.potions.push({ ...RNG.choice(GAME_DATA.items.potions) });
+            const metaPot = pickItemByRarity(GAME_DATA.items.potions, 0);
+            if (metaPot) {
+                this.inventory.potions.push({ ...metaPot });
+            }
         }
     }
 
@@ -115,8 +121,29 @@ export class Player {
         if (this.inventory.armor && this.inventory.armor.hp) val += this.inventory.armor.hp;
         val += this.armorUpgradeLvl * 3;
         if (this.hasArtifact("art9")) val += 10;
-        if (this.perks.includes("p23")) val += 10;
+        if (this.perks.includes("p23")) val += 18;
         return val;
+    }
+
+    addPerk(perkId, floor = 0) {
+        if (!perkId || this.perks.includes(perkId)) return false;
+        this.perks.push(perkId);
+        if (perkId === "p21") {
+            this.potionSlots += 1;
+            if (this.inventory.potions.length < this.potionSlots) {
+                const pot = pickItemByRarity(GAME_DATA.items.potions, floor);
+                if (pot) {
+                    this.inventory.potions.push({ ...pot });
+                }
+            }
+        }
+        if (perkId === "p9") {
+            this.en = Math.min(this.getTotalMaxEn(), this.en + 1);
+        }
+        if (perkId === "p23") {
+            this.heal(18);
+        }
+        return true;
     }
 
     clampHp() {
@@ -139,7 +166,7 @@ export class Player {
         if (this.hasArtifact("art5")) val += 1;
         if (this.perks.includes("p1")) val += 1;
         if (this.perks.includes("p4") && this.hp <= this.getTotalMaxHp() / 2) val += 3;
-        if (this.perks.includes("p20")) val += Math.min(4, Math.floor(this.gold / 15));
+        if (this.perks.includes("p20")) val += Math.min(5, Math.floor(this.gold / 12));
         return val;
     }
 
@@ -155,6 +182,7 @@ export class Player {
         let val = this.tempSpikes + this.battleSpikes;
         if (this.inventory.armor && this.inventory.armor.spikes) val += this.inventory.armor.spikes;
         if (this.perks.includes("p12")) val += 2;
+        if (this.perks.includes("p34")) val += 1;
         if (this.hasArtifact("art14")) val += 2;
         return val;
     }
@@ -195,8 +223,9 @@ export class Player {
 
     takeDamage(rawAmount, ignoreDef = false) {
         let amount = rawAmount;
-        if (this.damageReduction50) {
-            amount = Math.ceil(amount * 0.5);
+        const reducePct = Math.min(90, Math.max(0, this.damageReductionPct || 0));
+        if (reducePct > 0) {
+            amount = Math.ceil(amount * (1 - reducePct / 100));
         }
         if (this.hasArtifact("art18")) {
             amount = Math.max(1, amount - 1);
@@ -217,14 +246,17 @@ export class Player {
             }
         }
         this.hp = Math.max(0, this.hp - dmg);
-        if (this.perks.includes("p29") && dmg > 0) {
+        if (this.perks.includes("p29") && dmg > 0 && !this.steelScaleUsed) {
+            this.steelScaleUsed = true;
             this.addShield(2);
         }
 
         if (this.hp <= 0 && this.perks.includes("p26") && this.secondWindAvailable) {
             this.secondWindAvailable = false;
-            this.hp = 1;
-            this.addShield(12);
+            this.hp = Math.max(1, Math.ceil(this.getTotalMaxHp() * 0.4));
+            this.poison = 0;
+            this.bleed = 0;
+            this.addShield(18);
         }
         return dmg;
     }

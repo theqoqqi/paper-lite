@@ -1,7 +1,7 @@
 import { el } from "../utils/dom.js";
 import { game } from "../engine/game.js";
 import { GAME_DATA } from "../data/index.js";
-import { renderItemLabelChildren } from "./rarity.js";
+import { renderItemLabelChildren, renderTextWithRarity } from "./rarity.js";
 
 const STATS_HELP = [
     {
@@ -172,8 +172,11 @@ export function openCharacterModal(render) {
     } else {
         p.inventory.potions.forEach((pot, idx) => {
             const canDrinkHere = (game.state === "BATTLE" || pot.canUseOnMap);
+            const potText = pot.rarity
+                ? `[${pot.rarity}] ${pot.name} — ${pot.desc}`
+                : `${pot.name} — ${pot.desc}`;
             potPanel.appendChild(el("div", { style: { marginBottom: "6px" } }, [
-                el("div", { style: { fontSize: "12px" }, text: `${pot.name} — ${pot.desc}` }),
+                el("div", { style: { fontSize: "12px" } }, renderTextWithRarity(potText, pot.rarity || null)),
                 el("div", { className: "flex-row" }, [
                     canDrinkHere ? el("button", {
                         style: { padding: "4px", fontSize: "11px", background: "#243b24" },
@@ -208,10 +211,12 @@ export function openCharacterModal(render) {
         p.perks.forEach(pid => {
             const pObj = GAME_DATA.perks.find(x => x.id === pid);
             if (pObj) {
+                const perkText = pObj.rarity
+                    ? `• [${pObj.rarity}] ${pObj.name}: ${pObj.desc}`
+                    : `• ${pObj.name}: ${pObj.desc}`;
                 perkPanel.appendChild(el("div", {
                     style: { fontSize: "12px", marginBottom: "3px" },
-                    text: `• ${pObj.name}: ${pObj.desc}`,
-                }));
+                }, renderTextWithRarity(perkText, pObj.rarity || null)));
             }
         });
     }
