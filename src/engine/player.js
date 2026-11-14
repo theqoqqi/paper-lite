@@ -164,7 +164,7 @@ export class Player {
         if (this.hasArtifact("art40") || this.hasArtifact("art41")) val += 35;
         if (this.perks.includes("p23")) val += 18;
         if (this.hasArtifact("art39")) {
-            val = Math.round(val * 0.75);
+            val = Math.round(val * 0.5);
         }
         return Math.max(1, val);
     }
@@ -202,7 +202,7 @@ export class Player {
         if (this.perks.includes("p9")) val += 1;
         if (this.hasArtifact("art32")) val += 1;
         if (this.hasArtifact("art37")) val += 1;
-        if (this.hasArtifact("art39")) val -= 1;
+        if (this.hasArtifact("art39")) val -= 2;
         if (this.hasArtifact("art40") || this.hasArtifact("art41")) val += 2;
         return Math.max(2, val);
     }
@@ -234,7 +234,7 @@ export class Player {
         if (this.hasArtifact("art36")) val += 1;
         if (this.hasArtifact("art39")) val += 4;
         if (this.hasArtifact("art41")) val += 5;
-        if (this.hasArtifact("art38")) val -= 2;
+        if (this.hasArtifact("art38")) val -= 4;
         if (this.perks.includes("p5")) val += 1;
         return val;
     }
@@ -259,7 +259,7 @@ export class Player {
         if (this.hasArtifact("art27")) val += 5;
         if (this.hasArtifact("art31")) val += 15;
         if (this.hasArtifact("art38")) val += 25;
-        if (this.hasArtifact("art40")) val -= 10;
+        if (this.hasArtifact("art40")) val -= 20;
         if (this.hasArtifact("art41")) val += 25;
         return Math.max(0, Math.min(100, val));
     }
@@ -282,7 +282,7 @@ export class Player {
     getModifiedShieldGain(amount) {
         if (amount <= 0) return 0;
         if (this.hasArtifact("art38")) {
-            return Math.max(1, Math.floor(amount * 0.75));
+            return Math.max(1, Math.floor(amount * 0.5));
         }
         return amount;
     }
@@ -290,7 +290,7 @@ export class Player {
     modifyOutgoingDamage(amount) {
         if (amount <= 0) return amount;
         if (this.hasArtifact("art40")) {
-            return Math.max(1, Math.round(amount * 0.85));
+            return Math.max(1, Math.round(amount * 0.7));
         }
         return amount;
     }

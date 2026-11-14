@@ -436,7 +436,7 @@ export function resolveCampfire(game, choice) {
         if (game.player.perks.includes("p28")) game.player.gold += 8;
         let healAmt = Math.ceil(game.player.getTotalMaxHp() * mult);
         if (game.player.hasArtifact("art39")) {
-            healAmt = Math.max(1, Math.floor(healAmt * 0.5));
+            healAmt = Math.max(1, Math.floor(healAmt * 0.25));
         }
         game.player.heal(healAmt);
     } else if (choice === "sharpen") {

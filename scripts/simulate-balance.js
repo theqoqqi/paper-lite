@@ -676,7 +676,7 @@ function processIntermission(game, step, roomsSinceCampfire) {
         }
         let healAmt = Math.ceil(p.getTotalMaxHp() * healPct);
         if (p.hasArtifact("art39")) {
-            healAmt = Math.max(1, Math.floor(healAmt * 0.5));
+            healAmt = Math.max(1, Math.floor(healAmt * 0.25));
         }
         p.heal(healAmt);
         p.en = p.getTotalMaxEn();

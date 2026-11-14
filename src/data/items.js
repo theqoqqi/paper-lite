@@ -896,7 +896,7 @@ export const DATA_ITEMS = {
             type: "artifact",
             rarity: "Проклятое",
             cost: 60,
-            desc: "+7 ATK, +25% Крита, Криты 2.1x и лечат +5 HP; но -2 DEF и получаемый Щит -25%.",
+            desc: "+7 ATK, +25% Крита, Криты 2.1x и лечат +5 HP; но -4 DEF и получаемый Щит -50%.",
         },
         {
             id: "art39",
@@ -904,7 +904,7 @@ export const DATA_ITEMS = {
             type: "artifact",
             rarity: "Проклятое",
             cost: 62,
-            desc: "+4 DEF и +18 Щита в начале боя; но -25% MAX HP, -1 MAX EN и Костры лечат вдвое слабее.",
+            desc: "+4 DEF и +18 Щита в начале боя; но -50% MAX HP, -2 MAX EN и Костры лечат вчетверо слабее.",
         },
         {
             id: "art40",
@@ -912,7 +912,7 @@ export const DATA_ITEMS = {
             type: "artifact",
             rarity: "Проклятое",
             cost: 64,
-            desc: "+2 MAX EN, +1 EN каждый раунд, +35 MAX HP и +6 HP в конце раунда; но урон атак -15% и Крит -10%.",
+            desc: "+2 MAX EN, +1 EN каждый раунд, +35 MAX HP и +6 HP в конце раунда; но урон атак -30% и Крит -20%.",
         },
         {
             id: "art41",

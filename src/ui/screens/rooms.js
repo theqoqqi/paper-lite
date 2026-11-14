@@ -193,7 +193,7 @@ export function renderCampfireScreen(render) {
     const mult = game.player.perks.includes("p28") ? 0.7 : 0.45;
     let healAmt = Math.ceil(game.player.getTotalMaxHp() * mult);
     if (game.player.hasArtifact("art39")) {
-        healAmt = Math.max(1, Math.floor(healAmt * 0.5));
+        healAmt = Math.max(1, Math.floor(healAmt * 0.25));
     }
     return el("div", {}, [
         el("h3", { text: "🔥 Костёр Отдыха" }),
