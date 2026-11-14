@@ -17,15 +17,18 @@ export function createEnemyInstance(game, enemyKey, applyMutation = false) {
     const atkDepthBonus = FLOOR_ATK_BONUSES[floorIdx];
     const cursedCfg = GAME_DATA.cursedConfig;
     const fountainAtkBonus = (game.fountainCursesCount || 0) * (cursedCfg ? cursedCfg.fountainEnemyAtkStep : 1);
+    const eclipseCount = game.fountainEclipseCount || 0;
+    const eclipseAtkBonus = eclipseCount * (cursedCfg ? cursedCfg.eclipseEnemyAtkStep : 2);
+    const eclipseHpMult = 1 + eclipseCount * ((cursedCfg ? cursedCfg.eclipseEnemyHpPctStep : 25) / 100);
 
-    e.hp = Math.round(e.hp * depthMult);
+    e.hp = Math.round(e.hp * depthMult * eclipseHpMult);
     e.currentHp = e.hp;
     e.shield = e.shield || 0;
     e.spikes = e.spikes || 0;
     e.poison = 0;
     e.bleed = 0;
     e.regen = 0;
-    e.atkBonus = atkDepthBonus + fountainAtkBonus;
+    e.atkBonus = atkDepthBonus + fountainAtkBonus + eclipseAtkBonus;
     e.poisonOnHit = 0;
     e.bleedOnHit = 0;
     e.patternIndex = 0;
@@ -34,7 +37,7 @@ export function createEnemyInstance(game, enemyKey, applyMutation = false) {
         const mut = RNG.choice(GAME_DATA.mutations);
         e.mutationId = mut.id;
         e.name = `${mut.prefix} ${e.name}`;
-        e.hp += Math.round((mut.hpBonus || 0) * depthMult);
+        e.hp += Math.round((mut.hpBonus || 0) * depthMult * eclipseHpMult);
         e.currentHp = e.hp;
         e.def += mut.defBonus || 0;
         e.atkBonus += mut.atkBonus || 0;
@@ -936,6 +939,13 @@ export function onEnemyKilled(game, enemy) {
     if ((enemy.isElite || enemy.isBoss) && game.player.perks.includes("p25")) {
         xpGain += 8;
         goldGain += 10;
+    }
+    const cfg = GAME_DATA.cursedConfig;
+    const eclipseCount = game.fountainEclipseCount || 0;
+    if (eclipseCount > 0) {
+        const rewardMult = 1 + eclipseCount * ((cfg ? cfg.eclipseRewardBonusPct : 50) / 100);
+        xpGain = Math.ceil(xpGain * rewardMult);
+        goldGain = Math.ceil(goldGain * rewardMult);
     }
 
     game.player.xp += xpGain;

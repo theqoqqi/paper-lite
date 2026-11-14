@@ -419,6 +419,15 @@ export function resolveFountainChoice(game, drink) {
         return;
     }
     const cfg = GAME_DATA.cursedConfig;
+    if (game.player.hasArtifact(cfg.mergedArtifactId)) {
+        game.fountainEclipseCount = (game.fountainEclipseCount || 0) + 1;
+        game.fountainResult = {
+            isEclipseRitual: true,
+            eclipseCount: game.fountainEclipseCount,
+        };
+        game.saveGame("autosave");
+        return;
+    }
     game.player.gold += cfg.fountainGold;
     game.fountainCursesCount = (game.fountainCursesCount || 0) + 1;
     const chance = Math.min(12, game.fountainCursesCount * cfg.fountainChanceStep);

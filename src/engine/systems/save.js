@@ -44,6 +44,7 @@ export function serializeState(game) {
         pendingEquipment: game.pendingEquipment,
         pendingArtifact: game.pendingArtifact || null,
         fountainCursesCount: game.fountainCursesCount || 0,
+        fountainEclipseCount: game.fountainEclipseCount || 0,
         fountainResult: game.fountainResult || null,
         eventRewards: game.eventRewards,
         currentCorridorResult: game.currentCorridorResult,
@@ -102,6 +103,7 @@ export function loadGame(game, slotKeyOrJson = "autosave") {
         game.pendingEquipment = data.pendingEquipment || null;
         game.pendingArtifact = data.pendingArtifact || null;
         game.fountainCursesCount = data.fountainCursesCount || 0;
+        game.fountainEclipseCount = data.fountainEclipseCount || 0;
         game.fountainResult = data.fountainResult || null;
         game.shopMergedNotice = null;
         game.eventRewards = data.eventRewards || null;

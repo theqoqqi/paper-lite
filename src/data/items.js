@@ -18,6 +18,9 @@ export const DATA_CURSED_CONFIG = {
     fountainGold: 25,
     fountainChanceStep: 3,
     fountainEnemyAtkStep: 1,
+    eclipseEnemyAtkStep: 2,
+    eclipseEnemyHpPctStep: 25,
+    eclipseRewardBonusPct: 50,
     cursedArtifactIds: ["art38", "art39", "art40"],
     mergedArtifactId: "art41",
 };

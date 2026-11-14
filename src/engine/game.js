@@ -39,6 +39,7 @@ export class Game {
         this.pendingEquipment = null;
         this.pendingArtifact = null;
         this.fountainCursesCount = 0;
+        this.fountainEclipseCount = 0;
         this.fountainResult = null;
         this.shopMergedNotice = null;
         this.eventRewards = null;
@@ -114,6 +115,7 @@ export class Game {
         this.pendingEquipment = null;
         this.pendingArtifact = null;
         this.fountainCursesCount = 0;
+        this.fountainEclipseCount = 0;
         this.fountainResult = null;
         this.shopMergedNotice = null;
         this.eventRewards = null;

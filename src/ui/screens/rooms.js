@@ -5,6 +5,13 @@ import { playSound } from "../../utils/audio.js";
 import { renderStatsPanel, renderEquipmentComparison, renderPendingArtifactChoice } from "../components.js";
 import { renderTextWithRarity, renderItemLabelChildren, renderRarityTag } from "../rarity.js";
 
+const FOUNTAIN_OMENS = [
+    "Нечто проклятое теперь следует за вами по пятам.",
+    "Тьма запомнила вашу руку и она будет стремиться прикоснуться к ней вновь.",
+    "Проклятая находка сама подбирается всё ближе — дар, который лучше не брать в руки.",
+    "Скверна признала вас своим: осколки проклятой реликвии тянутся к вам и жаждут собраться воедино.",
+];
+
 export function renderLevelUpScreen(render) {
     if (!game._levelUpSoundPlayed) {
         playSound("levelUp");
@@ -269,8 +276,54 @@ export function renderCorridorScreen(render) {
 export function renderFountainScreen(render) {
     const cfg = GAME_DATA.cursedConfig;
     const res = game.fountainResult;
+    const hasMerged = Boolean(game.player && game.player.hasArtifact(cfg.mergedArtifactId));
 
     if (!res) {
+        if (hasMerged) {
+            return el("div", {}, [
+                el("h3", { text: "⛲ Источник Затмения" }),
+                renderStatsPanel(),
+                el("div", {
+                    className: "panel",
+                    style: {
+                        borderColor: "#ef5350",
+                        background: "#2a1618",
+                        marginBottom: "10px",
+                        lineHeight: "1.45",
+                    },
+                }, [
+                    el("div", {
+                        style: { marginBottom: "8px" },
+                        text: "Сердце Затмения гулко отзывается на тёмную воду. Вы можете омыть реликвию в источнике:",
+                    }),
+                    el("div", {
+                        style: { fontSize: "13px", color: "#ef9a9a", marginBottom: "4px" },
+                        text: `• Все враги до конца забега получат +${cfg.eclipseEnemyAtkStep} ATK и +${cfg.eclipseEnemyHpPctStep}% HP.`,
+                    }),
+                    el("div", {
+                        style: { fontSize: "13px", color: "#ffd54f" },
+                        text: `• Награда за убийство каждого врага вырастет на +${cfg.eclipseRewardBonusPct}% XP и +${cfg.eclipseRewardBonusPct}% золота.`,
+                    }),
+                ]),
+                el("button", {
+                    className: "btn-primary",
+                    text: "🌑 Омыть Сердце Затмения",
+                    onClick: () => {
+                        playSound("equip");
+                        game.resolveFountainChoice(true);
+                        render();
+                    },
+                }),
+                el("button", {
+                    text: "🚶 Пройти мимо",
+                    onClick: () => {
+                        game.resolveFountainChoice(false);
+                        render();
+                    },
+                }),
+            ]);
+        }
+
         return el("div", {}, [
             el("h3", { text: "⛲ Старый Фонтан" }),
             renderStatsPanel(),
@@ -298,6 +351,45 @@ export function renderFountainScreen(render) {
         ]);
     }
 
+    if (res.isEclipseRitual) {
+        return el("div", {}, [
+            el("h3", { text: "⛲ Источник Затмения" }),
+            renderStatsPanel(),
+            el("div", {
+                className: "panel",
+                style: {
+                    borderColor: "#ef5350",
+                    background: "#2a1618",
+                    marginBottom: "12px",
+                },
+            }, [
+                el("div", {
+                    style: { color: "#ef9a9a", fontWeight: "bold", marginBottom: "8px" },
+                    text: "🌑 Сердце Затмения впитало силу тёмных вод!",
+                }),
+                el("div", {
+                    style: { fontSize: "13px", marginBottom: "4px" },
+                    text: `• Все враги усилены ритуалом: +${res.eclipseCount * cfg.eclipseEnemyAtkStep} ATK и +${res.eclipseCount * cfg.eclipseEnemyHpPctStep}% HP.`,
+                }),
+                el("div", {
+                    style: { fontSize: "13px", color: "#ffd54f" },
+                    text: `• Бонус с каждого убитого врага: +${res.eclipseCount * cfg.eclipseRewardBonusPct}% XP и +${res.eclipseCount * cfg.eclipseRewardBonusPct}% золота.`,
+                }),
+            ]),
+            el("button", {
+                className: "btn-center btn-primary",
+                text: "Продолжить путь ➡️",
+                onClick: () => {
+                    game.leaveFountainRoom();
+                    render();
+                },
+            }),
+        ]);
+    }
+
+    const omenIdx = Math.max(0, Math.min(FOUNTAIN_OMENS.length - 1, (res.cursesCount || 1) - 1));
+    const omenText = FOUNTAIN_OMENS[omenIdx];
+
     return el("div", {}, [
         el("h3", { text: "⛲ Проклятый Фонтан" }),
         renderStatsPanel(),
@@ -323,7 +415,7 @@ export function renderFountainScreen(render) {
             }),
             el("div", {
                 style: { fontSize: "13px" },
-                text: `• Шанс встретить проклятый артефакт теперь ${res.cursedChance}%.`,
+                text: `• ${omenText}`,
             }),
         ]),
         el("button", {
