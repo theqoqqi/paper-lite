@@ -37,6 +37,10 @@ export class Game {
         this.rerollCost = 5;
         this.lastEarnedSouls = 0;
         this.pendingEquipment = null;
+        this.pendingArtifact = null;
+        this.fountainCursesCount = 0;
+        this.fountainResult = null;
+        this.shopMergedNotice = null;
         this.eventRewards = null;
         this.currentCorridorResult = null;
         this.battleFx = [];
@@ -108,6 +112,10 @@ export class Game {
         this.floor = 0;
         this.room = 1;
         this.pendingEquipment = null;
+        this.pendingArtifact = null;
+        this.fountainCursesCount = 0;
+        this.fountainResult = null;
+        this.shopMergedNotice = null;
         this.eventRewards = null;
         this.currentCorridorResult = null;
         this.previewShopOfferIndex = null;
@@ -304,9 +312,17 @@ export class Game {
         } else if (roomObj.type === "shop") {
             if (!roomObj.cleared) {
                 this.rerollCost = 5;
+                this.shopMergedNotice = null;
                 this.setupShop();
                 roomObj.cleared = true;
                 this.state = "SHOP";
+            } else {
+                this.state = "MAP";
+            }
+        } else if (roomObj.type === "fountain") {
+            if (!roomObj.cleared) {
+                this.fountainResult = null;
+                this.state = "FOUNTAIN";
             } else {
                 this.state = "MAP";
             }
@@ -327,6 +343,18 @@ export class Game {
 
     resolveSalvageChoice() {
         return EncounterSystem.resolveSalvageChoice(this);
+    }
+
+    resolvePendingArtifact(accept) {
+        return EncounterSystem.resolvePendingArtifact(this, accept);
+    }
+
+    resolveFountainChoice(drink) {
+        EncounterSystem.resolveFountainChoice(this, drink);
+    }
+
+    leaveFountainRoom() {
+        EncounterSystem.leaveFountainRoom(this);
     }
 
     finishRoom() {

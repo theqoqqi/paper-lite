@@ -1,7 +1,7 @@
 import { el } from "../../utils/dom.js";
 import { game } from "../../engine/game.js";
 import { playSound } from "../../utils/audio.js";
-import { renderStatsPanel, renderEquipmentComparison } from "../components.js";
+import { renderStatsPanel, renderEquipmentComparison, renderPendingArtifactChoice } from "../components.js";
 import { renderTextWithRarity } from "../rarity.js";
 
 const activeRowMap = new Map();
@@ -70,11 +70,16 @@ export function renderBattleScreen(render) {
             rewardBox.appendChild(renderEquipmentComparison(game.pendingEquipment, render));
         }
 
+        if (game.pendingArtifact) {
+            rewardBox.appendChild(renderPendingArtifactChoice(game.pendingArtifact, render));
+        }
+
+        const isChoicePending = Boolean(game.pendingEquipment || game.pendingArtifact);
         rewardBox.appendChild(el("button", {
             className: "btn-center btn-primary",
-            disabled: Boolean(game.pendingEquipment),
+            disabled: isChoicePending,
             style: { marginTop: "10px" },
-            text: game.pendingEquipment ? "Сначала сделайте выбор" : "Продолжить ➡️",
+            text: isChoicePending ? "Сначала сделайте выбор" : "Продолжить ➡️",
             onClick: () => {
                 game.proceedAfterBattle();
                 render();
@@ -82,6 +87,9 @@ export function renderBattleScreen(render) {
         }));
         wrap.appendChild(rewardBox);
     } else {
+        if (game.pendingArtifact) {
+            wrap.appendChild(renderPendingArtifactChoice(game.pendingArtifact, render));
+        }
         const enemyBoxChildren = [];
         if (enrageBonus > 0) {
             enemyBoxChildren.push(el("div", {
@@ -244,15 +252,23 @@ export function renderBattleScreen(render) {
         const art34Bonus = (target && p.hasArtifact("art34") && target.poison > 0 && target.bleed > 0) ? 4 : 0;
         const twoEnCost = p.perks.includes("p24") ? 1 : 2;
         const fastBonus = p.hasArtifact("art20") ? 2 : 0;
-        const fastMin = effAtk + 1 + fastBonus + art34Bonus;
-        const fastMax = effAtk + 4 + fastBonus + art34Bonus;
-        const execDmg = Math.round(2 + effAtk * 0.5) + (p.perks.includes("p1") ? 4 : 0) + p15Bonus + (p.hasArtifact("art26") ? 10 : 0) + art34Bonus;
-        const prcMin = effAtk + 3 + p15Bonus + art34Bonus;
-        const prcMax = effAtk + 7 + p15Bonus + art34Bonus;
+        const fastMin = p.modifyOutgoingDamage(effAtk + 1 + fastBonus + art34Bonus);
+        const fastMax = p.modifyOutgoingDamage(effAtk + 4 + fastBonus + art34Bonus);
+        const execDmg = p.modifyOutgoingDamage(
+            Math.round(2 + effAtk * 0.5)
+            + (p.perks.includes("p1") ? 4 : 0)
+            + p15Bonus
+            + (p.hasArtifact("art26") ? 10 : 0)
+            + art34Bonus,
+        );
+        const prcMin = p.modifyOutgoingDamage(effAtk + 3 + p15Bonus + art34Bonus);
+        const prcMax = p.modifyOutgoingDamage(effAtk + 7 + p15Bonus + art34Bonus);
         const whrArtBonus = p.hasArtifact("art28") ? 3 : 0;
-        const whrMin = Math.round(baseCombatAtk * 0.75) + (p.classId === "arcanist" ? 3 : 1) + whrArtBonus;
-        const whrMax = Math.round(baseCombatAtk * 0.75) + (p.classId === "arcanist" ? 6 : 4) + whrArtBonus;
-        const defShield = 3 + p.getTotalDef() + (p.classId === "crusader" ? 3 : 0) + (p.perks.includes("p31") ? 6 : 0) + (p.hasArtifact("art29") ? 3 : 0);
+        const whrMin = p.modifyOutgoingDamage(Math.round(baseCombatAtk * 0.75) + (p.classId === "arcanist" ? 3 : 1) + whrArtBonus);
+        const whrMax = p.modifyOutgoingDamage(Math.round(baseCombatAtk * 0.75) + (p.classId === "arcanist" ? 6 : 4) + whrArtBonus);
+        const defShield = p.getModifiedShieldGain(
+            Math.max(1, 3 + p.getTotalDef() + (p.classId === "crusader" ? 3 : 0) + (p.perks.includes("p31") ? 6 : 0) + (p.hasArtifact("art29") ? 3 : 0)),
+        );
 
         const formatCd = cd => (cd === 1 ? "[КД: 1 ход]" : `[КД: ${cd} хода]`);
         const defSub = cds.defend > 0 ? formatCd(cds.defend) : `[+${defShield} Щит, -50% ур.]`;
@@ -266,9 +282,10 @@ export function renderBattleScreen(render) {
             el("span", { style: { display: "block", fontSize: "11px", opacity: 0.85, marginTop: "2px" }, text: sub }),
         ]);
 
+        const isBlockedByArtifact = Boolean(game.pendingArtifact);
         const actionsGrid = el("div", {}, [
             el("div", { className: "flex-row" }, [
-                makeActionBtn("⚔️ Быстрый (0 EN)", `[${fastMin}-${fastMax} ур.]`, game.isProcessingTurn, () => game.playerAction("fast", render)),
+                makeActionBtn("⚔️ Быстрый (0 EN)", `[${fastMin}-${fastMax} ур.]`, game.isProcessingTurn || isBlockedByArtifact, () => game.playerAction("fast", render)),
                 makeActionBtn("🛡️ Защита (0 EN)", defSub, !game.canUseSkill("defend", 0), () => game.playerAction("defend", render)),
             ]),
             el("div", { className: "flex-row" }, [
@@ -291,7 +308,7 @@ export function renderBattleScreen(render) {
                     ? `🧪 [${pot.rarity}] ${pot.name} — ${pot.desc}`
                     : `🧪 ${pot.name} — ${pot.desc}`;
                 potRow.appendChild(el("button", {
-                    disabled: game.isProcessingTurn,
+                    disabled: game.isProcessingTurn || isBlockedByArtifact,
                     style: { padding: "6px", fontSize: "12px", background: "#243b24" },
                     onClick: () => {
                         game.usePotion(pIdx, render);

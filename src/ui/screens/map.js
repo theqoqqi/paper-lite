@@ -12,6 +12,7 @@ export function renderMapScreen(render) {
         event: { icon: "❓", name: "Событие" },
         shop: { icon: "⚖️", name: "Лавка" },
         campfire: { icon: "🔥", name: "Костёр" },
+        fountain: { icon: "⛲", name: "Фонтан" },
         boss: { icon: "👑", name: "БОСС" },
         corridor: { icon: "🕯️", name: "Коридор" },
     };

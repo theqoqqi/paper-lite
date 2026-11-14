@@ -62,7 +62,7 @@ export function renderGlobalNav(render) {
     nav.replaceChildren();
 
     const row = el("div", { className: "flex-row" });
-    if (game.player && ["MAP", "BATTLE", "SHOP", "EVENT", "CAMPFIRE", "EVENT_REWARDS", "CORRIDOR"].includes(game.state)) {
+    if (game.player && ["MAP", "BATTLE", "SHOP", "EVENT", "CAMPFIRE", "EVENT_REWARDS", "CORRIDOR", "FOUNTAIN"].includes(game.state)) {
         row.appendChild(el("button", {
             className: "btn-center",
             style: { background: "#2b3a4a" },
@@ -133,6 +133,51 @@ export function renderEquipmentComparison(pendingEquip, onResolved) {
                 onClick: () => {
                     playSound("gold");
                     game.resolveSalvageChoice();
+                    if (onResolved) onResolved();
+                },
+            }),
+        ]),
+    ]);
+}
+
+export function renderPendingArtifactChoice(pendingArt, onResolved) {
+    if (!pendingArt) return null;
+
+    return el("div", {
+        className: "panel",
+        style: {
+            borderColor: "#ef5350",
+            background: "#2a1618",
+            marginTop: "8px",
+        },
+    }, [
+        el("div", {
+            style: { fontWeight: "bold", color: "#ef9a9a", marginBottom: "6px" },
+            text: "🩸 Найден проклятый артефакт",
+        }),
+        el("div", {
+            style: { fontSize: "12px", marginBottom: "6px" },
+        }, renderItemLabelChildren("", pendingArt, "colon")),
+        el("div", {
+            style: { fontSize: "11px", color: "#bcaaa4", marginBottom: "8px" },
+            text: "Проклятый артефакт нельзя выбросить из инвентаря после принятия.",
+        }),
+        el("div", { className: "flex-row" }, [
+            el("button", {
+                style: { padding: "8px", fontSize: "12px", background: "#7f1d1d" },
+                text: "Принять проклятие",
+                onClick: () => {
+                    const res = game.resolvePendingArtifact(true);
+                    playSound(res && res.mergedArt ? "levelUp" : "equip");
+                    if (onResolved) onResolved();
+                },
+            }),
+            el("button", {
+                style: { padding: "8px", fontSize: "12px", background: "#37474f" },
+                text: "Отказаться",
+                onClick: () => {
+                    playSound("click");
+                    game.resolvePendingArtifact(false);
                     if (onResolved) onResolved();
                 },
             }),

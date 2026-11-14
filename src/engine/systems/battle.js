@@ -15,6 +15,8 @@ export function createEnemyInstance(game, enemyKey, applyMutation = false) {
     const floorIdx = Math.min(3, Math.max(0, game.floor || 0));
     const depthMult = FLOOR_HP_MULTIPLIERS[floorIdx];
     const atkDepthBonus = FLOOR_ATK_BONUSES[floorIdx];
+    const cursedCfg = GAME_DATA.cursedConfig;
+    const fountainAtkBonus = (game.fountainCursesCount || 0) * (cursedCfg ? cursedCfg.fountainEnemyAtkStep : 1);
 
     e.hp = Math.round(e.hp * depthMult);
     e.currentHp = e.hp;
@@ -23,7 +25,7 @@ export function createEnemyInstance(game, enemyKey, applyMutation = false) {
     e.poison = 0;
     e.bleed = 0;
     e.regen = 0;
-    e.atkBonus = atkDepthBonus;
+    e.atkBonus = atkDepthBonus + fountainAtkBonus;
     e.poisonOnHit = 0;
     e.bleedOnHit = 0;
     e.patternIndex = 0;
@@ -102,6 +104,9 @@ export function setupBattle(game, mode = "normal") {
     if (game.player.hasArtifact("art37")) {
         game.player.en += 2;
     }
+    if (game.player.hasArtifact("art40") || game.player.hasArtifact("art41")) {
+        game.player.en = Math.min(game.player.getTotalMaxEn(), game.player.en + 1);
+    }
     if (game.player.perks.includes("p24")) {
         game.player.en += 1;
     }
@@ -120,6 +125,8 @@ export function setupBattle(game, mode = "normal") {
     if (game.player.hasArtifact("art35")) game.player.addShield(8);
     if (game.player.hasArtifact("art36")) game.player.addShield(2);
     if (game.player.hasArtifact("art37")) game.player.addShield(6);
+    if (game.player.hasArtifact("art39")) game.player.addShield(6);
+    if (game.player.hasArtifact("art41")) game.player.addShield(8);
     if (game.player.classId === "engineer") game.player.addShield(5);
     if (game.player.inventory.weapon && game.player.inventory.weapon.startShield) {
         game.player.addShield(game.player.inventory.weapon.startShield);
@@ -177,7 +184,7 @@ export function canAffordEn(game, cost) {
 }
 
 export function canUseSkill(game, skillName, enCost = 0) {
-    if (game.isProcessingTurn || game.battleFinished) return false;
+    if (game.isProcessingTurn || game.battleFinished || game.pendingArtifact) return false;
     if ((game.player.cooldowns[skillName] || 0) > 0) return false;
     return canAffordEn(game, enCost);
 }
@@ -186,8 +193,10 @@ export function spendEn(game, cost) {
     if (game.player.en >= cost) {
         game.player.en -= cost;
         if (cost > 0 && game.player.hasArtifact("art32")) {
-            game.player.addShield(3);
-            game.addBattleFx({ target: "player", type: "shield", value: 3 });
+            const shieldAdded = game.player.addShield(3);
+            if (shieldAdded > 0) {
+                game.addBattleFx({ target: "player", type: "shield", value: shieldAdded });
+            }
         }
         return true;
     }
@@ -208,7 +217,7 @@ export function tickCooldowns(game) {
 }
 
 export function usePotion(game, potIndex, onStepRender) {
-    if (game.isProcessingTurn) return;
+    if (game.isProcessingTurn || game.pendingArtifact) return;
     const pot = game.player.inventory.potions[potIndex];
     if (!pot) return;
     if (game.state !== "BATTLE" && !pot.canUseOnMap) return;
@@ -230,8 +239,8 @@ export function usePotion(game, potIndex, onStepRender) {
             game.player.en += pot.en;
         }
         if (pot.shield) {
-            game.player.addShield(pot.shield);
-            game.addBattleFx({ target: "player", type: "shield", value: pot.shield });
+            const shieldAdded = game.player.addShield(pot.shield);
+            if (shieldAdded > 0) game.addBattleFx({ target: "player", type: "shield", value: shieldAdded });
         }
         if (pot.resetCooldowns) {
             game.player.cooldowns = { defend: 0, heavy: 0, pierce: 0, whirlwind: 0, concentrate: 0 };
@@ -277,8 +286,8 @@ export function usePotion(game, potIndex, onStepRender) {
         game.battleLog.unshift(`🧪 [${pot.rarity}] ${pot.name}: ${pot.desc}${alchNote}`);
         if (game.player.perks.includes("p36")) {
             game.player.en += 2;
-            game.player.addShield(8);
-            game.addBattleFx({ target: "player", type: "shield", value: 8 });
+            const shieldAdded = game.player.addShield(8);
+            if (shieldAdded > 0) game.addBattleFx({ target: "player", type: "shield", value: shieldAdded });
         }
     }
 
@@ -297,7 +306,7 @@ export function discardPotion(game, potIndex) {
 }
 
 export function playerAction(game, actionType, onStepRender) {
-    if (game.state !== "BATTLE" || game.isProcessingTurn || game.battleFinished) return;
+    if (game.state !== "BATTLE" || game.isProcessingTurn || game.battleFinished || game.pendingArtifact) return;
     ensureValidTarget(game);
     const target = game.enemies[game.selectedTargetIndex];
 
@@ -353,6 +362,7 @@ export function playerAction(game, actionType, onStepRender) {
             applyCritPlayerBonus(game);
             applyCritEnemyEffects(game, target);
         }
+        dmg = game.player.modifyOutgoingDamage(dmg);
         applyWeaponEffects(game, target, isCrit);
         if (game.player.perks.includes("p7")) {
             target.poison += 1;
@@ -364,21 +374,21 @@ export function playerAction(game, actionType, onStepRender) {
         game.player.concentrateBonus = 0;
 
     } else if (actionType === "defend") {
-        let shieldGain = 3
+        let shieldGain = Math.max(1, 3
             + game.player.getTotalDef()
             + (game.player.classId === "crusader" ? 3 : 0)
             + (game.player.perks.includes("p31") ? 6 : 0)
-            + (game.player.hasArtifact("art29") ? 3 : 0);
+            + (game.player.hasArtifact("art29") ? 3 : 0));
         if (game.player.classId === "crusader") game.player.tempSpikes += 3;
         if (game.player.perks.includes("p14")) game.player.tempSpikes += 4;
-        game.player.addShield(shieldGain);
-        game.addBattleFx({ target: "player", type: "shield", value: shieldGain });
+        const shieldAdded = game.player.addShield(shieldGain);
+        if (shieldAdded > 0) game.addBattleFx({ target: "player", type: "shield", value: shieldAdded });
         game.player.damageReductionPct = Math.max(game.player.damageReductionPct || 0, 50);
         game.player.bleed = 0;
         game.player.poison = 0;
         const defCd = Math.max(1, 3 - (game.player.perks.includes("p31") ? 1 : 0));
         game.player.cooldowns.defend = defCd;
-        game.battleLog.unshift(`🛡️ Глухая защита (+${shieldGain} Щит, -50% урон, очищение).`);
+        game.battleLog.unshift(`🛡️ Глухая защита (+${shieldAdded} Щит, -50% урон, очищение).`);
 
     } else if (actionType === "heavy") {
         if (!target || target.currentHp <= 0) return;
@@ -398,6 +408,7 @@ export function playerAction(game, actionType, onStepRender) {
             applyCritPlayerBonus(game);
             applyCritEnemyEffects(game, target);
         }
+        execDmg = game.player.modifyOutgoingDamage(execDmg);
         if (game.player.perks.includes("p8")) {
             target.bleed += 3;
             game.addBattleFx({ target: "enemy", enemy: target, type: "bleed", value: 3 });
@@ -416,9 +427,9 @@ export function playerAction(game, actionType, onStepRender) {
             onEnemyKilled(game, target);
             if (game.player.hasArtifact("art26")) {
                 game.player.heal(8);
-                game.player.addShield(6);
+                const cupShield = game.player.addShield(6);
                 game.addBattleFx({ target: "player", type: "heal", value: 8 });
-                game.addBattleFx({ target: "player", type: "shield", value: 6 });
+                if (cupShield > 0) game.addBattleFx({ target: "player", type: "shield", value: cupShield });
             }
             game.battleLog.unshift(`💀 Казнь ${target.name}${isPotionCrit ? " (КРИТ!)" : ""}: ${hpBefore} чистого урона — ДОБИТ! Ход не тратится!`);
             extraTurn = true;
@@ -443,6 +454,7 @@ export function playerAction(game, actionType, onStepRender) {
             applyCritPlayerBonus(game);
             applyCritEnemyEffects(game, target);
         }
+        prcRaw = game.player.modifyOutgoingDamage(prcRaw);
         const prcDef = ignoreAllDef ? 0 : Math.max(0, target.def - (game.player.hasArtifact("art3") ? 2 : 0));
         const p15Bonus = (game.player.perks.includes("p15") && (target.shield > 0 || target.def >= 2)) ? 8 : 0;
         const prcActual = Math.max(1, prcRaw - prcDef) + p15Bonus;
@@ -500,6 +512,7 @@ export function playerAction(game, actionType, onStepRender) {
                     applyCritEnemyEffects(game, en);
                     applyWeaponEffects(game, en, true);
                 }
+                enDmg = game.player.modifyOutgoingDamage(enDmg);
                 if (game.player.perks.includes("p7")) {
                     en.poison += 1;
                     game.addBattleFx({ target: "enemy", enemy: en, type: "poison", value: 1 });
@@ -508,9 +521,8 @@ export function playerAction(game, actionType, onStepRender) {
             }
         });
         if (game.player.hasArtifact("art28") && aliveBeforeWhirl > 0) {
-            const stormShield = aliveBeforeWhirl * 3;
-            game.player.addShield(stormShield);
-            game.addBattleFx({ target: "player", type: "shield", value: stormShield });
+            const stormShield = game.player.addShield(aliveBeforeWhirl * 3);
+            if (stormShield > 0) game.addBattleFx({ target: "player", type: "shield", value: stormShield });
         }
         game.player.concentrateBonus = 0;
 
@@ -526,9 +538,9 @@ export function playerAction(game, actionType, onStepRender) {
             }
         }
         if (game.player.hasArtifact("art10")) {
-            game.player.addShield(10);
+            const bookShield = game.player.addShield(10);
             game.player.concentrateBonus += 4;
-            game.addBattleFx({ target: "player", type: "shield", value: 10 });
+            if (bookShield > 0) game.addBattleFx({ target: "player", type: "shield", value: bookShield });
         }
         game.player.cooldowns.concentrate = 4;
         game.battleLog.unshift(`🧘 Концентрация (+2 EN, +${healAmt} HP, -1 ход ко всем КД).`);
@@ -602,20 +614,28 @@ export function runEnemyTurnSequence(game, onStepRender) {
             game.player.heal(1);
             game.addBattleFx({ target: "player", type: "heal", value: 1 });
         }
+        if (game.player.hasArtifact("art40")) {
+            game.player.heal(6);
+            game.addBattleFx({ target: "player", type: "heal", value: 6 });
+        }
+        if (game.player.hasArtifact("art41")) {
+            game.player.heal(6);
+            game.addBattleFx({ target: "player", type: "heal", value: 6 });
+        }
         if (game.player.hasArtifact("art8")) {
             game.enemies.forEach(en => {
                 if (en.currentHp > 0) dealDamageToEnemy(game, en, 3, true, false);
             });
         }
         if (game.player.hasArtifact("art33")) {
-            game.player.addShield(1);
-            game.addBattleFx({ target: "player", type: "shield", value: 1 });
+            const bannerShield = game.player.addShield(1);
+            if (bannerShield > 0) game.addBattleFx({ target: "player", type: "shield", value: bannerShield });
             if ((game.player.battleBannerAtk || 0) < 2) {
                 game.player.battleBannerAtk = (game.player.battleBannerAtk || 0) + 1;
                 game.player.battleAtk = (game.player.battleAtk || 0) + 1;
-                game.battleLog.unshift("🚩 Знамя Легиона даёт +1 Щита и +1 ATK до конца боя!");
+                game.battleLog.unshift(`🚩 Знамя Легиона даёт +${bannerShield} Щита и +1 ATK до конца боя!`);
             } else {
-                game.battleLog.unshift("🚩 Знамя Легиона даёт +1 Щита!");
+                game.battleLog.unshift(`🚩 Знамя Легиона даёт +${bannerShield} Щита!`);
             }
         }
 
@@ -634,14 +654,26 @@ export function runEnemyTurnSequence(game, onStepRender) {
             });
         }
         if (game.player.hasArtifact("art36")) {
-            game.player.addShield(2);
-            game.addBattleFx({ target: "player", type: "shield", value: 2 });
+            const golemShield = game.player.addShield(2);
+            if (golemShield > 0) game.addBattleFx({ target: "player", type: "shield", value: golemShield });
+        }
+        if (game.player.hasArtifact("art39")) {
+            const monoShield = game.player.addShield(6);
+            if (monoShield > 0) game.addBattleFx({ target: "player", type: "shield", value: monoShield });
+        }
+        if (game.player.hasArtifact("art40")) {
+            game.player.en = Math.min(game.player.getTotalMaxEn(), game.player.en + 1);
+        }
+        if (game.player.hasArtifact("art41")) {
+            game.player.en = Math.min(game.player.getTotalMaxEn(), game.player.en + 1);
+            const eclipseShield = game.player.addShield(8);
+            if (eclipseShield > 0) game.addBattleFx({ target: "player", type: "shield", value: eclipseShield });
         }
         if (game.player.hasArtifact("art30") && game.battleTurn % 2 === 0 && game.battleTurn <= 6) {
             game.player.en = Math.min(game.player.getTotalMaxEn(), game.player.en + 1);
-            game.player.addShield(2);
-            game.addBattleFx({ target: "player", type: "shield", value: 2 });
-            game.battleLog.unshift("📿 Костяные Чётки дают +1 EN и +2 Щита!");
+            const rosaryShield = game.player.addShield(2);
+            if (rosaryShield > 0) game.addBattleFx({ target: "player", type: "shield", value: rosaryShield });
+            game.battleLog.unshift(`📿 Костяные Чётки дают +1 EN и +${rosaryShield} Щита!`);
         }
         if (game.player.perks.includes("p18") && game.battleTurn % 3 === 0) {
             game.player.en = Math.min(game.player.getTotalMaxEn(), game.player.en + 2);
@@ -1041,7 +1073,7 @@ export function checkBattleEnd(game) {
 }
 
 export function proceedAfterBattle(game) {
-    if (!game.battleFinished || game.pendingEquipment) return;
+    if (!game.battleFinished || game.pendingEquipment || game.pendingArtifact) return;
     game.checkLevelUpOrFinishRoom();
 }
 
@@ -1049,15 +1081,26 @@ function applyCritPlayerBonus(game) {
     game.player.en = Math.min(game.player.getTotalMaxEn(), game.player.en + 1);
     if (game.player.perks.includes("p11")) {
         game.player.heal(6);
-        game.player.addShield(4);
+        const vampShield = game.player.addShield(4);
         game.addBattleFx({ target: "player", type: "heal", value: 6 });
-        game.addBattleFx({ target: "player", type: "shield", value: 4 });
+        if (vampShield > 0) game.addBattleFx({ target: "player", type: "shield", value: vampShield });
+    }
+    if (game.player.hasArtifact("art38")) {
+        game.player.heal(5);
+        game.addBattleFx({ target: "player", type: "heal", value: 5 });
+    }
+    if (game.player.hasArtifact("art41")) {
+        game.player.heal(5);
+        game.addBattleFx({ target: "player", type: "heal", value: 5 });
     }
 }
 
 function getCritMultiplier(player, actionType) {
     if (actionType === "fast" && player.perks.includes("p35")) return 2.5;
-    return player.hasArtifact("art31") ? 2.0 : 1.65;
+    if (player.hasArtifact("art41")) return 2.2;
+    if (player.hasArtifact("art38")) return 2.1;
+    if (player.hasArtifact("art31")) return 2.0;
+    return 1.65;
 }
 
 function applyCritEnemyEffects(game, enemy) {

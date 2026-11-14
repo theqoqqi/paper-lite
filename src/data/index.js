@@ -6,6 +6,7 @@ import {
     DATA_RARITY_ORDER,
     DATA_RARITY_COLORS,
     DATA_RARITY_WEIGHTS_BY_FLOOR,
+    DATA_CURSED_CONFIG,
 } from "./items.js";
 import { DATA_EVENTS } from "./events.js";
 import { DATA_CORRIDOR_ROOMS, DATA_CORRIDOR_OUTCOMES } from "./corridors.js";
@@ -22,6 +23,7 @@ export const GAME_DATA = {
     rarityOrder: DATA_RARITY_ORDER,
     rarityColors: DATA_RARITY_COLORS,
     rarityWeightsByFloor: DATA_RARITY_WEIGHTS_BY_FLOOR,
+    cursedConfig: DATA_CURSED_CONFIG,
     events: DATA_EVENTS,
     corridorRooms: DATA_CORRIDOR_ROOMS,
     corridorOutcomes: DATA_CORRIDOR_OUTCOMES,

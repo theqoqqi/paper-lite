@@ -21,6 +21,7 @@ import {
     renderEventRewardsScreen,
     renderCampfireScreen,
     renderCorridorScreen,
+    renderFountainScreen,
     renderShopScreen,
 } from "./ui/screens/rooms.js";
 
@@ -54,6 +55,8 @@ export function render() {
         container.appendChild(renderCampfireScreen(render));
     } else if (game.state === "CORRIDOR") {
         container.appendChild(renderCorridorScreen(render));
+    } else if (game.state === "FOUNTAIN") {
+        container.appendChild(renderFountainScreen(render));
     } else if (game.state === "SHOP") {
         container.appendChild(renderShopScreen(render));
     } else if (game.state === "GAMEOVER" || game.state === "VICTORY") {
@@ -99,7 +102,7 @@ function handlePopState() {
     }
 
     if (game.state === "EVENT_REWARDS") {
-        if (!game.pendingEquipment) {
+        if (!game.pendingEquipment && !game.pendingArtifact) {
             game.eventRewards = null;
             game.checkLevelUpOrFinishRoom();
             render();

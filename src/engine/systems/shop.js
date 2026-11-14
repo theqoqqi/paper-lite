@@ -26,7 +26,16 @@ export function unlockClass(game, classKey) {
 }
 
 export function setupShop(game) {
-    const unownedArts = GAME_DATA.items.artifacts.filter(a => !game.player.hasArtifact(a.id));
+    const cfg = GAME_DATA.cursedConfig;
+    const hasMerged = game.player.hasArtifact(cfg.mergedArtifactId);
+    const curseChance = Math.min(12, (game.fountainCursesCount || 0) * cfg.fountainChanceStep);
+
+    let availableNormalArts = GAME_DATA.items.artifacts.filter(
+        a => !a.excludeFromDrop && a.rarity !== cfg.cursedRarity && !game.player.hasArtifact(a.id),
+    );
+    let availableCursedArts = hasMerged ? [] : GAME_DATA.items.artifacts.filter(
+        a => !a.excludeFromDrop && a.rarity === cfg.cursedRarity && !game.player.hasArtifact(a.id),
+    );
 
     const w = pickItemByRarity(GAME_DATA.items.weapons, game.floor);
     const a = pickItemByRarity(GAME_DATA.items.armors, game.floor);
@@ -86,12 +95,21 @@ export function setupShop(game) {
     }];
 
     const shopArts = [];
-    let availableArts = unownedArts;
-    for (let i = 0; i < 2 && availableArts.length > 0; i++) {
-        const art = pickItemByRarity(availableArts, game.floor);
+    let hasCursedInShop = false;
+    for (let i = 0; i < 2; i++) {
+        let art = null;
+        if (!hasCursedInShop && curseChance > 0 && availableCursedArts.length > 0 && RNG.chance(curseChance)) {
+            art = RNG.choice(availableCursedArts);
+            hasCursedInShop = true;
+            availableCursedArts = availableCursedArts.filter(item => item.id !== art.id);
+        } else if (availableNormalArts.length > 0) {
+            art = pickItemByRarity(availableNormalArts, game.floor);
+            if (art) {
+                availableNormalArts = availableNormalArts.filter(item => item.id !== art.id);
+            }
+        }
         if (!art) break;
         shopArts.push(art);
-        availableArts = availableArts.filter(item => item.id !== art.id);
     }
     shopArts.forEach(art => {
         game.shopOffers.push({
@@ -111,6 +129,7 @@ export function rerollShop(game) {
     game.player.gold -= game.rerollCost;
     game.rerollCost += 4;
     game.previewShopOfferIndex = null;
+    game.shopMergedNotice = null;
     setupShop(game);
     game.saveGame("autosave");
 }
@@ -141,7 +160,12 @@ export function buyShopOffer(game, index) {
     } else if (offer.kind === "armor") {
         game.player.equipArmor(offer.item);
     } else if (offer.kind === "artifact") {
+        const mergedId = GAME_DATA.cursedConfig.mergedArtifactId;
+        const hadMerged = game.player.hasArtifact(mergedId);
         game.player.addArtifact(offer.item);
+        if (!hadMerged && game.player.hasArtifact(mergedId)) {
+            game.shopMergedNotice = GAME_DATA.items.artifacts.find(a => a.id === mergedId) || null;
+        }
     }
     game.saveGame("autosave");
 }

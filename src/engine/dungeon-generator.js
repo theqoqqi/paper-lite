@@ -23,7 +23,7 @@ export class DungeonGenerator {
             revealed: true,
         };
 
-        const majorCount = 10 + floor * 2;
+        const majorCount = 11 + floor * 2;
         const corridorCount = 3 + floor;
         const targetCount = majorCount + corridorCount;
         const startDir = RNG.choice(dirs);
@@ -130,6 +130,10 @@ export class DungeonGenerator {
 
         if (pool.length > 0) {
             pool.pop().type = "shop";
+        }
+
+        if (pool.length > 0) {
+            pool.pop().type = "fountain";
         }
 
         const campfiresCount = floor >= 2 ? 2 : 1;

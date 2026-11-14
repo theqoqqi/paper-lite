@@ -247,7 +247,13 @@ function selectTarget(game) {
         const p15Bonus = (p.perks.includes("p15") && (item.e.shield > 0 || item.e.def >= 2)) ? 8 : 0;
         const art26Bonus = p.hasArtifact("art26") ? 10 : 0;
         const art34Bonus = (p.hasArtifact("art34") && item.e.poison > 0 && item.e.bleed > 0) ? 4 : 0;
-        const execDmg = Math.round(2 + (atkVal + eliteBonus) * 0.5) + (p.perks.includes("p1") ? 4 : 0) + p15Bonus + art26Bonus + art34Bonus;
+        const execDmg = p.modifyOutgoingDamage(
+            Math.round(2 + (atkVal + eliteBonus) * 0.5)
+            + (p.perks.includes("p1") ? 4 : 0)
+            + p15Bonus
+            + art26Bonus
+            + art34Bonus,
+        );
         return item.e.currentHp <= execDmg;
     });
     if (killable && p.cooldowns.heavy === 0 && BattleSystem.canAffordEn(game, 1)) {
@@ -369,7 +375,13 @@ function chooseAction(game, playstyleId) {
     const p15Bonus = (target && p.perks.includes("p15") && (target.shield > 0 || target.def >= 2)) ? 8 : 0;
     const art26Bonus = p.hasArtifact("art26") ? 10 : 0;
     const art34Bonus = (target && p.hasArtifact("art34") && target.poison > 0 && target.bleed > 0) ? 4 : 0;
-    const execDmg = Math.round(2 + atkVal * 0.5) + (p.perks.includes("p1") ? 4 : 0) + p15Bonus + art26Bonus + art34Bonus;
+    const execDmg = p.modifyOutgoingDamage(
+        Math.round(2 + atkVal * 0.5)
+        + (p.perks.includes("p1") ? 4 : 0)
+        + p15Bonus
+        + art26Bonus
+        + art34Bonus,
+    );
 
     const twoEnCost = p.perks.includes("p24") ? 1 : 2;
     const canDef = BattleSystem.canUseSkill(game, "defend", 0);
@@ -615,7 +627,11 @@ function processIntermission(game, step, roomsSinceCampfire) {
         if (p.perks.includes("p28")) {
             p.gold += 8;
         }
-        p.heal(Math.ceil(p.getTotalMaxHp() * healPct));
+        let healAmt = Math.ceil(p.getTotalMaxHp() * healPct);
+        if (p.hasArtifact("art39")) {
+            healAmt = Math.max(1, Math.floor(healAmt * 0.5));
+        }
+        p.heal(healAmt);
         p.en = p.getTotalMaxEn();
         nextCampfireCounter = 0;
     }
@@ -1138,6 +1154,7 @@ const EXPECTED_ROI_MATRIX = {
         "Редкое": 1.1,
         "Эпическое": 1.2,
         "Легендарное": 1.3,
+        "Проклятое": 1.5,
     },
     potions: {
         "Обычное": 1.5,
@@ -1424,6 +1441,7 @@ function formatShortRarity(rarity) {
     if (rarity === "Редкое") return "Редк.";
     if (rarity === "Эпическое") return "Эпик.";
     if (rarity === "Легендарное") return "Лег.";
+    if (rarity === "Проклятое") return "Прокл.";
     return rarity.slice(0, 5);
 }
 

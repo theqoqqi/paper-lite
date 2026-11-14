@@ -42,6 +42,9 @@ export function serializeState(game) {
         selectedPerkChoices: game.selectedPerkChoices,
         battleLog: game.battleLog,
         pendingEquipment: game.pendingEquipment,
+        pendingArtifact: game.pendingArtifact || null,
+        fountainCursesCount: game.fountainCursesCount || 0,
+        fountainResult: game.fountainResult || null,
         eventRewards: game.eventRewards,
         currentCorridorResult: game.currentCorridorResult,
     });
@@ -97,6 +100,10 @@ export function loadGame(game, slotKeyOrJson = "autosave") {
         game.selectedPerkChoices = data.selectedPerkChoices || [];
         game.battleLog = data.battleLog || [];
         game.pendingEquipment = data.pendingEquipment || null;
+        game.pendingArtifact = data.pendingArtifact || null;
+        game.fountainCursesCount = data.fountainCursesCount || 0;
+        game.fountainResult = data.fountainResult || null;
+        game.shopMergedNotice = null;
         game.eventRewards = data.eventRewards || null;
         game.currentCorridorResult = data.currentCorridorResult || null;
         return true;

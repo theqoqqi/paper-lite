@@ -64,6 +64,50 @@ export function resolveSalvageChoice(game) {
     return result;
 }
 
+export function resolvePendingArtifact(game, accept) {
+    if (!game.pendingArtifact) return null;
+    const art = game.pendingArtifact;
+    game.pendingArtifact = null;
+    let mergedArt = null;
+
+    if (accept) {
+        const mergedId = GAME_DATA.cursedConfig.mergedArtifactId;
+        const hadMerged = game.player.hasArtifact(mergedId);
+        game.player.addArtifact(art);
+        if (!hadMerged && game.player.hasArtifact(mergedId)) {
+            mergedArt = GAME_DATA.items.artifacts.find(a => a.id === mergedId) || null;
+        }
+        const activeArtId = mergedArt ? mergedArt.id : art.id;
+
+        if (game.state === "BATTLE") {
+            if (!game.battleFinished && game.battleTurn === 1) {
+                if (activeArtId === "art39") {
+                    const gained = game.player.addShield(6);
+                    if (gained > 0) game.addBattleFx({ target: "player", type: "shield", value: gained });
+                } else if (activeArtId === "art41") {
+                    const gained = game.player.addShield(8);
+                    if (gained > 0) game.addBattleFx({ target: "player", type: "shield", value: gained });
+                }
+            }
+            if (mergedArt) {
+                game.battleLog.unshift(`🌑 СЛИЯНИЕ ПРОКЛЯТИЙ! Получен секретный артефакт: ${mergedArt.name}!`);
+                if (game.battleFinished && game.battleRewards) {
+                    game.battleRewards.items.push(`🌑 [Проклятое] Слияние: ${mergedArt.name} (${mergedArt.desc})`);
+                }
+            } else {
+                game.battleLog.unshift(`🩸 Принят проклятый артефакт: ${art.name}!`);
+            }
+        } else if (game.state === "EVENT_REWARDS" && game.eventRewards && mergedArt) {
+            game.eventRewards.items.push(`🌑 [Проклятое] Слияние: ${mergedArt.name} (${mergedArt.desc})`);
+        }
+    } else if (game.state === "BATTLE") {
+        game.battleLog.unshift(`🙅 Вы отказались от проклятого артефакта (${art.name}).`);
+    }
+
+    game.saveGame("autosave");
+    return { art, accepted: accept, mergedArt };
+}
+
 export function finishRoom(game) {
     const currentKey = `${game.playerPos.x},${game.playerPos.y}`;
     const roomObj = game.dungeonRooms[currentKey];
@@ -71,6 +115,8 @@ export function finishRoom(game) {
         roomObj.cleared = true;
     }
     game.currentCorridorResult = null;
+    game.fountainResult = null;
+    game.shopMergedNotice = null;
 
     if (roomObj && roomObj.type === "boss") {
         game.player.heal(game.player.getTotalMaxHp());
@@ -347,7 +393,11 @@ export function resolveCampfire(game, choice) {
     if (choice === "heal") {
         const mult = game.player.perks.includes("p28") ? 0.7 : 0.45;
         if (game.player.perks.includes("p28")) game.player.gold += 8;
-        game.player.heal(Math.ceil(game.player.getTotalMaxHp() * mult));
+        let healAmt = Math.ceil(game.player.getTotalMaxHp() * mult);
+        if (game.player.hasArtifact("art39")) {
+            healAmt = Math.max(1, Math.floor(healAmt * 0.5));
+        }
+        game.player.heal(healAmt);
     } else if (choice === "sharpen") {
         game.player.weaponUpgradeLvl += 1;
     } else if (choice === "meditate") {
@@ -355,6 +405,34 @@ export function resolveCampfire(game, choice) {
         game.player.heal(4);
     }
     finishRoom(game);
+}
+
+export function resolveFountainChoice(game, drink) {
+    const currentKey = `${game.playerPos.x},${game.playerPos.y}`;
+    const roomObj = game.dungeonRooms[currentKey];
+    if (roomObj) {
+        roomObj.cleared = true;
+    }
+    if (!drink) {
+        game.fountainResult = null;
+        finishRoom(game);
+        return;
+    }
+    const cfg = GAME_DATA.cursedConfig;
+    game.player.gold += cfg.fountainGold;
+    game.fountainCursesCount = (game.fountainCursesCount || 0) + 1;
+    const chance = Math.min(12, game.fountainCursesCount * cfg.fountainChanceStep);
+    game.fountainResult = {
+        goldGain: cfg.fountainGold,
+        cursesCount: game.fountainCursesCount,
+        cursedChance: chance,
+    };
+    game.saveGame("autosave");
+}
+
+export function leaveFountainRoom(game) {
+    game.fountainResult = null;
+    checkLevelUpOrFinishRoom(game);
 }
 
 export function triggerCorridorRoom(game) {
@@ -430,7 +508,24 @@ export function leaveCorridorRoom(game) {
 }
 
 export function grantRandomArtifact(game, minRarity = null) {
-    const unowned = GAME_DATA.items.artifacts.filter(a => !game.player.hasArtifact(a.id));
+    const cfg = GAME_DATA.cursedConfig;
+    const hasMerged = game.player.hasArtifact(cfg.mergedArtifactId);
+    const curseChance = Math.min(12, (game.fountainCursesCount || 0) * cfg.fountainChanceStep);
+    const unownedCursed = hasMerged
+        ? []
+        : GAME_DATA.items.artifacts.filter(
+            a => !a.excludeFromDrop && a.rarity === cfg.cursedRarity && !game.player.hasArtifact(a.id),
+        );
+
+    if (!game.pendingArtifact && curseChance > 0 && unownedCursed.length > 0 && RNG.chance(curseChance)) {
+        const cursedArt = RNG.choice(unownedCursed);
+        game.pendingArtifact = { ...cursedArt };
+        return cursedArt;
+    }
+
+    const unowned = GAME_DATA.items.artifacts.filter(
+        a => !a.excludeFromDrop && a.rarity !== cfg.cursedRarity && !game.player.hasArtifact(a.id),
+    );
     if (unowned.length === 0) return null;
     const art = pickItemByRarity(unowned, game.floor, minRarity);
     if (!art) return null;

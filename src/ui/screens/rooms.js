@@ -2,7 +2,7 @@ import { el } from "../../utils/dom.js";
 import { game } from "../../engine/game.js";
 import { GAME_DATA } from "../../data/index.js";
 import { playSound } from "../../utils/audio.js";
-import { renderStatsPanel, renderEquipmentComparison } from "../components.js";
+import { renderStatsPanel, renderEquipmentComparison, renderPendingArtifactChoice } from "../components.js";
 import { renderTextWithRarity, renderItemLabelChildren, renderRarityTag } from "../rarity.js";
 
 export function renderLevelUpScreen(render) {
@@ -120,11 +120,16 @@ export function renderEventRewardsScreen(render) {
         box.appendChild(renderEquipmentComparison(game.pendingEquipment, render));
     }
 
+    if (game.pendingArtifact) {
+        box.appendChild(renderPendingArtifactChoice(game.pendingArtifact, render));
+    }
+
+    const isChoicePending = Boolean(game.pendingEquipment || game.pendingArtifact);
     box.appendChild(el("button", {
         className: "btn-center btn-primary",
-        disabled: Boolean(game.pendingEquipment),
+        disabled: isChoicePending,
         style: { marginTop: "10px" },
-        text: game.pendingEquipment ? "Сначала сделайте выбор экипировки ☝️" : "Продолжить путь ➡️",
+        text: isChoicePending ? "Сначала сделайте выбор ☝️" : "Продолжить путь ➡️",
         onClick: () => {
             game.eventRewards = null;
             game.checkLevelUpOrFinishRoom();
@@ -137,7 +142,10 @@ export function renderEventRewardsScreen(render) {
 
 export function renderCampfireScreen(render) {
     const mult = game.player.perks.includes("p28") ? 0.7 : 0.45;
-    const healAmt = Math.ceil(game.player.getTotalMaxHp() * mult);
+    let healAmt = Math.ceil(game.player.getTotalMaxHp() * mult);
+    if (game.player.hasArtifact("art39")) {
+        healAmt = Math.max(1, Math.floor(healAmt * 0.5));
+    }
     return el("div", {}, [
         el("h3", { text: "🔥 Костёр Отдыха" }),
         renderStatsPanel(),
@@ -258,11 +266,94 @@ export function renderCorridorScreen(render) {
     return wrap;
 }
 
+export function renderFountainScreen(render) {
+    const cfg = GAME_DATA.cursedConfig;
+    const res = game.fountainResult;
+
+    if (!res) {
+        return el("div", {}, [
+            el("h3", { text: "⛲ Старый Фонтан" }),
+            renderStatsPanel(),
+            el("div", {
+                className: "panel",
+                style: { marginBottom: "10px", lineHeight: "1.45" },
+                text: "Среди замшелых камней стоит древняя чаша, до краёв полная неподвижной тёмной воды. На самом дне тускло поблёскивают золотые монеты.",
+            }),
+            el("button", {
+                className: "btn-primary",
+                text: `💰 Забрать горсть золота (+${cfg.fountainGold}G)`,
+                onClick: () => {
+                    playSound("gold");
+                    game.resolveFountainChoice(true);
+                    render();
+                },
+            }),
+            el("button", {
+                text: "🚶 Пройти мимо",
+                onClick: () => {
+                    game.resolveFountainChoice(false);
+                    render();
+                },
+            }),
+        ]);
+    }
+
+    return el("div", {}, [
+        el("h3", { text: "⛲ Проклятый Фонтан" }),
+        renderStatsPanel(),
+        el("div", {
+            className: "panel",
+            style: {
+                borderColor: "#ef5350",
+                background: "#2a1618",
+                marginBottom: "12px",
+            },
+        }, [
+            el("div", {
+                style: { color: "#ffd54f", fontWeight: "bold", marginBottom: "8px" },
+                text: `💰 Получено +${res.goldGain}G`,
+            }),
+            el("div", {
+                style: { color: "#ef9a9a", fontWeight: "bold", marginBottom: "6px" },
+                text: "☠️ Вода вскипела багряной тенью — вы прокляты!",
+            }),
+            el("div", {
+                style: { fontSize: "13px", marginBottom: "4px" },
+                text: `• Все враги получили +${res.cursesCount * cfg.fountainEnemyAtkStep} к атаке до конца забега.`,
+            }),
+            el("div", {
+                style: { fontSize: "13px" },
+                text: `• Шанс встретить проклятый артефакт теперь ${res.cursedChance}%.`,
+            }),
+        ]),
+        el("button", {
+            className: "btn-center btn-primary",
+            text: "Продолжить путь ➡️",
+            onClick: () => {
+                game.leaveFountainRoom();
+                render();
+            },
+        }),
+    ]);
+}
+
 export function renderShopScreen(render) {
     const wrap = el("div", {}, [
         el("h3", { text: "⚖️ Лавка Торговца и Кузнец" }),
         renderStatsPanel(),
     ]);
+
+    if (game.shopMergedNotice) {
+        wrap.appendChild(el("div", {
+            className: "panel",
+            style: {
+                borderColor: "#ef5350",
+                background: "#2a1618",
+                marginBottom: "8px",
+                fontSize: "13px",
+            },
+        }, renderItemLabelChildren("🌑 СЛИЯНИЕ ПРОКЛЯТИЙ! Получен: ", game.shopMergedNotice, "colon")));
+    }
 
     game.shopOffers.forEach((offer, idx) => {
         const isPotion = offer.kind === "potion";

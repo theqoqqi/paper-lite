@@ -82,13 +82,49 @@ export class Player {
 
     addArtifact(artObj) {
         if (!artObj || this.hasArtifact(artObj.id)) return false;
+
+        const cursedCfg = GAME_DATA.cursedConfig;
+        const mergedId = cursedCfg ? cursedCfg.mergedArtifactId : null;
+        if (mergedId && cursedCfg.cursedArtifactIds.includes(artObj.id) && this.hasArtifact(mergedId)) {
+            return false;
+        }
+
+        const oldMaxHp = this.getTotalMaxHp();
+        const oldMaxEn = this.getTotalMaxEn();
+
         this.inventory.artifacts.push({ ...artObj });
+
+        let mergedNow = false;
+        if (cursedCfg && cursedCfg.cursedArtifactIds.every(id => this.hasArtifact(id))) {
+            const mergedTpl = GAME_DATA.items.artifacts.find(a => a.id === mergedId);
+            if (mergedTpl) {
+                this.inventory.artifacts = this.inventory.artifacts.filter(
+                    a => !cursedCfg.cursedArtifactIds.includes(a.id),
+                );
+                this.inventory.artifacts.push({ ...mergedTpl });
+                mergedNow = true;
+            }
+        }
+
+        const newMaxHp = this.getTotalMaxHp();
+        const newMaxEn = this.getTotalMaxEn();
+
         if (artObj.id === "art9") {
             this.hp += 6;
         }
         if (artObj.id === "art32" || artObj.id === "art37") {
-            this.en = Math.min(this.getTotalMaxEn(), this.en + 1);
+            this.en += 1;
         }
+        if (mergedNow || artObj.id === "art40") {
+            if (newMaxHp > oldMaxHp) {
+                this.hp += (newMaxHp - oldMaxHp);
+            }
+            if (newMaxEn > oldMaxEn) {
+                this.en += (newMaxEn - oldMaxEn);
+            }
+        }
+
+        this.en = Math.min(newMaxEn, this.en);
         this.clampHp();
         return true;
     }
@@ -125,8 +161,12 @@ export class Player {
         if (this.inventory.armor && this.inventory.armor.hp) val += this.inventory.armor.hp;
         val += this.armorUpgradeLvl * 3;
         if (this.hasArtifact("art9")) val += 10;
+        if (this.hasArtifact("art40") || this.hasArtifact("art41")) val += 35;
         if (this.perks.includes("p23")) val += 18;
-        return val;
+        if (this.hasArtifact("art39")) {
+            val = Math.round(val * 0.75);
+        }
+        return Math.max(1, val);
     }
 
     addPerk(perkId, floor = 0) {
@@ -162,7 +202,9 @@ export class Player {
         if (this.perks.includes("p9")) val += 1;
         if (this.hasArtifact("art32")) val += 1;
         if (this.hasArtifact("art37")) val += 1;
-        return val;
+        if (this.hasArtifact("art39")) val -= 1;
+        if (this.hasArtifact("art40") || this.hasArtifact("art41")) val += 2;
+        return Math.max(2, val);
     }
 
     getTotalAtk() {
@@ -176,6 +218,8 @@ export class Player {
         if (this.hasArtifact("art32")) val += 1;
         if (this.hasArtifact("art35")) val += 2;
         if (this.hasArtifact("art37")) val += 2;
+        if (this.hasArtifact("art38")) val += 7;
+        if (this.hasArtifact("art41")) val += 8;
         if (this.perks.includes("p1")) val += 1;
         if (this.perks.includes("p4") && this.hp <= this.getTotalMaxHp() / 2) val += 3;
         if (this.perks.includes("p20")) val += Math.min(5, Math.floor(this.gold / 12));
@@ -188,6 +232,9 @@ export class Player {
         if (this.inventory.armor) val += this.inventory.armor.def || 0;
         if (this.hasArtifact("art35")) val += 1;
         if (this.hasArtifact("art36")) val += 1;
+        if (this.hasArtifact("art39")) val += 4;
+        if (this.hasArtifact("art41")) val += 5;
+        if (this.hasArtifact("art38")) val -= 2;
         if (this.perks.includes("p5")) val += 1;
         return val;
     }
@@ -211,7 +258,10 @@ export class Player {
         if (this.hasArtifact("art21")) val += 8;
         if (this.hasArtifact("art27")) val += 5;
         if (this.hasArtifact("art31")) val += 15;
-        return Math.min(100, val);
+        if (this.hasArtifact("art38")) val += 25;
+        if (this.hasArtifact("art40")) val -= 10;
+        if (this.hasArtifact("art41")) val += 25;
+        return Math.max(0, Math.min(100, val));
     }
 
     rollCrit(skillBonus = 0, forceCrit = false) {
@@ -229,9 +279,28 @@ export class Player {
         }
     }
 
+    getModifiedShieldGain(amount) {
+        if (amount <= 0) return 0;
+        if (this.hasArtifact("art38")) {
+            return Math.max(1, Math.floor(amount * 0.75));
+        }
+        return amount;
+    }
+
+    modifyOutgoingDamage(amount) {
+        if (amount <= 0) return amount;
+        if (this.hasArtifact("art40")) {
+            return Math.max(1, Math.round(amount * 0.85));
+        }
+        return amount;
+    }
+
     addShield(amount) {
+        const finalAmt = this.getModifiedShieldGain(amount);
+        if (finalAmt <= 0) return 0;
         const max = this.getTotalMaxHp();
-        this.shield = Math.min(max, this.shield + amount);
+        this.shield = Math.min(max, this.shield + finalAmt);
+        return finalAmt;
     }
 
     heal(amount) {

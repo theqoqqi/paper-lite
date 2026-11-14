@@ -10,6 +10,16 @@ export const DATA_RARITY_COLORS = {
     "Редкое": "#4fc3f7",
     "Эпическое": "#ce93d8",
     "Легендарное": "#ffa726",
+    "Проклятое": "#ef5350",
+};
+
+export const DATA_CURSED_CONFIG = {
+    cursedRarity: "Проклятое",
+    fountainGold: 25,
+    fountainChanceStep: 3,
+    fountainEnemyAtkStep: 1,
+    cursedArtifactIds: ["art38", "art39", "art40"],
+    mergedArtifactId: "art41",
 };
 
 export const DATA_RARITY_WEIGHTS_BY_FLOOR = [
@@ -876,6 +886,39 @@ export const DATA_ITEMS = {
             rarity: "Легендарное",
             cost: 46,
             desc: "Даёт +1 MAX EN, +2 ATK, +2 EN и +6 Щита в 1-м раунде боя; убийство лечит +3 HP, даёт +1 EN и сбрасывает перезарядки.",
+        },
+        {
+            id: "art38",
+            name: "Кровавый Венец",
+            type: "artifact",
+            rarity: "Проклятое",
+            cost: 60,
+            desc: "+7 ATK, +25% Крита, Криты 2.1x и лечат +5 HP; но -2 DEF и получаемый Щит -25%.",
+        },
+        {
+            id: "art39",
+            name: "Монолит Скорби",
+            type: "artifact",
+            rarity: "Проклятое",
+            cost: 62,
+            desc: "+4 DEF и +6 Щита в начале раунда; но -25% MAX HP, -1 MAX EN и Костры лечат вдвое слабее.",
+        },
+        {
+            id: "art40",
+            name: "Чаша Пустоты",
+            type: "artifact",
+            rarity: "Проклятое",
+            cost: 64,
+            desc: "+2 MAX EN, +1 EN каждый раунд, +35 MAX HP и +6 HP в конце раунда; но урон атак -15% и Крит -10%.",
+        },
+        {
+            id: "art41",
+            name: "Сердце Затмения",
+            type: "artifact",
+            rarity: "Проклятое",
+            cost: 186,
+            excludeFromDrop: true,
+            desc: "Слияние 3 проклятий без штрафов: +8 ATK, +5 DEF, +2 MAX EN, +35 MAX HP, +25% Крита (2.2x, +5 HP за Крит), +8 Щита и +1 EN каждый раунд, +6 HP в конце раунда.",
         },
     ],
     potions: POTION_TEMPLATES.flatMap(tpl =>
