@@ -266,32 +266,29 @@ export function renderBattleScreen(render) {
 
         const target = p && game.enemies[game.selectedTargetIndex];
         const roundOneAtk = game.battleTurn === 1
-            ? (p.perks.includes("p13") ? 5 : 0) + (p.hasArtifact("art22") ? 4 : 0)
+            ? (p.perks.includes("p13") ? 2 : 0) + (p.hasArtifact("art22") ? 5 : 0)
             : 0;
-        const skillArtAtk = p.hasArtifact("art18") ? 3 : 0;
+        const skillArtAtk = p.hasArtifact("art18") ? 2 : 0;
         const baseCombatAtk = atk + roundOneAtk + skillArtAtk;
-        const eliteAtk = (target && (target.isElite || target.isBoss) && p.perks.includes("p25")) ? 3 : 0;
-        const effAtk = baseCombatAtk + eliteAtk;
-        const p15Bonus = (target && p.perks.includes("p15") && (target.shield > 0 || target.def >= 2)) ? 8 : 0;
-        const art34Bonus = (target && p.hasArtifact("art34") && target.poison > 0 && target.bleed > 0) ? 4 : 0;
-        const twoEnCost = p.perks.includes("p24") ? 1 : 2;
+        const effAtk = baseCombatAtk;
+        const twoEnCost = 2;
+        const pierceCost = p.hasArtifact("art27") ? 1 : 2;
         const fastBonus = p.hasArtifact("art20") ? 2 : 0;
-        const fastMin = p.modifyOutgoingDamage(effAtk + 1 + fastBonus + art34Bonus);
-        const fastMax = p.modifyOutgoingDamage(effAtk + 4 + fastBonus + art34Bonus);
+        const fastMin = p.modifyOutgoingDamage(effAtk + 1 + fastBonus);
+        const fastMax = p.modifyOutgoingDamage(effAtk + 4 + fastBonus);
         const execDmg = p.modifyOutgoingDamage(
             Math.round(2 + effAtk * 0.5)
-            + (p.perks.includes("p1") ? 4 : 0)
-            + p15Bonus
-            + (p.hasArtifact("art26") ? 10 : 0)
-            + art34Bonus,
+            + (p.perks.includes("p1") ? 2 : 0)
+            + (p.hasArtifact("art26") ? 10 : 0),
         );
-        const prcMin = p.modifyOutgoingDamage(effAtk + 3 + p15Bonus + art34Bonus);
-        const prcMax = p.modifyOutgoingDamage(effAtk + 7 + p15Bonus + art34Bonus);
-        const whrArtBonus = p.hasArtifact("art28") ? 3 : 0;
-        const whrMin = p.modifyOutgoingDamage(Math.round(baseCombatAtk * 0.75) + (p.classId === "arcanist" ? 3 : 1) + whrArtBonus);
-        const whrMax = p.modifyOutgoingDamage(Math.round(baseCombatAtk * 0.75) + (p.classId === "arcanist" ? 6 : 4) + whrArtBonus);
+        const prcArtBonus = p.hasArtifact("art27") ? 4 : 0;
+        const prcMin = p.modifyOutgoingDamage(effAtk + 3 + prcArtBonus);
+        const prcMax = p.modifyOutgoingDamage(effAtk + 7 + prcArtBonus);
+        const whrArtBonus = p.hasArtifact("art28") ? 7 : 0;
+        const whrMin = p.modifyOutgoingDamage(Math.round(baseCombatAtk * 0.75) + (p.classId === "arcanist" ? 4 : 1) + whrArtBonus);
+        const whrMax = p.modifyOutgoingDamage(Math.round(baseCombatAtk * 0.75) + (p.classId === "arcanist" ? 7 : 4) + whrArtBonus);
         const defShield = p.getModifiedShieldGain(
-            Math.max(1, 3 + p.getTotalDef() + (p.classId === "crusader" ? 3 : 0) + (p.perks.includes("p31") ? 6 : 0) + (p.hasArtifact("art29") ? 3 : 0)),
+            Math.max(1, 3 + p.getTotalDef() + (p.classId === "crusader" ? 2 : 0) + (p.perks.includes("p31") ? 5 : 0)),
         );
 
         const formatCd = cd => (cd === 1 ? "[КД: 1 ход]" : `[КД: ${cd} хода]`);
@@ -313,7 +310,7 @@ export function renderBattleScreen(render) {
                 makeActionBtn("🛡️ Защита (0 EN)", defSub, !game.canUseSkill("defend", 0), () => game.playerAction("defend", render)),
             ]),
             el("div", { className: "flex-row" }, [
-                makeActionBtn(`🗡️ Пробитие (${twoEnCost} EN)`, prcSub, !game.canUseSkill("pierce", twoEnCost), () => game.playerAction("pierce", render)),
+                makeActionBtn(`🗡️ Пробитие (${pierceCost} EN)`, prcSub, !game.canUseSkill("pierce", pierceCost), () => game.playerAction("pierce", render)),
                 makeActionBtn(`🌪️ Вихрь (${twoEnCost} EN)`, whrSub, !game.canUseSkill("whirlwind", twoEnCost), () => game.playerAction("whirlwind", render)),
             ]),
             el("div", { className: "flex-row" }, [

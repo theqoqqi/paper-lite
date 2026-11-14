@@ -13,13 +13,12 @@ export function checkLevelUpOrFinishRoom(game) {
 }
 
 export function grantRandomEquipment(game, origin = "battle") {
-    const minRarity = origin === "battle" ? "Редкое" : null;
     const roll = RNG.range(1, 3);
     if (roll === 1 || roll === 2) {
         const type = roll === 1 ? "weapon" : "armor";
         const pool = roll === 1 ? GAME_DATA.items.weapons : GAME_DATA.items.armors;
         const label = roll === 1 ? "Оружие" : "Броня";
-        const item = pickItemByRarity(pool, game.floor, minRarity);
+        const item = pickItemByRarity(pool, game.floor);
         if (!item) return null;
         game.pendingEquipment = {
             type: type,
@@ -28,7 +27,7 @@ export function grantRandomEquipment(game, origin = "battle") {
         };
         return `${label}: [${item.rarity}] ${item.name} (${item.desc})`;
     }
-    const art = grantRandomArtifact(game, minRarity);
+    const art = grantRandomArtifact(game);
     if (art) {
         if (game.pendingArtifact && game.pendingArtifact.id === art.id) {
             return null;
@@ -83,10 +82,7 @@ export function resolvePendingArtifact(game, accept) {
         if (game.state === "BATTLE") {
             if (!game.battleFinished && game.battleTurn === 1) {
                 if (activeArtId === "art39") {
-                    const gained = game.player.addShield(18);
-                    if (gained > 0) game.addBattleFx({ target: "player", type: "shield", value: gained });
-                } else if (activeArtId === "art41") {
-                    const gained = game.player.addShield(8);
+                    const gained = game.player.addShield(16);
                     if (gained > 0) game.addBattleFx({ target: "player", type: "shield", value: gained });
                 }
             }
@@ -433,7 +429,7 @@ export function resolveEventOption(game, optionId) {
 export function resolveCampfire(game, choice) {
     if (choice === "heal") {
         const mult = game.player.perks.includes("p28") ? 0.7 : 0.45;
-        if (game.player.perks.includes("p28")) game.player.gold += 8;
+        if (game.player.perks.includes("p28")) game.player.gold += 6;
         let healAmt = Math.ceil(game.player.getTotalMaxHp() * mult);
         if (game.player.hasArtifact("art39")) {
             healAmt = Math.max(1, Math.floor(healAmt * 0.25));

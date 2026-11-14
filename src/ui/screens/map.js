@@ -371,7 +371,7 @@ export function renderMapScreen(render) {
     } else if (scoutStatus.reason === "no_en") {
         scoutBtnText = "🔍 Разведка (недостаточно ⚡ EN)";
     } else if (scoutStatus.costType === "hp") {
-        scoutBtnText = "🔍 Разведать окружение (3 ❤️ HP)";
+        scoutBtnText = `🔍 Разведать окружение (${scoutStatus.cost} ❤️ HP)`;
     }
 
     const actionButtons = [];

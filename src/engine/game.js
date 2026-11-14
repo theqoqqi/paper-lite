@@ -241,8 +241,8 @@ export class Game {
             return { canScout: true, costType: "en", cost: 1, count: unrevealedCount };
         }
 
-        if (this.player.classId === "reaper" && this.player.hp > 3) {
-            return { canScout: true, costType: "hp", cost: 3, count: unrevealedCount };
+        if (this.player.classId === "reaper" && this.player.hp > 2) {
+            return { canScout: true, costType: "hp", cost: 2, count: unrevealedCount };
         }
 
         return { canScout: false, reason: "no_en", count: unrevealedCount };
@@ -256,7 +256,7 @@ export class Game {
         if (status.costType === "en") {
             this.player.en -= 1;
         } else if (status.costType === "hp") {
-            this.player.hp -= 3;
+            this.player.hp -= 2;
         }
 
         const px = this.playerPos.x;

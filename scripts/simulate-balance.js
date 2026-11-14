@@ -291,21 +291,15 @@ function selectTarget(game) {
 
     const p = game.player;
     let atkVal = p.getTotalAtk();
-    if (p.hasArtifact("art18")) atkVal += 3;
-    if (game.battleTurn === 1 && p.perks.includes("p13")) atkVal += 5;
-    if (game.battleTurn === 1 && p.hasArtifact("art22")) atkVal += 4;
-    // Добивание Казнью ради экстра-хода
+    if (p.hasArtifact("art18")) atkVal += 2;
+    if (game.battleTurn === 1 && p.perks.includes("p13")) atkVal += 2;
+    if (game.battleTurn === 1 && p.hasArtifact("art22")) atkVal += 5;
     const killable = alive.find(item => {
-        const eliteBonus = (p.perks.includes("p25") && (item.e.isElite || item.e.isBoss)) ? 3 : 0;
-        const p15Bonus = (p.perks.includes("p15") && (item.e.shield > 0 || item.e.def >= 2)) ? 8 : 0;
         const art26Bonus = p.hasArtifact("art26") ? 10 : 0;
-        const art34Bonus = (p.hasArtifact("art34") && item.e.poison > 0 && item.e.bleed > 0) ? 4 : 0;
         const execDmg = p.modifyOutgoingDamage(
-            Math.round(2 + (atkVal + eliteBonus) * 0.5)
-            + (p.perks.includes("p1") ? 4 : 0)
-            + p15Bonus
-            + art26Bonus
-            + art34Bonus,
+            Math.round(2 + atkVal * 0.5)
+            + (p.perks.includes("p1") ? 2 : 0)
+            + art26Bonus,
         );
         return item.e.currentHp <= execDmg;
     });
@@ -352,7 +346,7 @@ function tryUsePotions(game) {
             }
         }
         if (potKey === "pot6") {
-            if (p.hp <= maxHp * 0.55 || (p.battleAtk === 0 && (aliveEnemies.some(e => e.isElite || e.isBoss) || seriousFight) && p.hp <= maxHp - 4)) {
+            if (p.hp <= maxHp * 0.55 || (p.concentrateBonus === 0 && seriousFight && p.hp <= maxHp - 4)) {
                 BattleSystem.usePotion(game, i);
                 return;
             }
@@ -379,7 +373,7 @@ function tryUsePotions(game) {
         if (potKey === "pot9") {
             const worthAcid = aliveEnemies.some(e => e.shield >= 3 || e.def >= 2 || (e.currentHp >= 10 && (e.shield > 0 || e.def > 0)))
                 || aliveEnemies.filter(e => e.shield > 0 || e.def > 0).length >= 2;
-            if (worthAcid || seriousFight) {
+            if (worthAcid) {
                 BattleSystem.usePotion(game, i);
                 return;
             }
@@ -421,25 +415,21 @@ function chooseAction(game, playstyleId) {
     const aliveCount = game.enemies.filter(e => e.currentHp > 0).length;
 
     let atkVal = p.getTotalAtk();
-    if (p.hasArtifact("art18")) atkVal += 3;
-    if (game.battleTurn === 1 && p.perks.includes("p13")) atkVal += 5;
-    if (game.battleTurn === 1 && p.hasArtifact("art22")) atkVal += 4;
-    if (target && p.perks.includes("p25") && (target.isElite || target.isBoss)) atkVal += 3;
-    const p15Bonus = (target && p.perks.includes("p15") && (target.shield > 0 || target.def >= 2)) ? 8 : 0;
+    if (p.hasArtifact("art18")) atkVal += 2;
+    if (game.battleTurn === 1 && p.perks.includes("p13")) atkVal += 2;
+    if (game.battleTurn === 1 && p.hasArtifact("art22")) atkVal += 5;
     const art26Bonus = p.hasArtifact("art26") ? 10 : 0;
-    const art34Bonus = (target && p.hasArtifact("art34") && target.poison > 0 && target.bleed > 0) ? 4 : 0;
     const execDmg = p.modifyOutgoingDamage(
         Math.round(2 + atkVal * 0.5)
-        + (p.perks.includes("p1") ? 4 : 0)
-        + p15Bonus
-        + art26Bonus
-        + art34Bonus,
+        + (p.perks.includes("p1") ? 2 : 0)
+        + art26Bonus,
     );
 
-    const twoEnCost = p.perks.includes("p24") ? 1 : 2;
+    const twoEnCost = 2;
+    const pierceCost = p.hasArtifact("art27") ? 1 : 2;
     const canDef = BattleSystem.canUseSkill(game, "defend", 0);
     const canExec = target && BattleSystem.canUseSkill(game, "heavy", 1);
-    const canPrc = target && BattleSystem.canUseSkill(game, "pierce", twoEnCost);
+    const canPrc = target && BattleSystem.canUseSkill(game, "pierce", pierceCost);
     const canWhirl = aliveCount >= 1 && BattleSystem.canUseSkill(game, "whirlwind", twoEnCost);
     const canConc = BattleSystem.canUseSkill(game, "concentrate", 0);
     const heavyThreat = hasIncomingHeavyAttack(game);
@@ -465,8 +455,8 @@ function chooseAction(game, playstyleId) {
     }
 
     if (playstyleId === "pierce_focus") {
-        if (canPrc && (target.shield > 0 || target.def >= 1 || p.en >= twoEnCost)) return "pierce";
-        if (p.en < twoEnCost && canConc && p.hp > safeConcHp) return "concentrate";
+        if (canPrc && (target.shield > 0 || target.def >= 1 || p.en >= pierceCost)) return "pierce";
+        if (p.en < pierceCost && canConc && p.hp > safeConcHp) return "concentrate";
         return "fast";
     }
 
@@ -1094,7 +1084,7 @@ function generateMarkdownReport(results, baselines, activeFloors = ACTIVE_FLOOR_
     md += "| Категория | Обычное | Редкое | Эпическое | Легендарное |\n";
     md += "| :--- | :---: | :---: | :---: | :---: |\n";
     md += `| **Оружие и Броня** (1.0x) | ${EXPECTED_ROI_MATRIX.weapons["Обычное"]} | ${EXPECTED_ROI_MATRIX.weapons["Редкое"]} | ${EXPECTED_ROI_MATRIX.weapons["Эпическое"]} | ${EXPECTED_ROI_MATRIX.weapons["Легендарное"]} |\n`;
-    md += `| **Артефакты** (0.5x) | ${EXPECTED_ROI_MATRIX.artifacts["Обычное"]} | ${EXPECTED_ROI_MATRIX.artifacts["Редкое"]} | ${EXPECTED_ROI_MATRIX.artifacts["Эпическое"]} | ${EXPECTED_ROI_MATRIX.artifacts["Легендарное"]} |\n`;
+    md += `| **Артефакты** (0.38x) | ${EXPECTED_ROI_MATRIX.artifacts["Обычное"]} | ${EXPECTED_ROI_MATRIX.artifacts["Редкое"]} | ${EXPECTED_ROI_MATRIX.artifacts["Эпическое"]} | ${EXPECTED_ROI_MATRIX.artifacts["Легендарное"]} |\n`;
     md += `| **Зелья (1 шт.)** (0.75x) | ${EXPECTED_ROI_MATRIX.potions["Обычное"]} | ${EXPECTED_ROI_MATRIX.potions["Редкое"]} | ${EXPECTED_ROI_MATRIX.potions["Эпическое"]} | ${EXPECTED_ROI_MATRIX.potions["Легендарное"]} |\n`;
     md += `| **Перки (Δ% эталон)** | +${PERK_EXPECTED_PCT_BY_RARITY["Обычное"]}% | +${PERK_EXPECTED_PCT_BY_RARITY["Редкое"]}% | +${PERK_EXPECTED_PCT_BY_RARITY["Эпическое"]}% | +${PERK_EXPECTED_PCT_BY_RARITY["Легендарное"]}% |\n\n`;
 
@@ -1179,12 +1169,12 @@ function hslToHex(h, s, l) {
     return `#${toHex(f(0))}${toHex(f(8))}${toHex(f(4))}`;
 }
 
-const PERK_EXPECTED_PCT = 20;
+const PERK_EXPECTED_PCT = 8;
 const PERK_EXPECTED_PCT_BY_RARITY = {
-    "Обычное": 13,
-    "Редкое": 20,
-    "Эпическое": 28,
-    "Легендарное": 36,
+    "Обычное": 5,
+    "Редкое": 8,
+    "Эпическое": 12,
+    "Легендарное": 17,
 };
 const DEFAULT_RARITY_BY_CATEGORY = {
     weapons: "Обычное",
@@ -1195,29 +1185,29 @@ const DEFAULT_RARITY_BY_CATEGORY = {
 };
 const EXPECTED_ROI_MATRIX = {
     weapons: {
-        "Обычное": 2.0,
-        "Редкое": 2.2,
-        "Эпическое": 2.4,
-        "Легендарное": 2.6,
+        "Обычное": 1.2,
+        "Редкое": 1.35,
+        "Эпическое": 1.5,
+        "Легендарное": 1.7,
     },
     armors: {
-        "Обычное": 2.0,
-        "Редкое": 2.2,
-        "Эпическое": 2.4,
-        "Легендарное": 2.6,
+        "Обычное": 1.2,
+        "Редкое": 1.35,
+        "Эпическое": 1.5,
+        "Легендарное": 1.7,
     },
     artifacts: {
-        "Обычное": 1.0,
-        "Редкое": 1.1,
-        "Эпическое": 1.2,
-        "Легендарное": 1.3,
-        "Проклятое": 1.5,
+        "Обычное": 0.45,
+        "Редкое": 0.5,
+        "Эпическое": 0.55,
+        "Легендарное": 0.6,
+        "Проклятое": 0.7,
     },
     potions: {
-        "Обычное": 1.5,
-        "Редкое": 1.65,
-        "Эпическое": 1.8,
-        "Легендарное": 1.95,
+        "Обычное": 0.9,
+        "Редкое": 1.0,
+        "Эпическое": 1.1,
+        "Легендарное": 1.2,
     },
 };
 
@@ -1425,7 +1415,7 @@ function colorizeAuditMarkdown(simResults = null) {
         "> 1. **Э1–Э4 и Сырой прирост (растянутая шкала прироста дальности комнат от $+0\\%$ до $+180\\%+$):**  ",
         `>    <span style="color: ${hslToHex(calculateRawPctHue(0), 85, 54)}">**+0% (база)**</span> $\\to$ <span style="color: ${hslToHex(calculateRawPctHue(35), 85, 54)}">**+35% (норма)**</span> $\\to$ <span style="color: ${hslToHex(calculateRawPctHue(56), 85, 54)}">**+56% (сильно)**</span> $\\to$ <span style="color: ${hslToHex(calculateRawPctHue(75), 85, 54)}">**+75% (алый)**</span> $\\to$ <span style="color: ${hslToHex(calculateRawPctHue(125), 85, 54)}">**+125% (мощно)**</span> $\\to$ <span style="color: ${hslToHex(calculateRawPctHue(180), 85, 54)}">**+180%+ (пурпур)**</span>`,
         "> 2. **Оценка силы / Value Score (отношение среднего прироста к эталону категории и редкости, где 100 — точное попадание):**  ",
-        `>    *Эталон 100: Оружие/Броня \`2.0 / 2.2 / 2.4 / 2.6 %/G\`, Артефакты \`1.0 / 1.1 / 1.2 / 1.3 %/G\`, Зелья (1 шт.) \`1.5 / 1.65 / 1.8 / 1.95 %/G\`, Перки \`+${PERK_EXPECTED_PCT_BY_RARITY["Обычное"]}% / +${PERK_EXPECTED_PCT_BY_RARITY["Редкое"]}% / +${PERK_EXPECTED_PCT_BY_RARITY["Эпическое"]}% / +${PERK_EXPECTED_PCT_BY_RARITY["Легендарное"]}%\`.*  `,
+        `>    *Эталон 100: Оружие/Броня \`${EXPECTED_ROI_MATRIX.weapons["Обычное"]} / ${EXPECTED_ROI_MATRIX.weapons["Редкое"]} / ${EXPECTED_ROI_MATRIX.weapons["Эпическое"]} / ${EXPECTED_ROI_MATRIX.weapons["Легендарное"]} %/G\`, Артефакты \`${EXPECTED_ROI_MATRIX.artifacts["Обычное"]} / ${EXPECTED_ROI_MATRIX.artifacts["Редкое"]} / ${EXPECTED_ROI_MATRIX.artifacts["Эпическое"]} / ${EXPECTED_ROI_MATRIX.artifacts["Легендарное"]} %/G\`, Зелья (1 шт.) \`${EXPECTED_ROI_MATRIX.potions["Обычное"]} / ${EXPECTED_ROI_MATRIX.potions["Редкое"]} / ${EXPECTED_ROI_MATRIX.potions["Эпическое"]} / ${EXPECTED_ROI_MATRIX.potions["Легендарное"]} %/G\`, Перки \`+${PERK_EXPECTED_PCT_BY_RARITY["Обычное"]}% / +${PERK_EXPECTED_PCT_BY_RARITY["Редкое"]}% / +${PERK_EXPECTED_PCT_BY_RARITY["Эпическое"]}% / +${PERK_EXPECTED_PCT_BY_RARITY["Легендарное"]}%\`.*  `,
         `>    <span style="color: ${hslToHex(calculateScoreHue(0), 85, 54)}">**0 (мусор)**</span> $\\to$ <span style="color: ${hslToHex(calculateScoreHue(50), 85, 54)}">**50 (слабо)**</span> $\\to$ <span style="color: ${hslToHex(calculateScoreHue(100), 85, 54)}">**100 (идеал)**</span> $\\to$ <span style="color: ${hslToHex(calculateScoreHue(130), 85, 54)}">**130 (лайм)**</span> $\\to$ <span style="color: ${hslToHex(calculateScoreHue(160), 85, 54)}">**160 (янтарь)**</span> $\\to$ <span style="color: ${hslToHex(calculateScoreHue(215), 85, 54)}">**215 (алый)**</span> $\\to$ <span style="color: ${hslToHex(calculateScoreHue(350), 85, 54)}">**350 (малина)**</span> $\\to$ <span style="color: ${hslToHex(calculateScoreHue(500), 85, 54)}">**500+ (пурпур)**</span>`,
     ].join("\n");
 
@@ -1444,13 +1434,13 @@ function colorizeAuditMarkdown(simResults = null) {
 
 function classifyItemVerdict({ cost, rarity, deltaRmsPctVal, deltaRmsVal, valueScore, maxStyleMult, bestPlaystyle }) {
     if (cost && cost > 0) {
-        if ((valueScore >= 165 && deltaRmsPctVal >= 50) || deltaRmsPctVal >= 120) {
+        if ((valueScore >= 165 && deltaRmsPctVal >= 35) || deltaRmsPctVal >= 120) {
             return { verdict: "Универсальная имба", icon: "🚨" };
         }
-        if (valueScore >= 140 && deltaRmsPctVal >= 20) {
+        if (valueScore >= 140 && deltaRmsPctVal >= 15) {
             return { verdict: "Сверхвыгодно (Высокий ROI)", icon: "💎" };
         }
-        if (deltaRmsPctVal <= 6 && deltaRmsVal <= 0.2) {
+        if (deltaRmsPctVal <= 2 || (deltaRmsPctVal <= 4 && deltaRmsVal <= 0.15 && valueScore < 70)) {
             return { verdict: "Слабо / Мусор", icon: "💤" };
         }
         if (valueScore <= 60) {
@@ -1462,10 +1452,10 @@ function classifyItemVerdict({ cost, rarity, deltaRmsPctVal, deltaRmsVal, valueS
         return { verdict: "Баланс", icon: "✅" };
     }
 
-    if ((valueScore >= 165 && deltaRmsPctVal >= 45) || deltaRmsPctVal >= 75 || deltaRmsVal >= 2.5) {
+    if ((valueScore >= 165 && deltaRmsPctVal >= 25) || deltaRmsPctVal >= 55 || deltaRmsVal >= 2.2) {
         return { verdict: "Универсальная имба", icon: "🚨" };
     }
-    if (deltaRmsPctVal <= 8 && deltaRmsVal <= 0.25) {
+    if (deltaRmsPctVal <= 2 && deltaRmsVal <= 0.1) {
         return { verdict: "Слабо / Мусор", icon: "💤" };
     }
     if (rarity && valueScore <= 55) {
