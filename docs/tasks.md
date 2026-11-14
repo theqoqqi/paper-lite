@@ -16,3 +16,4 @@
 | Ребаланс перков и зелий, система редкости | Реализовано | [009-perks-and-potions-rebalance.md](tasks/009-perks-and-potions-rebalance.md) |
 | Расширение пула артефактов (18 → 37) | Реализовано | [010-artifacts-expansion.md](tasks/010-artifacts-expansion.md) |
 | Проклятые артефакты (37 → 40) и Проклятый Фонтан | Реализовано | [011-cursed-artifacts-and-fountain.md](tasks/011-cursed-artifacts-and-fountain.md) |
+| Отображение случайных наград в событиях | Реализовано | [012-event-random-rewards-display.md](tasks/012-event-random-rewards-display.md) |

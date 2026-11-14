@@ -32,7 +32,10 @@ export function grantRandomEquipment(game, origin = "battle") {
     }
     const art = grantRandomArtifact(game, minRarity);
     if (art) {
-        return `Артефакт: [${art.rarity}] ${art.name}`;
+        if (game.pendingArtifact && game.pendingArtifact.id === art.id) {
+            return null;
+        }
+        return formatArtifactLine(art);
     }
     game.player.gold += 15;
     return "Сундук золота (+15G)";
@@ -91,17 +94,28 @@ export function resolvePendingArtifact(game, accept) {
             }
             if (mergedArt) {
                 game.battleLog.unshift(`🌑 СЛИЯНИЕ ПРОКЛЯТИЙ! Получен секретный артефакт: ${mergedArt.name}!`);
-                if (game.battleFinished && game.battleRewards) {
+                if (game.battleRewards) {
                     game.battleRewards.items.push(`🌑 [Проклятое] Слияние: ${mergedArt.name} (${mergedArt.desc})`);
                 }
             } else {
                 game.battleLog.unshift(`🩸 Принят проклятый артефакт: ${art.name}!`);
+                if (game.battleRewards) {
+                    game.battleRewards.items.push(formatArtifactLine(art));
+                }
             }
-        } else if (game.state === "EVENT_REWARDS" && game.eventRewards && mergedArt) {
-            game.eventRewards.items.push(`🌑 [Проклятое] Слияние: ${mergedArt.name} (${mergedArt.desc})`);
+        } else if (game.state === "EVENT_REWARDS" && game.eventRewards) {
+            if (!Array.isArray(game.eventRewards.items)) game.eventRewards.items = [];
+            if (mergedArt) {
+                game.eventRewards.items.push(`🌑 [Проклятое] Слияние: ${mergedArt.name} (${mergedArt.desc})`);
+            } else {
+                game.eventRewards.items.push(formatArtifactLine(art));
+            }
         }
     } else if (game.state === "BATTLE") {
         game.battleLog.unshift(`🙅 Вы отказались от проклятого артефакта (${art.name}).`);
+    } else if (game.state === "EVENT_REWARDS" && game.eventRewards) {
+        if (!Array.isArray(game.eventRewards.notes)) game.eventRewards.notes = [];
+        game.eventRewards.notes.push(`🙅 Вы отказались от проклятого артефакта (${art.name}).`);
     }
 
     game.saveGame("autosave");
@@ -166,14 +180,10 @@ export function resolveEventOption(game, optionId) {
     } else if (optionId === "altar_gold") {
         if (game.player.gold < 12) return;
         game.player.gold -= 12;
-        const art = grantRandomArtifact(game);
-        const items = formatArtifactReward(art);
-        game.eventRewards = {
-            gold: 0,
-            items: items,
-        };
-        game.state = "EVENT_REWARDS";
-        game.saveGame("autosave");
+        const items = [];
+        const notes = [];
+        collectEventArtifact(game, items, notes);
+        openEventRewards(game, { items, notes });
         return;
     } else if (optionId === "spring_heal") {
         game.player.heal(game.player.getTotalMaxHp());
@@ -191,7 +201,16 @@ export function resolveEventOption(game, optionId) {
     } else if (optionId === "stash_take") {
         game.player.gold += 10;
         game.player.heal(5);
-        grantRandomPotion(game);
+        const items = [];
+        const notes = [];
+        collectRandomPotions(game, 1, items, notes);
+        openEventRewards(game, {
+            gold: 10,
+            effects: ["❤️ +5 HP"],
+            items,
+            notes,
+        });
+        return;
     } else if (optionId === "chest_open") {
         if (RNG.chance(50)) {
             game.setupBattle("mimic");
@@ -200,12 +219,10 @@ export function resolveEventOption(game, optionId) {
         } else {
             game.player.gold += 15;
             const loot = grantRandomEquipment(game, "event");
-            game.eventRewards = {
+            openEventRewards(game, {
                 gold: 15,
                 items: loot ? [loot] : [],
-            };
-            game.state = "EVENT_REWARDS";
-            game.saveGame("autosave");
+            });
             return;
         }
     } else if (optionId === "lib_xp") {
@@ -214,28 +231,30 @@ export function resolveEventOption(game, optionId) {
     } else if (optionId === "lib_perk") {
         if (game.player.hp <= 6) return;
         game.player.hp -= 6;
-        const available = GAME_DATA.perks.filter(p => !game.player.perks.includes(p.id));
-        const picked = pickItemByRarity(available, game.floor);
-        if (picked) game.player.addPerk(picked.id, game.floor);
+        const items = [];
+        const effects = ["💔 -6 HP"];
+        const notes = [];
+        collectRandomEventPerk(game, items, effects, notes);
+        openEventRewards(game, { effects, items, notes });
+        return;
     } else if (optionId === "gamble_play") {
         if (game.player.gold < 8) return;
         game.player.gold -= 8;
         let wonGold = 0;
         const wonItems = [];
+        const notes = [];
         if (RNG.chance(50)) {
             wonGold = 20;
             game.player.gold += 20;
-            const pot = grantRandomPotion(game);
-            if (pot) {
-                wonItems.push(`🧪 [${pot.rarity}] Зелье: ${pot.name}`);
-            }
+            collectRandomPotions(game, 1, wonItems, notes);
+        } else {
+            notes.push("Ничего не выиграно! Бес забирает ставку (-8G).");
         }
-        game.eventRewards = {
+        openEventRewards(game, {
             gold: wonGold,
-            items: wonItems.length > 0 ? wonItems : (wonGold === 0 ? ["Ничего не выиграно! Бес забирает ставку."] : []),
-        };
-        game.state = "EVENT_REWARDS";
-        game.saveGame("autosave");
+            items: wonItems,
+            notes,
+        });
         return;
     } else if (optionId === "gamble_rob") {
         if (game.player.hp <= 4) return;
@@ -243,9 +262,15 @@ export function resolveEventOption(game, optionId) {
         game.player.gold += 9;
     } else if (optionId === "lab_potions") {
         game.player.potionSlots += 1;
-        for (let i = 0; i < 2; i++) {
-            grantRandomPotion(game);
-        }
+        const items = [];
+        const notes = [];
+        collectRandomPotions(game, 2, items, notes);
+        openEventRewards(game, {
+            effects: ["🧪 +1 Слот пояса зелий"],
+            items,
+            notes,
+        });
+        return;
     } else if (optionId === "lab_mutagen") {
         game.player.baseMaxHp += 7;
         game.player.hp = Math.max(1, game.player.hp - 3);
@@ -254,14 +279,15 @@ export function resolveEventOption(game, optionId) {
         game.player.baseMaxHp = Math.max(6, game.player.baseMaxHp - 5);
         game.player.clampHp();
         game.player.gold += 18;
-        const art = grantRandomArtifact(game);
-        const items = formatArtifactReward(art);
-        game.eventRewards = {
+        const items = [];
+        const notes = [];
+        collectEventArtifact(game, items, notes);
+        openEventRewards(game, {
             gold: 18,
-            items: items,
-        };
-        game.state = "EVENT_REWARDS";
-        game.saveGame("autosave");
+            effects: ["💔 -5 MAX HP"],
+            items,
+            notes,
+        });
         return;
     } else if (optionId === "soul_buy_souls") {
         if (game.player.gold < 12) return;
@@ -282,14 +308,14 @@ export function resolveEventOption(game, optionId) {
     } else if (optionId === "well_blood") {
         if (game.player.hp <= 6) return;
         game.player.hp -= 6;
-        const art = grantRandomArtifact(game);
-        const items = formatArtifactReward(art);
-        game.eventRewards = {
-            gold: 0,
-            items: items,
-        };
-        game.state = "EVENT_REWARDS";
-        game.saveGame("autosave");
+        const items = [];
+        const notes = [];
+        collectEventArtifact(game, items, notes);
+        openEventRewards(game, {
+            effects: ["💔 -6 HP"],
+            items,
+            notes,
+        });
         return;
     } else if (optionId === "pilgrim_help") {
         if (game.player.hp <= 5) return;
@@ -299,7 +325,15 @@ export function resolveEventOption(game, optionId) {
         game.player.totalRunXp += 8;
     } else if (optionId === "pilgrim_rob") {
         game.player.gold += 15;
-        grantRandomPotion(game);
+        const items = [];
+        const notes = [];
+        collectRandomPotions(game, 1, items, notes);
+        openEventRewards(game, {
+            gold: 15,
+            items,
+            notes,
+        });
+        return;
     } else if (optionId === "cauldron_drink") {
         if (RNG.chance(50)) {
             game.player.baseMaxHp += 8;
@@ -308,24 +342,28 @@ export function resolveEventOption(game, optionId) {
             game.player.hp = Math.max(1, game.player.hp - 6);
         }
     } else if (optionId === "cauldron_potion") {
-        grantRandomPotion(game);
+        const items = [];
+        const notes = [];
+        collectRandomPotions(game, 1, items, notes);
+        openEventRewards(game, { items, notes });
+        return;
     } else if (optionId === "cauldron_gold") {
         game.player.gold += 12;
     } else if (optionId === "monolith_perk") {
         if (game.player.hp <= 7) return;
         game.player.hp -= 7;
-        const available = GAME_DATA.perks.filter(p => !game.player.perks.includes(p.id));
-        const picked = pickItemByRarity(available, game.floor);
-        if (picked) game.player.addPerk(picked.id, game.floor);
+        const items = [];
+        const effects = ["💔 -7 HP"];
+        const notes = [];
+        collectRandomEventPerk(game, items, effects, notes);
+        openEventRewards(game, { effects, items, notes });
+        return;
     } else if (optionId === "monolith_pray") {
         game.player.en = game.player.getTotalMaxEn();
         game.player.xp += 15;
         game.player.totalRunXp += 15;
     } else if (optionId === "sarcophagus_fight") {
-        game.player.gold += 20;
-        grantRandomArtifact(game);
-        game.setupBattle("elite");
-        game.saveGame("autosave");
+        startEliteEventWithArtifact(game, 20, "Саркофаг вскрыт");
         return;
     } else if (optionId === "sarcophagus_pray") {
         if (game.player.gold < 8) return;
@@ -340,12 +378,10 @@ export function resolveEventOption(game, optionId) {
             game.player.gold += 22;
             won = true;
         }
-        game.eventRewards = {
+        openEventRewards(game, {
             gold: won ? 22 : 0,
-            items: won ? [] : ["Проигрыш в кости (-10G)"],
-        };
-        game.state = "EVENT_REWARDS";
-        game.saveGame("autosave");
+            notes: won ? [] : ["Проигрыш в кости (-10G)."],
+        });
         return;
     } else if (optionId === "pawn_blood") {
         if (game.player.hp <= 8) return;
@@ -354,14 +390,10 @@ export function resolveEventOption(game, optionId) {
     } else if (optionId === "pawn_relic") {
         if (game.player.gold < 20) return;
         game.player.gold -= 20;
-        const art = grantRandomArtifact(game);
-        const items = formatArtifactReward(art);
-        game.eventRewards = {
-            gold: 0,
-            items: items,
-        };
-        game.state = "EVENT_REWARDS";
-        game.saveGame("autosave");
+        const items = [];
+        const notes = [];
+        collectEventArtifact(game, items, notes);
+        openEventRewards(game, { items, notes });
         return;
     } else if (optionId === "rift_dive") {
         if (RNG.chance(50)) {
@@ -377,12 +409,17 @@ export function resolveEventOption(game, optionId) {
         game.saveMeta();
     } else if (optionId === "nest_loot") {
         game.player.gold += 12;
-        grantRandomPotion(game);
+        const items = [];
+        const notes = [];
+        collectRandomPotions(game, 1, items, notes);
+        openEventRewards(game, {
+            gold: 12,
+            items,
+            notes,
+        });
+        return;
     } else if (optionId === "nest_hunt") {
-        game.player.gold += 15;
-        grantRandomArtifact(game);
-        game.setupBattle("elite");
-        game.saveGame("autosave");
+        startEliteEventWithArtifact(game, 15, "Добыча из логова");
         return;
     }
 
@@ -579,8 +616,97 @@ export function pickItemByRarity(items, floor = 0, minRarity = null) {
     return RNG.choice(items);
 }
 
-function formatArtifactReward(art) {
-    return art ? [`💍 [${art.rarity}] Артефакт: ${art.name} (${art.desc})`] : [];
+function openEventRewards(game, { gold = 0, effects = [], items = [], notes = [] }) {
+    game.eventRewards = {
+        gold,
+        effects,
+        items,
+        notes,
+    };
+    game.state = "EVENT_REWARDS";
+    game.saveGame("autosave");
+}
+
+function startEliteEventWithArtifact(game, bonusGold, sourceText) {
+    game.player.gold += bonusGold;
+    const art = grantRandomArtifact(game);
+    const isPendingCursed = Boolean(game.pendingArtifact && art && game.pendingArtifact.id === art.id);
+    game.setupBattle("elite");
+    if (!isPendingCursed) {
+        if (art) {
+            game.battleRewards.items.push(formatArtifactLine(art));
+            game.battleLog.unshift(`💍 ${sourceText}: +${bonusGold}G и [${art.rarity}] ${art.name} (${art.desc})`);
+        } else {
+            game.battleLog.unshift(`💰 ${sourceText}: +${bonusGold}G (все доступные артефакты уже собраны).`);
+        }
+    } else {
+        game.battleLog.unshift(`💰 ${sourceText}: +${bonusGold}G. Внутри таится проклятая реликвия!`);
+    }
+    game.saveGame("autosave");
+}
+
+function collectEventArtifact(game, items, notes) {
+    const art = grantRandomArtifact(game);
+    if (!art) {
+        notes.push("💍 Все доступные артефакты уже собраны.");
+        return null;
+    }
+    const isPendingCursed = Boolean(game.pendingArtifact && game.pendingArtifact.id === art.id);
+    if (!isPendingCursed) {
+        items.push(formatArtifactLine(art));
+    }
+    return art;
+}
+
+function collectRandomEventPerk(game, items, effects, notes) {
+    const available = GAME_DATA.perks.filter(p => !game.player.perks.includes(p.id));
+    const picked = pickItemByRarity(available, game.floor);
+    if (!picked) {
+        notes.push("✨ Все доступные перки уже изучены.");
+        return null;
+    }
+    const potionsBefore = game.player.inventory.potions.length;
+    const slotsBefore = game.player.potionSlots;
+    game.player.addPerk(picked.id, game.floor);
+    items.push(formatPerkLine(picked));
+    if (game.player.potionSlots > slotsBefore) {
+        effects.push(`🧪 +${game.player.potionSlots - slotsBefore} Слот пояса зелий`);
+    }
+    game.player.inventory.potions.slice(potionsBefore).forEach(pot => {
+        items.push(formatPotionLine(pot));
+    });
+    return picked;
+}
+
+function collectRandomPotions(game, count, items, notes) {
+    let overflowCount = 0;
+    for (let i = 0; i < count; i++) {
+        const pot = grantRandomPotion(game);
+        if (pot) {
+            items.push(formatPotionLine(pot));
+        } else {
+            overflowCount++;
+        }
+    }
+    if (overflowCount > 0) {
+        notes.push(
+            overflowCount === 1
+                ? "🧪 Пояс зелий полон — новое зелье не поместилось."
+                : `🧪 Пояс зелий полон — не поместилось зелий: ${overflowCount}.`,
+        );
+    }
+}
+
+function formatArtifactLine(art) {
+    return `💍 [${art.rarity}] Артефакт: ${art.name} (${art.desc})`;
+}
+
+function formatPotionLine(pot) {
+    return `🧪 [${pot.rarity}] Зелье: ${pot.name} (${pot.desc})`;
+}
+
+function formatPerkLine(perk) {
+    return `✨ [${perk.rarity}] Перк: ${perk.name} (${perk.desc})`;
 }
 
 function grantRandomPotion(game) {

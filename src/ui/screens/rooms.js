@@ -94,6 +94,13 @@ export function renderEventScreen(render) {
 
 export function renderEventRewardsScreen(render) {
     const rewards = game.eventRewards || { gold: 0, items: [] };
+    const effects = Array.isArray(rewards.effects) ? rewards.effects : [];
+    const items = Array.isArray(rewards.items) ? rewards.items : [];
+    const notes = Array.isArray(rewards.notes) ? rewards.notes : [];
+    const hasAnyReward = (rewards.gold > 0)
+        || items.length > 0
+        || effects.some(ef => !ef.startsWith("💔"))
+        || Boolean(game.pendingEquipment || game.pendingArtifact);
     const wrap = el("div", {}, [
         el("h3", { text: "❓ Награда за событие" }),
         renderStatsPanel(),
@@ -101,7 +108,10 @@ export function renderEventRewardsScreen(render) {
             className: "panel",
             style: { borderColor: "#4caf50", background: "#1b2e1b" },
         }, [
-            el("h3", { style: { color: "#81c784" }, text: "🎁 НАЙДЕНЫ ТРОФЕИ!" }),
+            el("h3", {
+                style: { color: "#81c784" },
+                text: hasAnyReward ? "🎁 НАЙДЕНЫ ТРОФЕИ!" : "❓ Итог события",
+            }),
             rewards.gold > 0 ? el("p", {
                 className: "text-center",
                 style: { marginBottom: "8px" },
@@ -111,15 +121,31 @@ export function renderEventRewardsScreen(render) {
     ]);
 
     const box = wrap.lastElementChild;
-    if (rewards.items.length > 0) {
+    if (effects.length > 0) {
+        box.appendChild(el("div", {
+            className: "text-center",
+            style: { color: "#c8e6c9", fontSize: "13px", marginBottom: "8px" },
+            text: effects.join(" • "),
+        }));
+    }
+
+    if (items.length > 0) {
         box.appendChild(el("div", {
             style: { marginBottom: "6px", fontWeight: "bold" },
             text: "Найденные предметы:",
         }));
-        rewards.items.forEach(it => {
+        items.forEach(it => {
             box.appendChild(el("div", {
-                style: { color: "#ffd54f", fontSize: "13px" },
+                style: { color: "#ffd54f", fontSize: "13px", marginBottom: "3px" },
             }, renderTextWithRarity(`• ${it}`)));
+        });
+    }
+
+    if (notes.length > 0) {
+        notes.forEach(note => {
+            box.appendChild(el("div", {
+                style: { color: "#cfd8dc", fontSize: "12px", marginTop: "6px" },
+            }, renderTextWithRarity(note)));
         });
     }
 
