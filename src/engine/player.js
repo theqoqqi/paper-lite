@@ -37,6 +37,7 @@ export class Player {
         this.tempSpikes = 0;
         this.battleSpikes = 0;
         this.battleAtk = 0;
+        this.battleBannerAtk = 0;
         this.poison = 0;
         this.bleed = 0;
         this.concentrateBonus = 0;
@@ -84,6 +85,9 @@ export class Player {
         this.inventory.artifacts.push({ ...artObj });
         if (artObj.id === "art9") {
             this.hp += 6;
+        }
+        if (artObj.id === "art32" || artObj.id === "art37") {
+            this.en = Math.min(this.getTotalMaxEn(), this.en + 1);
         }
         this.clampHp();
         return true;
@@ -156,6 +160,8 @@ export class Player {
         if (this.inventory.weapon && this.inventory.weapon.en) val += this.inventory.weapon.en;
         if (this.inventory.armor && this.inventory.armor.en) val += this.inventory.armor.en;
         if (this.perks.includes("p9")) val += 1;
+        if (this.hasArtifact("art32")) val += 1;
+        if (this.hasArtifact("art37")) val += 1;
         return val;
     }
 
@@ -164,6 +170,12 @@ export class Player {
         if (this.inventory.weapon) val += this.inventory.weapon.atk || 0;
         if (this.hasArtifact("art3")) val += 1;
         if (this.hasArtifact("art5")) val += 1;
+        if (this.hasArtifact("art24") && this.hp <= this.getTotalMaxHp() / 2) val += 1;
+        if (this.hasArtifact("art27")) val += 1;
+        if (this.hasArtifact("art29") && this.shield > 0) val += 2;
+        if (this.hasArtifact("art32")) val += 1;
+        if (this.hasArtifact("art35")) val += 2;
+        if (this.hasArtifact("art37")) val += 2;
         if (this.perks.includes("p1")) val += 1;
         if (this.perks.includes("p4") && this.hp <= this.getTotalMaxHp() / 2) val += 3;
         if (this.perks.includes("p20")) val += Math.min(5, Math.floor(this.gold / 12));
@@ -174,6 +186,8 @@ export class Player {
         let val = this.baseDef + Math.floor(this.armorUpgradeLvl / 2);
         if (this.inventory.weapon && this.inventory.weapon.def) val += this.inventory.weapon.def;
         if (this.inventory.armor) val += this.inventory.armor.def || 0;
+        if (this.hasArtifact("art35")) val += 1;
+        if (this.hasArtifact("art36")) val += 1;
         if (this.perks.includes("p5")) val += 1;
         return val;
     }
@@ -184,6 +198,7 @@ export class Player {
         if (this.perks.includes("p12")) val += 2;
         if (this.perks.includes("p34")) val += 1;
         if (this.hasArtifact("art14")) val += 2;
+        if (this.hasArtifact("art25")) val += 1;
         return val;
     }
 
@@ -193,6 +208,9 @@ export class Player {
         if (this.perks.includes("p2")) val += 12;
         if (this.hasArtifact("art5")) val += 8;
         if (this.hasArtifact("art11")) val += 24;
+        if (this.hasArtifact("art21")) val += 8;
+        if (this.hasArtifact("art27")) val += 5;
+        if (this.hasArtifact("art31")) val += 15;
         return Math.min(100, val);
     }
 
@@ -228,6 +246,9 @@ export class Player {
             amount = Math.ceil(amount * (1 - reducePct / 100));
         }
         if (this.hasArtifact("art18")) {
+            amount = Math.max(1, amount - 1);
+        }
+        if (this.hasArtifact("art24") && this.hp <= this.getTotalMaxHp() / 2) {
             amount = Math.max(1, amount - 1);
         }
         if (this.perks.includes("p19") && amount >= 8) {

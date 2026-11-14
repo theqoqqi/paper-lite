@@ -233,18 +233,26 @@ export function renderBattleScreen(render) {
         wrap.appendChild(enemyBox);
 
         const target = p && game.enemies[game.selectedTargetIndex];
+        const roundOneAtk = game.battleTurn === 1
+            ? (p.perks.includes("p13") ? 5 : 0) + (p.hasArtifact("art22") ? 4 : 0)
+            : 0;
+        const skillArtAtk = p.hasArtifact("art18") ? 3 : 0;
+        const baseCombatAtk = atk + roundOneAtk + skillArtAtk;
         const eliteAtk = (target && (target.isElite || target.isBoss) && p.perks.includes("p25")) ? 3 : 0;
-        const effAtk = atk + eliteAtk;
+        const effAtk = baseCombatAtk + eliteAtk;
         const p15Bonus = (target && p.perks.includes("p15") && (target.shield > 0 || target.def >= 2)) ? 8 : 0;
+        const art34Bonus = (target && p.hasArtifact("art34") && target.poison > 0 && target.bleed > 0) ? 4 : 0;
         const twoEnCost = p.perks.includes("p24") ? 1 : 2;
-        const fastMin = effAtk + 1;
-        const fastMax = effAtk + 4;
-        const execDmg = Math.round(2 + effAtk * 0.5) + (p.perks.includes("p1") ? 4 : 0) + p15Bonus;
-        const prcMin = effAtk + 3 + p15Bonus;
-        const prcMax = effAtk + 7 + p15Bonus;
-        const whrMin = Math.round(atk * 0.75) + (p.classId === "arcanist" ? 3 : 1);
-        const whrMax = Math.round(atk * 0.75) + (p.classId === "arcanist" ? 6 : 4);
-        const defShield = 3 + p.getTotalDef() + (p.classId === "crusader" ? 3 : 0) + (p.perks.includes("p31") ? 6 : 0);
+        const fastBonus = p.hasArtifact("art20") ? 2 : 0;
+        const fastMin = effAtk + 1 + fastBonus + art34Bonus;
+        const fastMax = effAtk + 4 + fastBonus + art34Bonus;
+        const execDmg = Math.round(2 + effAtk * 0.5) + (p.perks.includes("p1") ? 4 : 0) + p15Bonus + (p.hasArtifact("art26") ? 10 : 0) + art34Bonus;
+        const prcMin = effAtk + 3 + p15Bonus + art34Bonus;
+        const prcMax = effAtk + 7 + p15Bonus + art34Bonus;
+        const whrArtBonus = p.hasArtifact("art28") ? 3 : 0;
+        const whrMin = Math.round(baseCombatAtk * 0.75) + (p.classId === "arcanist" ? 3 : 1) + whrArtBonus;
+        const whrMax = Math.round(baseCombatAtk * 0.75) + (p.classId === "arcanist" ? 6 : 4) + whrArtBonus;
+        const defShield = 3 + p.getTotalDef() + (p.classId === "crusader" ? 3 : 0) + (p.perks.includes("p31") ? 6 : 0) + (p.hasArtifact("art29") ? 3 : 0);
 
         const formatCd = cd => (cd === 1 ? "[КД: 1 ход]" : `[КД: ${cd} хода]`);
         const defSub = cds.defend > 0 ? formatCd(cds.defend) : `[+${defShield} Щит, -50% ур.]`;

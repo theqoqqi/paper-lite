@@ -240,11 +240,14 @@ function selectTarget(game) {
     let atkVal = p.getTotalAtk();
     if (p.hasArtifact("art18")) atkVal += 3;
     if (game.battleTurn === 1 && p.perks.includes("p13")) atkVal += 5;
+    if (game.battleTurn === 1 && p.hasArtifact("art22")) atkVal += 4;
     // Добивание Казнью ради экстра-хода
     const killable = alive.find(item => {
         const eliteBonus = (p.perks.includes("p25") && (item.e.isElite || item.e.isBoss)) ? 3 : 0;
         const p15Bonus = (p.perks.includes("p15") && (item.e.shield > 0 || item.e.def >= 2)) ? 8 : 0;
-        const execDmg = Math.round(2 + (atkVal + eliteBonus) * 0.5) + (p.perks.includes("p1") ? 4 : 0) + p15Bonus;
+        const art26Bonus = p.hasArtifact("art26") ? 10 : 0;
+        const art34Bonus = (p.hasArtifact("art34") && item.e.poison > 0 && item.e.bleed > 0) ? 4 : 0;
+        const execDmg = Math.round(2 + (atkVal + eliteBonus) * 0.5) + (p.perks.includes("p1") ? 4 : 0) + p15Bonus + art26Bonus + art34Bonus;
         return item.e.currentHp <= execDmg;
     });
     if (killable && p.cooldowns.heavy === 0 && BattleSystem.canAffordEn(game, 1)) {
@@ -340,7 +343,8 @@ function tryUsePotions(game) {
 function getIncomingDamage(game) {
     const p = game.player;
     const totalDef = p.getTotalDef();
-    const flatReduce = p.hasArtifact("art18") ? 1 : 0;
+    const flatReduce = (p.hasArtifact("art18") ? 1 : 0)
+        + (p.hasArtifact("art24") && p.hp <= p.getTotalMaxHp() / 2 ? 1 : 0);
     let total = 0;
     for (const e of game.enemies) {
         if (e.currentHp <= 0) continue;
@@ -360,9 +364,12 @@ function chooseAction(game, playstyleId) {
     let atkVal = p.getTotalAtk();
     if (p.hasArtifact("art18")) atkVal += 3;
     if (game.battleTurn === 1 && p.perks.includes("p13")) atkVal += 5;
+    if (game.battleTurn === 1 && p.hasArtifact("art22")) atkVal += 4;
     if (target && p.perks.includes("p25") && (target.isElite || target.isBoss)) atkVal += 3;
     const p15Bonus = (target && p.perks.includes("p15") && (target.shield > 0 || target.def >= 2)) ? 8 : 0;
-    const execDmg = Math.round(2 + atkVal * 0.5) + (p.perks.includes("p1") ? 4 : 0) + p15Bonus;
+    const art26Bonus = p.hasArtifact("art26") ? 10 : 0;
+    const art34Bonus = (target && p.hasArtifact("art34") && target.poison > 0 && target.bleed > 0) ? 4 : 0;
+    const execDmg = Math.round(2 + atkVal * 0.5) + (p.perks.includes("p1") ? 4 : 0) + p15Bonus + art26Bonus + art34Bonus;
 
     const twoEnCost = p.perks.includes("p24") ? 1 : 2;
     const canDef = BattleSystem.canUseSkill(game, "defend", 0);
@@ -387,7 +394,7 @@ function chooseAction(game, playstyleId) {
     }
 
     if (playstyleId === "execute_focus") {
-        if (canExec && (target.currentHp <= execDmg || target.def >= 2 || target.shield > 0 || p.perks.includes("p1"))) return "heavy";
+        if (canExec && (target.currentHp <= execDmg || target.def >= 2 || target.shield > 0 || p.perks.includes("p1") || p.hasArtifact("art26"))) return "heavy";
         if (p.en < 1 && canConc) return "concentrate";
         return "fast";
     }
@@ -575,6 +582,7 @@ function processIntermission(game, step, roomsSinceCampfire) {
     p.tempSpikes = 0;
     p.battleSpikes = 0;
     p.battleAtk = 0;
+    p.battleBannerAtk = 0;
     p.damageReductionPct = 0;
     p.steelScaleUsed = false;
     p.forceCritNext = false;
