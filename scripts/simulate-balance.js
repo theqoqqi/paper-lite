@@ -12,12 +12,14 @@
  * Использование:
  *   node scripts/simulate-balance.js                  # Быстрый прогон всех 104 сущностей по всем 4 этажам
  *   node scripts/simulate-balance.js --full           # Глубокий аудит с увеличенной выборкой
+ *   node scripts/simulate-balance.js --classes        # Сравнительный аудит баланса классов по этажам
  *   node scripts/simulate-balance.js --colorize       # Мгновенное обновление цветов в docs/items-and-perks-balance.md
  *   node scripts/simulate-balance.js --id p35         # Анализ конкретного перка / предмета
  *   node scripts/simulate-balance.js --category perks # Анализ только категории (perks/weapons/armors/artifacts/potions)
  *   node scripts/simulate-balance.js --class assassin # Анализ только по одному классу
  *   node scripts/simulate-balance.js --floor 2        # Анализ только одного стартового этажа (1..4+)
  *   node scripts/simulate-balance.js --abyss          # Проверка механик и прогон кривой сложности Бездны (5+)
+ *   node scripts/simulate-balance.js --workers 8      # Явное число потоков-воркеров (по умолчанию CPU - 1)
  *   node scripts/simulate-balance.js --no-report      # Без записи в docs/balance-report.md
  */
 
@@ -54,6 +56,8 @@ const {
 } = await import("../src/data/index.js");
 const fs = await import("fs");
 const path = await import("path");
+const os = await import("node:os");
+const { Worker, isMainThread, parentPort, workerData } = await import("node:worker_threads");
 
 // 2.1 Детерминированный генератор псевдослучайных чисел (Mulberry32)
 function createMulberry32(seed) {
@@ -81,20 +85,25 @@ function getRoomSeed(styleId, classId, runIndex, stepIndex) {
 }
 
 // 3. Разбор аргументов CLI
-const args = process.argv.slice(2);
+const args = isMainThread ? process.argv.slice(2) : [];
 const isFullRun = args.includes("--full");
 const isColorizeOnly = args.includes("--colorize") || args.includes("--colorize-only");
+const isClassesMode = args.includes("--classes");
 const targetIdArg = getArgValue(args, "--id");
 const targetCatArg = getArgValue(args, "--category");
 const targetClassArg = getArgValue(args, "--class");
 const targetFloorArg = parseInt(getArgValue(args, "--floor"), 10);
 const customRunsArg = parseInt(getArgValue(args, "--runs"), 10);
+const workersArg = parseInt(getArgValue(args, "--workers"), 10);
 const skipReport = args.includes("--no-report");
 const isAbyssMode = args.includes("--abyss");
 
 const RUNS_PER_PLAYSTYLE = Number.isFinite(customRunsArg)
     ? customRunsArg
     : (isFullRun ? 20 : 8);
+const WORKERS_COUNT = Number.isFinite(workersArg) && workersArg >= 1
+    ? workersArg
+    : Math.max(1, os.cpus().length - 1);
 
 function getArgValue(argList, flag) {
     const idx = argList.indexOf(flag);
@@ -250,7 +259,7 @@ const ACTIVE_FLOOR_PROFILES = Number.isFinite(targetFloorArg) && targetFloorArg 
         fp => !Number.isFinite(targetFloorArg) || fp.floorNum === targetFloorArg
     );
 
-const CLASSES = ["wanderer", "assassin", "crusader"].filter(c => !targetClassArg || targetClassArg === c);
+const CLASSES = Object.keys(GAME_DATA.classes).filter(c => !targetClassArg || targetClassArg === c);
 const ALL_SKILLS = ["fast", "heavy", "pierce", "whirlwind", "defend", "concentrate"];
 
 // Стили игры и профили атак (под контролем игрока)
@@ -507,6 +516,12 @@ function createMetricsContainer() {
 function simulateFloorRun(classId, itemDef, playstyleId, runIndex, metrics, floorProfile = FLOOR_PROFILES[0]) {
     const game = new Game();
     game.init();
+    game.saveGame = () => null;
+    game.saveMeta = () => {};
+    game.generateFloorMap = () => {
+        if (game.player) game.player.secondWindAvailable = true;
+    };
+    setSeed(getRoomSeed(playstyleId, classId, runIndex, -1));
     game.startRun(classId);
 
     if (floorProfile) {
@@ -625,7 +640,8 @@ function simulateFloorRun(classId, itemDef, playstyleId, runIndex, metrics, floo
         metrics.turnsSurvived += totalTurns;
     }
 
-    return { runDamage, roomsCleared, totalTurns };
+    const ownFloorSteps = getOwnFloorStepCount(floorProfile);
+    return { runDamage, roomsCleared, totalTurns, floorCleared: roomsCleared >= ownFloorSteps };
 }
 
 function processIntermission(game, step, roomsSinceCampfire) {
@@ -714,50 +730,9 @@ function processIntermission(game, step, roomsSinceCampfire) {
 }
 
 // 7. Расчёт базовых линий (по всем активным этажам)
-function runFloorSample(itemDef, floorProfile, metricsA, metricsB = null) {
-    let totalAllDamage = 0;
-    let totalAllRooms = 0;
-    let totalAllTurns = 0;
-    let totalAllRuns = 0;
-    const byPlaystyle = {};
-
-    for (const style of PLAYSTYLES) {
-        let styleDamage = 0;
-        let styleRooms = 0;
-        let styleRuns = 0;
-
-        for (const cls of CLASSES) {
-            for (let i = 0; i < RUNS_PER_PLAYSTYLE; i++) {
-                const res = simulateFloorRun(cls, itemDef, style.id, i, metricsA, floorProfile);
-                styleDamage += res.runDamage;
-                styleRooms += res.roomsCleared;
-                totalAllTurns += res.totalTurns;
-                styleRuns++;
-
-                if (metricsB) {
-                    metricsB.totalDamageDealt += res.runDamage;
-                    metricsB.roomsCleared += res.roomsCleared;
-                    metricsB.turnsSurvived += res.totalTurns;
-                }
-            }
-        }
-
-        byPlaystyle[style.id] = {
-            avgDamage: Math.round((styleDamage / styleRuns) * 10) / 10,
-            avgRooms: Math.round((styleRooms / styleRuns) * 10) / 10,
-        };
-
-        totalAllDamage += styleDamage;
-        totalAllRooms += styleRooms;
-        totalAllRuns += styleRuns;
-    }
-
-    return {
-        avgDamage: Math.round((totalAllDamage / totalAllRuns) * 10) / 10,
-        avgRooms: Math.round((totalAllRooms / totalAllRuns) * 10) / 10,
-        avgTurns: Math.round((totalAllTurns / totalAllRuns) * 10) / 10,
-        byPlaystyle,
-    };
+function runFloorSample(itemDef, floorProfile, metricsA, metricsB = null, classes = CLASSES, runsPerPlaystyle = RUNS_PER_PLAYSTYLE) {
+    const slices = PLAYSTYLES.map(style => runStyleSlice(itemDef, floorProfile, style.id, classes, runsPerPlaystyle));
+    return aggregateFloorSlices(slices, metricsA, metricsB);
 }
 
 function calcSkillMetrics(metricsObj) {
@@ -774,7 +749,7 @@ function calcSkillMetrics(metricsObj) {
     return { skillDpc, skillEdpc };
 }
 
-function calculateFloorBaselines(activeFloors = ACTIVE_FLOOR_PROFILES) {
+async function calculateFloorBaselines(activeFloors = ACTIVE_FLOOR_PROFILES, pool = null, classes = CLASSES, runsPerPlaystyle = RUNS_PER_PLAYSTYLE) {
     console.log("⏳ Расчёт базовых линий прогрессии по этажам (без тестируемых предметов)...");
     const byFloor = {};
     const aggMetrics = createMetricsContainer();
@@ -783,9 +758,44 @@ function calculateFloorBaselines(activeFloors = ACTIVE_FLOOR_PROFILES) {
     let sumDamage = 0;
     let sumTurns = 0;
 
+    let samplesByFloorId = {};
+    if (pool) {
+        const tasks = [];
+        for (const fp of activeFloors) {
+            for (const style of PLAYSTYLES) {
+                tasks.push({
+                    kind: "styleSlice",
+                    itemDef: null,
+                    floorProfile: fp,
+                    styleId: style.id,
+                    classes,
+                    runsPerPlaystyle,
+                });
+            }
+        }
+        const results = await pool.runTasks(tasks);
+        const slicesByFloor = {};
+        for (const fp of activeFloors) {
+            slicesByFloor[fp.id] = [];
+        }
+        for (const slice of results) {
+            slicesByFloor[slice.floorId].push(slice);
+        }
+        for (const fp of activeFloors) {
+            const floorMetrics = createMetricsContainer();
+            const sample = aggregateFloorSlices(slicesByFloor[fp.id], floorMetrics);
+            samplesByFloorId[fp.id] = { sample, floorMetrics };
+        }
+    } else {
+        for (const fp of activeFloors) {
+            const floorMetrics = createMetricsContainer();
+            const sample = runFloorSample(null, fp, floorMetrics, null, classes, runsPerPlaystyle);
+            samplesByFloorId[fp.id] = { sample, floorMetrics };
+        }
+    }
+
     for (const fp of activeFloors) {
-        const floorMetrics = createMetricsContainer();
-        const sample = runFloorSample(null, fp, floorMetrics);
+        const { sample, floorMetrics } = samplesByFloorId[fp.id];
 
         for (const sk of ALL_SKILLS) {
             aggMetrics.skillCasts[sk] += floorMetrics.skillCasts[sk];
@@ -822,7 +832,7 @@ function calculateFloorBaselines(activeFloors = ACTIVE_FLOOR_PROFILES) {
 }
 
 // 8. Оценка предмета по всем активным этажам
-function evaluateFloorItem(itemDef, baselines, activeFloors = ACTIVE_FLOOR_PROFILES) {
+function evaluateFloorItem(itemDef, baselines, activeFloors = ACTIVE_FLOOR_PROFILES, classes = CLASSES, runsPerPlaystyle = RUNS_PER_PLAYSTYLE) {
     const aggMetrics = createMetricsContainer();
     const cost = itemDef.cost || null;
     const byFloor = {};
@@ -849,7 +859,7 @@ function evaluateFloorItem(itemDef, baselines, activeFloors = ACTIVE_FLOOR_PROFI
 
     for (const fp of activeFloors) {
         const base = baselines.byFloor[fp.id];
-        const sample = runFloorSample(itemDef, fp, aggMetrics);
+        const sample = runFloorSample(itemDef, fp, aggMetrics, null, classes, runsPerPlaystyle);
 
         const deltaDamage = Math.max(0, Math.round((sample.avgDamage - base.avgDamage) * 10) / 10);
         const deltaDamagePct = base.avgDamage > 0 ? Math.max(0, Math.round((deltaDamage / base.avgDamage) * 100)) : 0;
@@ -1505,46 +1515,105 @@ async function main() {
         runAbyssAudit();
         return;
     }
+    if (CLASSES.length === 0) {
+        console.error(`❌ Неизвестный класс в --class: ${targetClassArg}`);
+        process.exit(1);
+    }
+    if (isClassesMode) {
+        await runClassesAudit(ACTIVE_FLOOR_PROFILES);
+        return;
+    }
+
     const startTime = Date.now();
     const activeFloors = ACTIVE_FLOOR_PROFILES;
     const isFilteredRun = Boolean(targetIdArg || targetCatArg || targetClassArg || Number.isFinite(targetFloorArg));
-
-    console.log("==========================================================================================");
-    console.log("🎮 Headless Balance Simulator — Paper-Lite (Multi-Floor Survival & Economy Progression)");
-    console.log(`Параметры: запусков/стиль=${RUNS_PER_PLAYSTYLE}, классы=[${CLASSES.join(", ")}], этажи=[${activeFloors.map(f => f.label).join(", ")}], фильтр ID=${targetIdArg || "все"}`);
-    console.log("==========================================================================================\n");
-
-    const baselines = calculateFloorBaselines(activeFloors);
     const itemPool = buildItemPool();
+    const totalParallelTasks = Math.max(activeFloors.length * PLAYSTYLES.length, itemPool.length);
+    const usePool = WORKERS_COUNT > 1 && itemPool.length >= 4;
+    const pool = usePool
+        ? createWorkerPool(Math.min(WORKERS_COUNT, totalParallelTasks), {
+            activeFloors,
+            classes: CLASSES,
+            runsPerPlaystyle: RUNS_PER_PLAYSTYLE,
+        })
+        : null;
 
-    console.log(`\nЗапуск оценки пула сущностей: ${itemPool.length} шт...\n`);
-    const floorColsHeader = activeFloors.map(fp => fp.label.padEnd(6)).join(" | ");
-    const floorColsRule = activeFloors.map(() => "--------").join("+");
-    const tableRule = `------+-------------------------+-----------+-------+--------+--------+------+${floorColsRule}+--------------------+--------------------------+-----------------------`;
-    console.log(`ID    | Название                | Катег.    | Редк. | Цена   | ROI    | VS   | ${floorColsHeader} | Ср.Комн (Δ)        | Лучший стиль (xMult)     | Вердикт`);
-    console.log(tableRule);
+    try {
+        console.log("==========================================================================================");
+        console.log("🎮 Headless Balance Simulator — Paper-Lite (Multi-Floor Survival & Economy Progression)");
+        console.log(`Параметры: запусков/стиль=${RUNS_PER_PLAYSTYLE}, потоки=${pool ? pool.size : 1}, классы=[${CLASSES.join(", ")}], этажи=[${activeFloors.map(f => f.label).join(", ")}], фильтр ID=${targetIdArg || "все"}`);
+        console.log("==========================================================================================\n");
 
-    const results = [];
-    for (const item of itemPool) {
-        try {
-            const res = evaluateFloorItem(item, baselines, activeFloors);
-            results.push(res);
-            console.log(formatConsoleRow(res, activeFloors));
-        } catch (err) {
-            console.error(`❌ Ошибка симуляции для ${item.id} (${item.name}):`, err.message);
+        const baselines = await calculateFloorBaselines(activeFloors, pool, CLASSES, RUNS_PER_PLAYSTYLE);
+        if (pool && itemPool.length > 0) {
+            await pool.broadcast({ kind: "setBaselines", baselines });
         }
-    }
 
-    const elapsed = Math.round((Date.now() - startTime) / 100) / 10;
-    console.log(tableRule);
-    console.log(`\n✨ Симуляция завершена за ${elapsed}s. Обработано сущностей: ${results.length}/${itemPool.length}.`);
+        console.log(`\nЗапуск оценки пула сущностей: ${itemPool.length} шт...\n`);
+        const floorColsHeader = activeFloors.map(fp => fp.label.padEnd(6)).join(" | ");
+        const floorColsRule = activeFloors.map(() => "--------").join("+");
+        const tableRule = `------+-------------------------+-----------+-------+--------+--------+------+${floorColsRule}+--------------------+--------------------------+-----------------------`;
+        console.log(`ID    | Название                | Катег.    | Редк. | Цена   | ROI    | VS   | ${floorColsHeader} | Ср.Комн (Δ)        | Лучший стиль (xMult)     | Вердикт`);
+        console.log(tableRule);
 
-    if (!skipReport && results.length > 0) {
-        if (isFilteredRun) {
-            console.log("ℹ️ Фильтрованный прогон: файлы отчётов не перезаписаны (запустите без фильтров для полного обновления).");
+        const results = [];
+        if (pool && itemPool.length > 0) {
+            const orderedResults = new Array(itemPool.length);
+            let nextPrintIdx = 0;
+
+            const flushOrderedResults = () => {
+                while (nextPrintIdx < itemPool.length && orderedResults[nextPrintIdx] !== undefined) {
+                    const entry = orderedResults[nextPrintIdx];
+                    if (entry.error) {
+                        console.error(`❌ Ошибка симуляции для ${entry.item.id} (${entry.item.name}):`, entry.error);
+                    } else {
+                        results.push(entry.res);
+                        console.log(formatConsoleRow(entry.res, activeFloors));
+                    }
+                    nextPrintIdx++;
+                }
+            };
+
+            const tasks = itemPool.map((item, idx) => ({
+                kind: "evalItem",
+                itemDef: item,
+                index: idx,
+            }));
+            await pool.runTasks(tasks, (task, payload) => {
+                if (payload.itemError) {
+                    orderedResults[task.index] = { error: payload.itemError, item: task.itemDef };
+                } else {
+                    orderedResults[task.index] = { res: payload };
+                }
+                flushOrderedResults();
+            });
         } else {
-            generateMarkdownReport(results, baselines, activeFloors);
-            colorizeAuditMarkdown(results);
+            for (const item of itemPool) {
+                try {
+                    const res = evaluateFloorItem(item, baselines, activeFloors, CLASSES, RUNS_PER_PLAYSTYLE);
+                    results.push(res);
+                    console.log(formatConsoleRow(res, activeFloors));
+                } catch (err) {
+                    console.error(`❌ Ошибка симуляции для ${item.id} (${item.name}):`, err.message);
+                }
+            }
+        }
+
+        const elapsed = Math.round((Date.now() - startTime) / 100) / 10;
+        console.log(tableRule);
+        console.log(`\n✨ Симуляция завершена за ${elapsed}s. Обработано сущностей: ${results.length}/${itemPool.length}.`);
+
+        if (!skipReport && results.length > 0) {
+            if (isFilteredRun) {
+                console.log("ℹ️ Фильтрованный прогон: файлы отчётов не перезаписаны (запустите без фильтров для полного обновления).");
+            } else {
+                generateMarkdownReport(results, baselines, activeFloors);
+                colorizeAuditMarkdown(results);
+            }
+        }
+    } finally {
+        if (pool) {
+            await pool.close();
         }
     }
 }
@@ -1864,7 +1933,366 @@ function assertAbyss(condition, message) {
     return 1;
 }
 
-main().catch(err => {
-    console.error("Критический сбой симулятора:", err);
-    process.exit(1);
-});
+async function runClassesAudit(activeFloors = ACTIVE_FLOOR_PROFILES) {
+    const startTime = Date.now();
+    const sortedClasses = [...CLASSES].sort(
+        (a, b) => (GAME_DATA.classes[a]?.cost ?? 0) - (GAME_DATA.classes[b]?.cost ?? 0)
+    );
+    const totalTasks = sortedClasses.length * activeFloors.length * PLAYSTYLES.length;
+    const usePool = WORKERS_COUNT > 1 && totalTasks >= 4;
+    const pool = usePool
+        ? createWorkerPool(Math.min(WORKERS_COUNT, totalTasks), {
+            activeFloors,
+            classes: sortedClasses,
+            runsPerPlaystyle: RUNS_PER_PLAYSTYLE,
+        })
+        : null;
+
+    try {
+        console.log("==========================================================================================");
+        console.log("⚔️ Headless Class Balance Audit — Paper-Lite (Сравнение классов без предметов)");
+        console.log(`Параметры: запусков/стиль=${RUNS_PER_PLAYSTYLE}, потоки=${pool ? pool.size : 1}, классы=[${sortedClasses.join(", ")}], этажи=[${activeFloors.map(f => f.label).join(", ")}]`);
+        console.log("==========================================================================================\n");
+
+        const sliceMap = new Map();
+        for (const cls of sortedClasses) {
+            for (const fp of activeFloors) {
+                sliceMap.set(`${cls}::${fp.id}`, []);
+            }
+        }
+
+        if (pool) {
+            const tasks = [];
+            for (const cls of sortedClasses) {
+                for (const fp of activeFloors) {
+                    for (const style of PLAYSTYLES) {
+                        tasks.push({
+                            kind: "styleSlice",
+                            itemDef: null,
+                            floorProfile: fp,
+                            styleId: style.id,
+                            classes: [cls],
+                            runsPerPlaystyle: RUNS_PER_PLAYSTYLE,
+                            sliceKey: `${cls}::${fp.id}`,
+                        });
+                    }
+                }
+            }
+            const slices = await pool.runTasks(tasks);
+            for (let i = 0; i < tasks.length; i++) {
+                sliceMap.get(tasks[i].sliceKey).push(slices[i]);
+            }
+        } else {
+            for (const cls of sortedClasses) {
+                for (const fp of activeFloors) {
+                    for (const style of PLAYSTYLES) {
+                        sliceMap.get(`${cls}::${fp.id}`).push(
+                            runStyleSlice(null, fp, style.id, [cls], RUNS_PER_PLAYSTYLE)
+                        );
+                    }
+                }
+            }
+        }
+
+        const floorColsHeader = activeFloors.map(fp => `${fp.label} (комн/закр)`.padEnd(14)).join(" | ");
+        const floorColsRule = activeFloors.map(() => "----------------").join("+");
+        const tableRule = `---------------------------+----------+${floorColsRule}+---------+----------+------------`;
+        console.log(`Класс (ID)                 | Цена     | ${floorColsHeader} | Ср.Комн | Ср.Урон  | К Страннику`);
+        console.log(tableRule);
+
+        const rows = [];
+        for (const cls of sortedClasses) {
+            const clsMeta = GAME_DATA.classes[cls] || { name: cls, cost: 0 };
+            const byFloor = {};
+            let sumRooms = 0;
+            let sumDamage = 0;
+
+            for (const fp of activeFloors) {
+                const sample = aggregateFloorSlices(sliceMap.get(`${cls}::${fp.id}`));
+                byFloor[fp.id] = {
+                    avgRooms: sample.avgRooms,
+                    clearPct: sample.clearPct,
+                    avgDamage: sample.avgDamage,
+                };
+                sumRooms += sample.avgRooms;
+                sumDamage += sample.avgDamage;
+            }
+
+            const floorCount = activeFloors.length || 1;
+            rows.push({
+                cls,
+                name: clsMeta.name || cls,
+                cost: clsMeta.cost ?? 0,
+                byFloor,
+                avgRooms: Math.round((sumRooms / floorCount) * 10) / 10,
+                avgDamage: Math.round((sumDamage / floorCount) * 10) / 10,
+            });
+        }
+
+        const refRow = rows.find(r => r.cls === "wanderer");
+        for (const row of rows) {
+            const namePad = `${row.name} (${row.cls})`.slice(0, 26).padEnd(26);
+            const costPad = `${row.cost} душ`.padEnd(8);
+            const floorCells = activeFloors.map(fp => {
+                const f = row.byFloor[fp.id];
+                return `${f.avgRooms.toFixed(1)} (${f.clearPct}%)`.padEnd(14);
+            }).join(" | ");
+            const avgRoomsPad = row.avgRooms.toFixed(1).padEnd(7);
+            const avgDmgPad = row.avgDamage.toFixed(1).padEnd(8);
+            const relStr = refRow && refRow.avgRooms > 0
+                ? `x${(row.avgRooms / refRow.avgRooms).toFixed(2)}`
+                : "—";
+            console.log(`${namePad} | ${costPad} | ${floorCells} | ${avgRoomsPad} | ${avgDmgPad} | ${relStr}`);
+        }
+
+        const elapsed = Math.round((Date.now() - startTime) / 100) / 10;
+        console.log(tableRule);
+        console.log(`\n✨ Аудит классов завершён за ${elapsed}s.`);
+    } finally {
+        if (pool) {
+            await pool.close();
+        }
+    }
+}
+
+function createWorkerPool(workerCount, config) {
+    const scriptUrl = new URL(import.meta.url);
+    const workers = [];
+    let closing = false;
+    let failed = false;
+    let failureError = null;
+    let nextMessageId = 1;
+    const inflight = new Map();
+
+    const failPool = (reason) => {
+        if (failed) return;
+        failed = true;
+        closing = true;
+        console.error(`❌ Аварийное завершение пула воркеров: ${reason}`);
+        for (const wk of workers) {
+            wk.terminate().catch(() => {});
+        }
+        failureError = new Error(reason);
+        for (const entry of inflight.values()) {
+            entry.reject(failureError);
+        }
+        inflight.clear();
+    };
+
+    for (let i = 0; i < workerCount; i++) {
+        const w = new Worker(scriptUrl, { workerData: config });
+        const workerIdx = i;
+        w.on("message", (msg) => {
+            const entry = inflight.get(msg.id);
+            if (!entry) return;
+            inflight.delete(msg.id);
+            if (msg.fatal) {
+                failPool(`Ошибка внутри воркера #${workerIdx + 1}: ${msg.fatal}`);
+                return;
+            }
+            entry.resolve(msg.payload);
+        });
+        w.on("error", (err) => {
+            failPool(`Событие error в воркере #${workerIdx + 1}: ${err.stack || err.message}`);
+        });
+        w.on("exit", (code) => {
+            if (!closing) {
+                failPool(`Воркер #${workerIdx + 1} завершился с кодом ${code}`);
+            }
+        });
+        workers.push(w);
+    }
+
+    const sendToWorker = (worker, message) => {
+        return new Promise((resolve, reject) => {
+            if (failed) {
+                reject(failureError || new Error("Пул воркеров остановлен"));
+                return;
+            }
+            const id = nextMessageId++;
+            inflight.set(id, { resolve, reject });
+            worker.postMessage({ ...message, id });
+        });
+    };
+
+    return {
+        size: workerCount,
+        async broadcast(message) {
+            await Promise.all(workers.map(w => sendToWorker(w, message)));
+        },
+        async runTasks(tasks, onTaskResult = null) {
+            if (tasks.length === 0) return [];
+            const results = new Array(tasks.length);
+            let nextTaskIdx = 0;
+
+            const pumpWorker = async (worker) => {
+                while (true) {
+                    if (failed) throw failureError || new Error("Пул воркеров остановлен");
+                    const taskIdx = nextTaskIdx++;
+                    if (taskIdx >= tasks.length) return;
+                    const task = tasks[taskIdx];
+                    const payload = await sendToWorker(worker, task);
+                    results[taskIdx] = payload;
+                    if (onTaskResult) onTaskResult(task, payload);
+                }
+            };
+
+            await Promise.all(workers.map(w => pumpWorker(w)));
+            return results;
+        },
+        async close() {
+            closing = true;
+            await Promise.allSettled(workers.map(w => w.terminate()));
+        },
+    };
+}
+
+function initWorker() {
+    let workerBaselines = null;
+    const cfg = workerData || {};
+
+    parentPort.on("message", (msg) => {
+        try {
+            if (msg.kind === "setBaselines") {
+                workerBaselines = msg.baselines;
+                parentPort.postMessage({ id: msg.id, payload: true });
+                return;
+            }
+            if (msg.kind === "styleSlice") {
+                const classes = msg.classes || cfg.classes || CLASSES;
+                const runs = msg.runsPerPlaystyle ?? cfg.runsPerPlaystyle ?? RUNS_PER_PLAYSTYLE;
+                const slice = runStyleSlice(msg.itemDef, msg.floorProfile, msg.styleId, classes, runs);
+                restoreRandom();
+                parentPort.postMessage({ id: msg.id, payload: slice });
+                return;
+            }
+            if (msg.kind === "evalItem") {
+                try {
+                    const activeFloors = cfg.activeFloors || ACTIVE_FLOOR_PROFILES;
+                    const classes = cfg.classes || CLASSES;
+                    const runs = cfg.runsPerPlaystyle ?? RUNS_PER_PLAYSTYLE;
+                    const res = evaluateFloorItem(msg.itemDef, workerBaselines, activeFloors, classes, runs);
+                    restoreRandom();
+                    parentPort.postMessage({ id: msg.id, payload: res });
+                } catch (itemErr) {
+                    restoreRandom();
+                    parentPort.postMessage({
+                        id: msg.id,
+                        payload: { itemError: itemErr.message },
+                    });
+                }
+                return;
+            }
+            parentPort.postMessage({ id: msg.id, fatal: `Неизвестный тип задачи: ${msg.kind}` });
+        } catch (err) {
+            restoreRandom();
+            parentPort.postMessage({ id: msg.id, fatal: err.stack || err.message });
+        }
+    });
+}
+
+function aggregateFloorSlices(slices, metricsA = null, metricsB = null) {
+    const byStyleId = {};
+    for (const s of slices) {
+        byStyleId[s.styleId] = s;
+    }
+
+    let totalAllDamage = 0;
+    let totalAllRooms = 0;
+    let totalAllTurns = 0;
+    let totalAllRuns = 0;
+    let totalAllClears = 0;
+    const byPlaystyle = {};
+
+    for (const style of PLAYSTYLES) {
+        const slice = byStyleId[style.id];
+        if (!slice) continue;
+
+        if (metricsA) mergeMetrics(metricsA, slice.metrics);
+        if (metricsB) mergeMetrics(metricsB, slice.metrics);
+
+        byPlaystyle[style.id] = {
+            avgDamage: Math.round((slice.styleDamage / slice.styleRuns) * 10) / 10,
+            avgRooms: Math.round((slice.styleRooms / slice.styleRuns) * 10) / 10,
+        };
+
+        totalAllDamage += slice.styleDamage;
+        totalAllRooms += slice.styleRooms;
+        totalAllTurns += slice.totalTurns;
+        totalAllRuns += slice.styleRuns;
+        totalAllClears += slice.floorClears;
+    }
+
+    return {
+        avgDamage: Math.round((totalAllDamage / totalAllRuns) * 10) / 10,
+        avgRooms: Math.round((totalAllRooms / totalAllRuns) * 10) / 10,
+        avgTurns: Math.round((totalAllTurns / totalAllRuns) * 10) / 10,
+        clearPct: Math.round((totalAllClears / totalAllRuns) * 100),
+        byPlaystyle,
+    };
+}
+
+function runStyleSlice(itemDef, floorProfile, styleId, classes = CLASSES, runsPerPlaystyle = RUNS_PER_PLAYSTYLE) {
+    const metrics = createMetricsContainer();
+    let styleDamage = 0;
+    let styleRooms = 0;
+    let totalTurns = 0;
+    let styleRuns = 0;
+    let floorClears = 0;
+
+    for (const cls of classes) {
+        for (let i = 0; i < runsPerPlaystyle; i++) {
+            const res = simulateFloorRun(cls, itemDef, styleId, i, metrics, floorProfile);
+            styleDamage += res.runDamage;
+            styleRooms += res.roomsCleared;
+            totalTurns += res.totalTurns;
+            styleRuns++;
+            if (res.floorCleared) floorClears++;
+        }
+    }
+
+    return {
+        styleId,
+        floorId: floorProfile.id,
+        styleDamage,
+        styleRooms,
+        totalTurns,
+        styleRuns,
+        floorClears,
+        metrics,
+    };
+}
+
+function mergeMetrics(target, source) {
+    target.totalDamageDealt += source.totalDamageDealt;
+    target.roomsCleared += source.roomsCleared;
+    target.turnsSurvived += source.turnsSurvived;
+    for (const sk of ALL_SKILLS) {
+        target.skillCasts[sk] += source.skillCasts[sk];
+        target.skillDamage[sk] += source.skillDamage[sk];
+        target.skillDefense[sk] += source.skillDefense[sk];
+    }
+}
+
+function getOwnFloorStepCount(floorProfile) {
+    const stepsSource = floorProfile && floorProfile.customSteps ? floorProfile.customSteps : GAUNTLET_STEPS;
+    const startStep = floorProfile && !floorProfile.customSteps ? floorProfile.startStepIndex : 0;
+    let count = 0;
+    for (let i = startStep; i < stepsSource.length; i++) {
+        if (stepsSource[i].floor === floorProfile.floor) {
+            count++;
+        } else {
+            break;
+        }
+    }
+    return count || (stepsSource.length - startStep);
+}
+
+if (isMainThread) {
+    main().catch(err => {
+        console.error("Критический сбой симулятора:", err);
+        process.exit(1);
+    });
+} else {
+    initWorker();
+}
