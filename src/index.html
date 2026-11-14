@@ -223,8 +223,8 @@
                 height: 64px;
                 box-sizing: content-box;
                 flex-shrink: 0;
-                background-repeat: no-repeat;
-                image-rendering: pixelated;
+                position: relative;
+                overflow: hidden;
                 background-color: #151515;
                 border: 1px solid #444;
                 border-right: none;
@@ -236,11 +236,21 @@
                 height: 128px;
             }
 
+            .enemy-sprite-art {
+                width: 100%;
+                height: 100%;
+                background-repeat: no-repeat;
+                image-rendering: pixelated;
+                transform-origin: center center;
+            }
+
             .enemy-sprite-fallback {
                 width: 64px;
                 height: 64px;
                 box-sizing: content-box;
                 flex-shrink: 0;
+                position: relative;
+                overflow: hidden;
                 display: flex;
                 align-items: center;
                 justify-content: center;
@@ -251,10 +261,81 @@
                 border-radius: 6px 0 0 6px;
             }
 
+            .enemy-sprite-fallback .enemy-sprite-art {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+
             .enemy-sprite-fallback.elite {
                 width: 128px;
                 height: 128px;
                 font-size: 40px;
+            }
+
+            .mutated::after {
+                content: "";
+                position: absolute;
+                inset: 0;
+                pointer-events: none;
+            }
+
+            .mut-poison .enemy-sprite-art {
+                filter: sepia(1) saturate(4) hue-rotate(68deg) brightness(0.96) contrast(1.1);
+            }
+
+            .mut-poison::after {
+                background: radial-gradient(circle, transparent 48%, rgba(102, 187, 106, 0.34) 100%);
+                box-shadow: inset 0 0 12px rgba(76, 175, 80, 0.45);
+                animation: mut-aura-pulse 2.4s ease-in-out infinite;
+            }
+
+            .mut-blood .enemy-sprite-art {
+                filter: sepia(1) saturate(4.5) hue-rotate(-38deg) brightness(0.95) contrast(1.15);
+            }
+
+            .mut-blood::after {
+                background: radial-gradient(circle, transparent 48%, rgba(229, 57, 53, 0.36) 100%);
+                box-shadow: inset 0 0 12px rgba(229, 57, 53, 0.48);
+                animation: mut-aura-pulse 1.9s ease-in-out infinite;
+            }
+
+            .mut-regen .enemy-sprite-art {
+                filter: sepia(1) saturate(3.2) hue-rotate(128deg) brightness(1) contrast(1.1);
+            }
+
+            .mut-regen::after {
+                background: radial-gradient(circle, transparent 46%, rgba(38, 198, 218, 0.34) 100%);
+                box-shadow: inset 0 0 12px rgba(38, 198, 218, 0.45);
+                animation: mut-aura-pulse 2.6s ease-in-out infinite;
+            }
+
+            .mut-armor .enemy-sprite-art {
+                filter: sepia(1) saturate(2.2) hue-rotate(172deg) brightness(1.05) contrast(1.25);
+            }
+
+            .mut-armor::after {
+                background: radial-gradient(circle, transparent 52%, rgba(144, 164, 174, 0.28) 100%);
+                box-shadow: inset 0 0 0 2px rgba(176, 190, 197, 0.35), inset 0 0 10px rgba(120, 144, 156, 0.4);
+            }
+
+            .mut-giant .enemy-sprite-art {
+                transform: scale(1.16);
+                filter: sepia(1) saturate(2.8) hue-rotate(-8deg) contrast(1.25);
+            }
+
+            .mut-giant::after {
+                background: radial-gradient(circle, transparent 46%, rgba(255, 167, 38, 0.3) 100%);
+                box-shadow: inset 0 0 14px rgba(255, 152, 0, 0.4);
+            }
+
+            @keyframes mut-aura-pulse {
+                0%, 100% {
+                    opacity: 0.55;
+                }
+                50% {
+                    opacity: 1;
+                }
             }
 
             .enemy-info {

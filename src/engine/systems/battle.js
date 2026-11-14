@@ -32,6 +32,7 @@ export function createEnemyInstance(game, enemyKey, applyMutation = false) {
 
     if (applyMutation && !e.isBoss) {
         const mut = RNG.choice(GAME_DATA.mutations);
+        e.mutationId = mut.id;
         e.name = `${mut.prefix} ${e.name}`;
         e.hp += Math.round((mut.hpBonus || 0) * depthMult);
         e.currentHp = e.hp;

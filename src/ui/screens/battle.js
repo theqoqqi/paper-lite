@@ -6,6 +6,20 @@ import { renderTextWithRarity } from "../rarity.js";
 
 const activeRowMap = new Map();
 
+const MUTATION_VISUAL_GROUPS = {
+    armored: "armor",
+    spiked: "armor",
+    barbed: "armor",
+    furious: "blood",
+    bloodthirsty: "blood",
+    frenzied: "blood",
+    plagued: "poison",
+    toxic: "poison",
+    regen: "regen",
+    undying: "regen",
+    giant: "giant",
+};
+
 export function renderBattleScreen(render) {
     game.ensureValidTarget();
     const p = game.player;
@@ -134,6 +148,8 @@ export function renderBattleScreen(render) {
 
             const isBossBanner = Boolean(en.sprite && en.sprite.isBanner);
             const isEliteSprite = Boolean(en.sprite && en.sprite.width === 128);
+            const mutGroup = en.mutationId ? MUTATION_VISUAL_GROUPS[en.mutationId] : null;
+            const mutClassSuffix = mutGroup ? ` mutated mut-${mutGroup}` : "";
 
             let spriteEl;
             if (isBossBanner) {
@@ -145,18 +161,26 @@ export function renderBattleScreen(render) {
                 });
             } else if (en.sprite) {
                 spriteEl = el("div", {
-                    className: `enemy-sprite ${isEliteSprite ? "elite" : ""}`,
-                    style: {
-                        backgroundImage: `url("${en.sprite.src}")`,
-                        backgroundPosition: `-${en.sprite.x}px -${en.sprite.y}px`,
-                    },
-                });
+                    className: `enemy-sprite${isEliteSprite ? " elite" : ""}${mutClassSuffix}`,
+                }, [
+                    el("div", {
+                        className: "enemy-sprite-art",
+                        style: {
+                            backgroundImage: `url("${en.sprite.src}")`,
+                            backgroundPosition: `-${en.sprite.x}px -${en.sprite.y}px`,
+                        },
+                    }),
+                ]);
             } else {
                 const fallbackText = en.isBoss ? "👑" : (en.name.includes("Мимик") ? "📦" : (en.isElite ? "💀" : "👾"));
                 spriteEl = el("div", {
-                    className: `enemy-sprite-fallback ${en.isElite ? "elite" : ""}`,
-                    text: fallbackText,
-                });
+                    className: `enemy-sprite-fallback${en.isElite ? " elite" : ""}${mutClassSuffix}`,
+                }, [
+                    el("div", {
+                        className: "enemy-sprite-art",
+                        text: fallbackText,
+                    }),
+                ]);
             }
 
             const infoChildren = [];
