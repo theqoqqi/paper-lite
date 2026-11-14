@@ -45,7 +45,7 @@ export function setupShop(game) {
     const pot2 = pickItemByRarity(pot2Pool, game.floor) || pot1;
 
     const forgeWeaponCost = scaleShopCost(14 + game.player.weaponUpgradeLvl * 10, game.floor);
-    const forgeArmorCost = scaleShopCost(14 + game.player.armorUpgradeLvl * 10, game.floor);
+    const forgeArmorCost = scaleShopCost(24 + game.player.armorUpgradeLvl * 16, game.floor);
     const healCost = scaleShopCost(5, game.floor);
 
     game.shopOffers = [{
@@ -59,7 +59,7 @@ export function setupShop(game) {
     }, {
         id: "forge_armor",
         kind: "forge_a",
-        name: `🛡️ Укрепление брони (Ур. ${game.player.armorUpgradeLvl + 1}: +3 HP и +DEF)`,
+        name: `🛡️ Укрепление брони (Ур. ${game.player.armorUpgradeLvl + 1}: +1 DEF навсегда)`,
         cost: forgeArmorCost,
         bought: false,
     }, {
@@ -158,7 +158,6 @@ export function buyShopOffer(game, index) {
         game.player.weaponUpgradeLvl += 1;
     } else if (offer.kind === "forge_a") {
         game.player.armorUpgradeLvl += 1;
-        game.player.heal(3);
     } else if (offer.kind === "potion") {
         game.player.inventory.potions.push({ ...offer.item });
     } else if (offer.kind === "weapon") {

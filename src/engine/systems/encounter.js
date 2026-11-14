@@ -16,16 +16,7 @@ export function grantRandomEquipment(game, origin = "battle") {
     const roll = RNG.range(1, 3);
     if (roll === 1 || roll === 2) {
         const type = roll === 1 ? "weapon" : "armor";
-        const pool = roll === 1 ? GAME_DATA.items.weapons : GAME_DATA.items.armors;
-        const label = roll === 1 ? "Оружие" : "Броня";
-        const item = pickItemByRarity(pool, game.floor);
-        if (!item) return null;
-        game.pendingEquipment = {
-            type: type,
-            item: { ...item },
-            origin: origin,
-        };
-        return `${label}: [${item.rarity}] ${item.name} (${item.desc})`;
+        return grantEquipmentByType(game, type, origin);
     }
     const art = grantRandomArtifact(game);
     if (art) {
@@ -190,14 +181,15 @@ export function resolveEventOption(game, optionId) {
     } else if (optionId === "spring_max") {
         game.player.baseMaxHp += 5;
         game.player.heal(5);
-    } else if (optionId === "smith_atk") {
-        game.player.weaponUpgradeLvl += 1;
-    } else if (optionId === "smith_def") {
-        game.player.armorUpgradeLvl += 1;
-        game.player.heal(3);
-    } else if (optionId === "smith_xp") {
-        game.player.xp += 10;
-        game.player.totalRunXp += 10;
+    } else if (optionId === "smith_weapon" || optionId === "smith_armor") {
+        const type = optionId === "smith_weapon" ? "weapon" : "armor";
+        const loot = grantEquipmentByType(game, type, "event");
+        openEventRewards(game, {
+            items: loot ? [loot] : [],
+        });
+        return;
+    } else if (optionId === "smith_gold") {
+        game.player.gold += 15;
     } else if (optionId === "stash_take") {
         game.player.gold += 10;
         game.player.heal(5);
@@ -320,9 +312,9 @@ export function resolveEventOption(game, optionId) {
     } else if (optionId === "pilgrim_help") {
         if (game.player.hp <= 5) return;
         game.player.hp -= 5;
-        game.player.weaponUpgradeLvl += 1;
-        game.player.xp += 8;
-        game.player.totalRunXp += 8;
+        game.player.baseMaxHp += 6;
+        game.player.xp += 12;
+        game.player.totalRunXp += 12;
     } else if (optionId === "pilgrim_rob") {
         game.player.gold += 15;
         const items = [];
@@ -397,8 +389,8 @@ export function resolveEventOption(game, optionId) {
         return;
     } else if (optionId === "rift_dive") {
         if (RNG.chance(50)) {
-            game.player.armorUpgradeLvl += 1;
-            game.player.heal(3);
+            game.player.baseMaxHp += 10;
+            game.player.heal(10);
         } else {
             game.player.hp = Math.max(1, game.player.hp - 8);
         }
@@ -642,6 +634,20 @@ function startEliteEventWithArtifact(game, bonusGold, sourceText) {
         game.battleLog.unshift(`💰 ${sourceText}: +${bonusGold}G. Внутри таится проклятая реликвия!`);
     }
     game.saveGame("autosave");
+}
+
+function grantEquipmentByType(game, type, origin = "battle") {
+    const isWeapon = type === "weapon";
+    const pool = isWeapon ? GAME_DATA.items.weapons : GAME_DATA.items.armors;
+    const label = isWeapon ? "Оружие" : "Броня";
+    const item = pickItemByRarity(pool, game.floor);
+    if (!item) return null;
+    game.pendingEquipment = {
+        type: type,
+        item: { ...item },
+        origin: origin,
+    };
+    return `${label}: [${item.rarity}] ${item.name} (${item.desc})`;
 }
 
 function collectEventArtifact(game, items, notes) {

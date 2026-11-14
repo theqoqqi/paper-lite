@@ -159,7 +159,6 @@ export class Player {
     getTotalMaxHp() {
         let val = this.baseMaxHp;
         if (this.inventory.armor && this.inventory.armor.hp) val += this.inventory.armor.hp;
-        val += this.armorUpgradeLvl * 3;
         if (this.hasArtifact("art9")) val += 6;
         if (this.perks.includes("p23")) val += 10;
         if (this.perks.includes("p5")) val -= 5;
@@ -214,7 +213,7 @@ export class Player {
     }
 
     getTotalDef() {
-        let val = this.baseDef + Math.floor(this.armorUpgradeLvl / 2);
+        let val = this.baseDef + this.armorUpgradeLvl;
         if (this.inventory.weapon && this.inventory.weapon.def) val += this.inventory.weapon.def;
         if (this.inventory.armor) val += this.inventory.armor.def || 0;
         if (this.hasArtifact("art35")) val += 1;

@@ -702,7 +702,7 @@ function processIntermission(game, step, roomsSinceCampfire) {
         const upgradeStep = (p._simUpgradesDone || 0) % 2;
         const nextCost = upgradeStep === 0
             ? 14 + (p.weaponUpgradeLvl + baseForgeLvl) * 10
-            : 14 + (p.armorUpgradeLvl + baseForgeLvl) * 10;
+            : 24 + (p.armorUpgradeLvl + baseForgeLvl) * 16;
         if (p.gold < nextCost) break;
 
         p.gold -= nextCost;
@@ -712,7 +712,6 @@ function processIntermission(game, step, roomsSinceCampfire) {
             p.weaponUpgradeLvl += 1;
         } else {
             p.armorUpgradeLvl += 1;
-            p.heal(3);
         }
     }
 
@@ -1891,7 +1890,8 @@ function simulateAbyssDeepRun(classId, runIndex) {
             while (true) {
                 const upgradeStep = (p._simAbyssUpgrades || 0) % 2;
                 const lvl = upgradeStep === 0 ? p.weaponUpgradeLvl : p.armorUpgradeLvl;
-                const nextCost = Math.max(1, Math.round((14 + lvl * 10) * priceMult));
+                const baseCost = upgradeStep === 0 ? 14 + lvl * 10 : 24 + lvl * 16;
+                const nextCost = Math.max(1, Math.round(baseCost * priceMult));
                 if (p.gold < nextCost) break;
                 p.gold -= nextCost;
                 p._simAbyssUpgrades = (p._simAbyssUpgrades || 0) + 1;
