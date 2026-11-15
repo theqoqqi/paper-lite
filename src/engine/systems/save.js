@@ -50,6 +50,8 @@ export function serializeState(game) {
         fountainResult: game.fountainResult || null,
         eventRewards: game.eventRewards,
         currentCorridorResult: game.currentCorridorResult,
+        scoutCooldown: game.scoutCooldown || 0,
+        scoutSession: game.scoutSession || null,
     });
 }
 
@@ -111,6 +113,8 @@ export function loadGame(game, slotKeyOrJson = "autosave") {
         game.shopMergedNotice = null;
         game.eventRewards = data.eventRewards || null;
         game.currentCorridorResult = data.currentCorridorResult || null;
+        game.scoutCooldown = data.scoutCooldown || 0;
+        game.scoutSession = data.scoutSession || null;
         return true;
     } catch (e) {
         console.error(e);

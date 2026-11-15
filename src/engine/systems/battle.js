@@ -189,6 +189,26 @@ export function setupBattle(game, mode = "normal") {
     if (game.player.perks.includes("p27")) {
         game.enemies.forEach(en => { en.poison += 1; });
     }
+    const currentRoom = game.dungeonRooms && game.playerPos
+        ? game.dungeonRooms[`${game.playerPos.x},${game.playerPos.y}`]
+        : null;
+    if (currentRoom) {
+        if (currentRoom.poisoned) {
+            game.enemies.forEach(en => { en.poison += 2; });
+            currentRoom.poisoned = false;
+            game.battleLog.unshift("🧪 Диверсия: враги начинают бой с +2 Яда.");
+        }
+        if (currentRoom.alerted) {
+            game.enemies.forEach(en => { en.shield = (en.shield || 0) + 3; });
+            currentRoom.alerted = false;
+            game.battleLog.unshift("🛡️ Враги настороже: каждый начинает бой со +3 Щита.");
+        }
+        if (currentRoom.weakened) {
+            game.player.concentrateBonus = (game.player.concentrateBonus || 0) + 5;
+            currentRoom.weakened = false;
+            game.battleLog.unshift("🎯 Слабое место изучено: +5 к следующей атаке.");
+        }
+    }
 
     game.player.tempSpikes = 0;
     game.player.battleSpikes = 0;

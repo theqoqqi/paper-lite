@@ -8,6 +8,98 @@ import * as ShopSystem from "./systems/shop.js";
 import * as EncounterSystem from "./systems/encounter.js";
 import * as BattleSystem from "./systems/battle.js";
 
+const SCOUT_DIRS = [
+    { name: "up", dx: 0, dy: -1 },
+    { name: "down", dx: 0, dy: 1 },
+    { name: "left", dx: -1, dy: 0 },
+    { name: "right", dx: 1, dy: 0 },
+];
+
+const SCOUT_ACTION_CONFIG = {
+    battle: {
+        label: "Провести диверсию",
+        icon: "⚔️",
+        successText: "Вы незаметно подкинули яд к привалу врагов (враги начнут бой в этой комнате с +2 Яда).",
+        failText: "Враги заметили движение в проходе (в этой комнате враги начнут со +3 Щита).",
+        isCombat: true,
+        onSuccess: (game, room) => {
+            if (room) room.poisoned = true;
+        },
+    },
+    elite: {
+        label: "Выследить слабость",
+        icon: "💀",
+        successText: "Вы разглядели брешь в защите противника (+5 к первой атаке в этой комнате).",
+        failText: "Противник почуял слежку (в этой комнате враги начнут со +3 Щита).",
+        isCombat: true,
+        onSuccess: (game, room) => {
+            if (room) room.weakened = true;
+        },
+    },
+    boss: {
+        label: "Изучить повадки босса",
+        icon: "👑",
+        successText: "Вы заметили уязвимый момент в движениях босса (+5 к первой атаке в этой комнате).",
+        failText: "Владыка зала заметил вашу тень в проходе (в комнате босса враги начнут со +3 Щита).",
+        isCombat: true,
+        onSuccess: (game, room) => {
+            if (room) room.weakened = true;
+        },
+    },
+    corridor: {
+        label: "Наметить короткий путь",
+        icon: "🕯️",
+        successText: "Вы заранее разглядели удобный обход и сэкономили силы (+1 EN).",
+        failText: "Короткого пути нет — лишь зря потратили время.",
+        isCombat: false,
+        onSuccess: (game) => {
+            game.player.en = Math.min(game.player.getTotalMaxEn(), game.player.en + 1);
+        },
+    },
+    event: {
+        label: "Прислушаться к происходящему",
+        icon: "❓",
+        successText: "Удалось подметить важные детали до входа в комнату (+7 XP).",
+        failText: "Впереди тихо — ничего интересного.",
+        isCombat: false,
+        onSuccess: (game) => {
+            game.player.xp += 7;
+            game.player.totalRunXp += 7;
+        },
+    },
+    shop: {
+        label: "Осмотреть ящики у входа",
+        icon: "⚖️",
+        successText: "Среди придорожных ящиков нашлось несколько забытых монет (+6 Золота).",
+        failText: "Вас прогнали охранники — вы не успели ничего найти.",
+        isCombat: false,
+        onSuccess: (game) => {
+            game.player.gold += 6;
+        },
+    },
+    campfire: {
+        label: "Понаблюдать за огнём",
+        icon: "🔥",
+        successText: "Ровное пламя успокаивает дыхание и возвращает немного сил (+5 HP).",
+        failText: "Огонь почти затух — перевести дух не удалось.",
+        isCombat: false,
+        onSuccess: (game) => {
+            game.player.heal(5);
+        },
+    },
+    fountain: {
+        label: "Понаблюдать за блуждающими духами",
+        icon: "⛲",
+        successText: "Блуждающие отголоски душ притягиваются из зала (+4 Очка Душ).",
+        failText: "Духи растворились во мраке — ничего не случилось.",
+        isCombat: false,
+        onSuccess: (game) => {
+            game.meta.souls += 4;
+            game.saveMeta();
+        },
+    },
+};
+
 export class Game {
     constructor() {
         this.defaultMeta = {
@@ -57,6 +149,8 @@ export class Game {
         this.currentCorridorResult = null;
         this.battleFx = [];
         this.previewShopOfferIndex = null;
+        this.scoutCooldown = 0;
+        this.scoutSession = null;
     }
 
     init() {
@@ -162,6 +256,8 @@ export class Game {
         this.eventRewards = null;
         this.currentCorridorResult = null;
         this.previewShopOfferIndex = null;
+        this.scoutCooldown = 0;
+        this.scoutSession = null;
         this.generateFloorMap();
         this.state = "MAP";
         this.saveGame("autosave");
@@ -169,6 +265,8 @@ export class Game {
 
     generateFloorMap() {
         if (this.player) this.player.secondWindAvailable = true;
+        this.scoutCooldown = 0;
+        this.scoutSession = null;
         const generated = DungeonGenerator.generate(this.floor);
         this.dungeonRooms = generated.rooms;
         this.playerPos = { ...generated.startPos };
@@ -198,6 +296,7 @@ export class Game {
         playSound("step");
         if (isNewRoom) {
             this.player.en = Math.min(this.player.getTotalMaxEn(), this.player.en + 1);
+            this.scoutCooldown = Math.max(0, (this.scoutCooldown || 0) - 1);
         }
         targetRoom.visited = true;
         targetRoom.visible = true;
@@ -215,15 +314,8 @@ export class Game {
         const currentRoom = this.dungeonRooms[`${px},${py}`];
         if (!currentRoom) return { canScout: false, reason: "no_room" };
 
-        const dirs = [
-            { name: "up", dx: 0, dy: -1 },
-            { name: "down", dx: 0, dy: 1 },
-            { name: "left", dx: -1, dy: 0 },
-            { name: "right", dx: 1, dy: 0 },
-        ];
-
         let unrevealedCount = 0;
-        for (const dir of dirs) {
+        for (const dir of SCOUT_DIRS) {
             if (currentRoom.doors[dir.name]) {
                 const adjKey = `${px + dir.dx},${py + dir.dy}`;
                 const adjRoom = this.dungeonRooms[adjKey];
@@ -237,15 +329,43 @@ export class Game {
             return { canScout: false, reason: "all_revealed" };
         }
 
-        if (this.player.en >= 1) {
-            return { canScout: true, costType: "en", cost: 1, count: unrevealedCount };
+        if ((this.scoutCooldown || 0) > 0) {
+            return {
+                canScout: false,
+                reason: "cooldown",
+                cooldown: this.scoutCooldown,
+                count: unrevealedCount,
+            };
         }
 
-        if (this.player.classId === "reaper" && this.player.hp > 2) {
-            return { canScout: true, costType: "hp", cost: 2, count: unrevealedCount };
+        const cost = unrevealedCount;
+        if (this.player.en >= cost) {
+            return {
+                canScout: true,
+                costType: "en",
+                cost,
+                enSpent: cost,
+                hpCost: 0,
+                count: unrevealedCount,
+            };
         }
 
-        return { canScout: false, reason: "no_en", count: unrevealedCount };
+        if (this.player.classId === "reaper") {
+            const enSpent = Math.max(0, this.player.en);
+            const hpCost = (cost - enSpent) * 2;
+            if (this.player.hp > hpCost) {
+                return {
+                    canScout: true,
+                    costType: enSpent > 0 ? "en_hp" : "hp",
+                    cost,
+                    enSpent,
+                    hpCost,
+                    count: unrevealedCount,
+                };
+            }
+        }
+
+        return { canScout: false, reason: "no_en", cost, count: unrevealedCount };
     }
 
     scoutSurroundings() {
@@ -253,36 +373,143 @@ export class Game {
         const status = this.getScoutStatus();
         if (!status.canScout) return false;
 
-        if (status.costType === "en") {
-            this.player.en -= 1;
-        } else if (status.costType === "hp") {
-            this.player.hp -= 2;
+        if (status.enSpent > 0) {
+            this.player.en -= status.enSpent;
+        }
+        if (status.hpCost > 0) {
+            this.player.hp -= status.hpCost;
         }
 
         const px = this.playerPos.x;
         const py = this.playerPos.y;
         const currentRoom = this.dungeonRooms[`${px},${py}`];
 
-        const dirs = [
-            { name: "up", dx: 0, dy: -1 },
-            { name: "down", dx: 0, dy: 1 },
-            { name: "left", dx: -1, dy: 0 },
-            { name: "right", dx: 1, dy: 0 },
-        ];
+        const revealedRooms = [];
+        const seenTypes = new Set();
+        const actions = [];
 
-        for (const dir of dirs) {
+        for (const dir of SCOUT_DIRS) {
             if (currentRoom.doors[dir.name]) {
                 const adjKey = `${px + dir.dx},${py + dir.dy}`;
                 const adjRoom = this.dungeonRooms[adjKey];
                 if (adjRoom) {
+                    const wasUnrevealed = !adjRoom.revealed && !adjRoom.visited;
                     adjRoom.revealed = true;
                     adjRoom.visible = true;
+                    if (wasUnrevealed) {
+                        revealedRooms.push({ id: adjKey, type: adjRoom.type });
+                        if (!seenTypes.has(adjRoom.type) && SCOUT_ACTION_CONFIG[adjRoom.type]) {
+                            seenTypes.add(adjRoom.type);
+                            const cfg = SCOUT_ACTION_CONFIG[adjRoom.type];
+                            actions.push({
+                                id: adjRoom.type,
+                                type: adjRoom.type,
+                                icon: cfg.icon,
+                                label: cfg.label,
+                            });
+                        }
+                    }
                 }
             }
         }
 
+        this.scoutCooldown = 5;
+        this.scoutSession = {
+            revealedRooms,
+            actions,
+            result: null,
+        };
+        this.state = "SCOUT";
         this.saveGame("autosave");
         return true;
+    }
+
+    resolveScoutAction(actionId) {
+        if (this.state !== "SCOUT" || !this.scoutSession || this.scoutSession.result) return false;
+
+        if (actionId === "quiet") {
+            this.scoutSession = null;
+            this.state = "MAP";
+            this.saveGame("autosave");
+            return true;
+        }
+
+        if (actionId === "far_passage") {
+            this.scoutCooldown = (this.scoutCooldown || 5) + 1;
+            const candidates = [];
+            const candidateIds = new Set();
+            for (const entry of this.scoutSession.revealedRooms) {
+                const refRoom = this.dungeonRooms[entry.id];
+                if (!refRoom) continue;
+                for (const dir of SCOUT_DIRS) {
+                    if (!refRoom.doors[dir.name]) continue;
+                    const candKey = `${refRoom.x + dir.dx},${refRoom.y + dir.dy}`;
+                    const candRoom = this.dungeonRooms[candKey];
+                    if (candRoom && !candRoom.revealed && !candRoom.visited && !candidateIds.has(candKey)) {
+                        candidateIds.add(candKey);
+                        candidates.push(candRoom);
+                    }
+                }
+            }
+
+            if (candidates.length > 0 && RNG.chance(50)) {
+                const chosen = RNG.choice(candidates);
+                chosen.revealed = true;
+                chosen.visible = true;
+                this.scoutSession.result = {
+                    title: "👣 Осмотреть дальний проход",
+                    text: "За открытыми комнатами удалось разглядеть ещё один проход.",
+                    tone: "positive",
+                };
+            } else {
+                this.scoutSession.result = {
+                    title: "👣 Осмотреть дальний проход",
+                    text: "Впереди ничего не разглядеть.",
+                    tone: "neutral",
+                };
+            }
+
+            this.saveGame("autosave");
+            return true;
+        }
+
+        const hasAction = this.scoutSession.actions.some(a => a.id === actionId);
+        const cfg = SCOUT_ACTION_CONFIG[actionId];
+        if (!hasAction || !cfg) return false;
+
+        this.scoutCooldown = (this.scoutCooldown || 5) + 1;
+        const matchingRooms = this.scoutSession.revealedRooms
+            .filter(r => r.type === actionId)
+            .map(r => this.dungeonRooms[r.id])
+            .filter(Boolean);
+        const targetRoom = matchingRooms.length > 0 ? RNG.choice(matchingRooms) : null;
+
+        if (RNG.chance(70)) {
+            cfg.onSuccess(this, targetRoom);
+            this.scoutSession.result = {
+                title: `${cfg.icon} ${cfg.label}`,
+                text: cfg.successText,
+                tone: "positive",
+            };
+        } else {
+            if (cfg.isCombat && targetRoom) {
+                targetRoom.alerted = true;
+            }
+            this.scoutSession.result = {
+                title: `${cfg.icon} ${cfg.label}`,
+                text: cfg.failText,
+                tone: cfg.isCombat ? "negative" : "neutral",
+            };
+        }
+
+        this.saveGame("autosave");
+        return true;
+    }
+
+    finishScoutSession() {
+        if (this.state !== "SCOUT") return;
+        this.scoutSession = null;
+        this.checkLevelUpOrFinishRoom();
     }
 
     updateFogOfWar() {

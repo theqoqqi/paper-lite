@@ -66,7 +66,7 @@ export function renderGlobalNav(render) {
 
     const row = el("div", { className: "flex-row" });
     const hasCharacterButton = game.player
-        && ["MAP", "BATTLE", "SHOP", "EVENT", "CAMPFIRE", "EVENT_REWARDS", "CORRIDOR", "FOUNTAIN"].includes(game.state);
+        && ["MAP", "BATTLE", "SHOP", "EVENT", "CAMPFIRE", "EVENT_REWARDS", "CORRIDOR", "FOUNTAIN", "SCOUT"].includes(game.state);
 
     if (hasCharacterButton) {
         row.appendChild(el("button", {

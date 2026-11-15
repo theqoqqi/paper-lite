@@ -3,19 +3,27 @@ import { game } from "../../engine/game.js";
 import { GAME_DATA, getFloorMeta, ABYSS_START_FLOOR } from "../../data/index.js";
 import { renderStatsPanel } from "../components.js";
 
+export const MAP_ROOM_TYPES = {
+    start: { icon: "🚪", name: "Вход" },
+    battle: { icon: "⚔️", name: "Бой" },
+    elite: { icon: "💀", name: "Элита" },
+    event: { icon: "❓", name: "Событие" },
+    shop: { icon: "⚖️", name: "Лавка" },
+    campfire: { icon: "🔥", name: "Костёр" },
+    fountain: { icon: "⛲", name: "Фонтан" },
+    boss: { icon: "👑", name: "БОСС" },
+    corridor: { icon: "🕯️", name: "Коридор" },
+};
+
+const SCOUT_ROOM_MARKS = [
+    { key: "alerted", icon: "❗" },
+    { key: "poisoned", icon: "🤢" },
+    { key: "weakened", icon: "🗡️" },
+];
+
 export function renderMapScreen(render) {
     const floorData = getFloorMeta(game.floor);
-    const roomTypes = {
-        start: { icon: "🚪", name: "Вход" },
-        battle: { icon: "⚔️", name: "Бой" },
-        elite: { icon: "💀", name: "Элита" },
-        event: { icon: "❓", name: "Событие" },
-        shop: { icon: "⚖️", name: "Лавка" },
-        campfire: { icon: "🔥", name: "Костёр" },
-        fountain: { icon: "⛲", name: "Фонтан" },
-        boss: { icon: "👑", name: "БОСС" },
-        corridor: { icon: "🕯️", name: "Коридор" },
-    };
+    const roomTypes = MAP_ROOM_TYPES;
 
     const px = game.playerPos.x;
     const py = game.playerPos.y;
@@ -150,6 +158,10 @@ export function renderMapScreen(render) {
                     opacity = "0.25";
                 }
 
+                const scoutMarks = (!isCenter && !room.cleared)
+                    ? SCOUT_ROOM_MARKS.filter(m => room[m.key]).map(m => m.icon)
+                    : [];
+
                 cell = el("div", {
                     className: nodeClass,
                     style: {
@@ -171,6 +183,19 @@ export function renderMapScreen(render) {
                         }
                     },
                 }, [
+                    scoutMarks.length > 0 ? el("div", {
+                        style: {
+                            position: "absolute",
+                            top: "0",
+                            right: "0",
+                            width: "15px",
+                            height: "15px",
+                            lineHeight: "15px",
+                            fontSize: "11px",
+                            pointerEvents: "none",
+                        },
+                        text: scoutMarks.join(""),
+                    }) : null,
                     el("div", {
                         style: {
                             fontSize: "20px",
@@ -213,7 +238,7 @@ export function renderMapScreen(render) {
             const shouldShowRight = dx < 2 && room.doors.right;
             if (shouldShowRight) {
                 const rightRoom = game.dungeonRooms[`${rx + 1},${ry}`];
-                if (rightRoom && rightRoom.doors.left && (room.visited || rightRoom.visited)) {
+                if (rightRoom && rightRoom.doors.left && isCorridorVisible(room, rightRoom)) {
                     const isCorridorWalkable = (isCenter && currentRoom.doors.right) || (dx === -1 && dy === 0 && currentRoom.doors.left);
                     const targetX = isCenter ? rx + 1 : rx;
                     const targetY = ry;
@@ -247,7 +272,7 @@ export function renderMapScreen(render) {
             const shouldShowDown = dy < 2 && room.doors.down;
             if (shouldShowDown) {
                 const downRoom = game.dungeonRooms[`${rx},${ry + 1}`];
-                if (downRoom && downRoom.doors.up && (room.visited || downRoom.visited)) {
+                if (downRoom && downRoom.doors.up && isCorridorVisible(room, downRoom)) {
                     const isCorridorWalkable = (isCenter && currentRoom.doors.down) || (dx === 0 && dy === -1 && currentRoom.doors.up);
                     const targetX = rx;
                     const targetY = isCenter ? ry + 1 : ry;
@@ -280,7 +305,7 @@ export function renderMapScreen(render) {
 
             if (dx === 2 && room.doors.right) {
                 const outsideRoom = game.dungeonRooms[`${rx + 1},${ry}`];
-                if (outsideRoom && outsideRoom.doors.left && (room.visited || (room.visible && outsideRoom.visited))) {
+                if (outsideRoom && outsideRoom.doors.left && isEdgeCorridorVisible(room, outsideRoom)) {
                     corridorLayer.appendChild(el("div", {
                         style: {
                             position: "absolute",
@@ -301,7 +326,7 @@ export function renderMapScreen(render) {
 
             if (dx === -2 && room.doors.left) {
                 const outsideRoom = game.dungeonRooms[`${rx - 1},${ry}`];
-                if (outsideRoom && outsideRoom.doors.right && (room.visited || (room.visible && outsideRoom.visited))) {
+                if (outsideRoom && outsideRoom.doors.right && isEdgeCorridorVisible(room, outsideRoom)) {
                     corridorLayer.appendChild(el("div", {
                         style: {
                             position: "absolute",
@@ -322,7 +347,7 @@ export function renderMapScreen(render) {
 
             if (dy === -2 && room.doors.up) {
                 const outsideRoom = game.dungeonRooms[`${rx},${ry - 1}`];
-                if (outsideRoom && outsideRoom.doors.down && (room.visited || (room.visible && outsideRoom.visited))) {
+                if (outsideRoom && outsideRoom.doors.down && isEdgeCorridorVisible(room, outsideRoom)) {
                     corridorLayer.appendChild(el("div", {
                         style: {
                             position: "absolute",
@@ -343,7 +368,7 @@ export function renderMapScreen(render) {
 
             if (dy === 2 && room.doors.down) {
                 const outsideRoom = game.dungeonRooms[`${rx},${ry + 1}`];
-                if (outsideRoom && outsideRoom.doors.up && (room.visited || (room.visible && outsideRoom.visited))) {
+                if (outsideRoom && outsideRoom.doors.up && isEdgeCorridorVisible(room, outsideRoom)) {
                     corridorLayer.appendChild(el("div", {
                         style: {
                             position: "absolute",
@@ -365,13 +390,19 @@ export function renderMapScreen(render) {
     });
 
     const scoutStatus = game.getScoutStatus();
-    let scoutBtnText = "🔍 Разведать окружение (1 ⚡ EN)";
+    let scoutBtnText = `🔍 Разведать окружение (${scoutStatus.cost || 1} ⚡ EN)`;
+    let scoutBtnSub = null;
     if (scoutStatus.reason === "all_revealed") {
         scoutBtnText = "🔍 Все соседние комнаты разведаны";
+    } else if (scoutStatus.reason === "cooldown") {
+        scoutBtnText = "🔍 Разведать окружение";
+        scoutBtnSub = `[Перезарядка: ${scoutStatus.cooldown} комн.]`;
     } else if (scoutStatus.reason === "no_en") {
-        scoutBtnText = "🔍 Разведка (недостаточно ⚡ EN)";
+        scoutBtnText = `🔍 Разведка (нужно ${scoutStatus.cost} ⚡ EN)`;
+    } else if (scoutStatus.costType === "en_hp") {
+        scoutBtnText = `🔍 Разведать окружение (${scoutStatus.enSpent} ⚡ EN + ${scoutStatus.hpCost} ❤️ HP)`;
     } else if (scoutStatus.costType === "hp") {
-        scoutBtnText = `🔍 Разведать окружение (${scoutStatus.cost} ❤️ HP)`;
+        scoutBtnText = `🔍 Разведать окружение (${scoutStatus.hpCost} ❤️ HP)`;
     }
 
     const actionButtons = [];
@@ -421,12 +452,23 @@ export function renderMapScreen(render) {
             marginBottom: "6px",
         },
         disabled: !scoutStatus.canScout,
-        text: scoutBtnText,
         onClick: () => {
             game.scoutSurroundings();
             render();
         },
-    }));
+    }, scoutBtnSub ? [
+        el("span", { style: { display: "block" }, text: scoutBtnText }),
+        el("span", {
+            style: {
+                display: "block",
+                fontSize: "11px",
+                color: "#999999",
+                opacity: 0.85,
+                marginTop: "2px",
+            },
+            text: scoutBtnSub,
+        }),
+    ] : [scoutBtnText]));
 
     return el("div", {}, [
         el("h3", { text: `Этаж ${game.floor + 1}: ${floorData.name}` }),
@@ -444,4 +486,19 @@ export function renderMapScreen(render) {
             text: "Нажмите на соседнюю комнату для перехода",
         }),
     ]);
+}
+
+function isCorridorVisible(roomA, roomB) {
+    return Boolean(
+        roomA.visited
+        || roomB.visited
+        || (roomA.revealed && roomB.revealed)
+    );
+}
+
+function isEdgeCorridorVisible(room, outsideRoom) {
+    return Boolean(
+        room.visited
+        || (room.visible && (outsideRoom.visited || (room.revealed && outsideRoom.revealed)))
+    );
 }

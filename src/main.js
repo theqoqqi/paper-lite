@@ -24,6 +24,7 @@ import {
     renderCorridorScreen,
     renderFountainScreen,
     renderShopScreen,
+    renderScoutScreen,
 } from "./ui/screens/rooms.js";
 
 export function render() {
@@ -60,6 +61,8 @@ export function render() {
         container.appendChild(renderFountainScreen(render));
     } else if (game.state === "SHOP") {
         container.appendChild(renderShopScreen(render));
+    } else if (game.state === "SCOUT") {
+        container.appendChild(renderScoutScreen(render));
     } else if (game.state === "ABYSS_CHOICE") {
         container.appendChild(renderAbyssChoiceScreen(render));
     } else if (game.state === "GAMEOVER" || game.state === "VICTORY") {

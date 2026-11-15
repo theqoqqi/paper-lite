@@ -4,6 +4,7 @@ import { GAME_DATA } from "../../data/index.js";
 import { playSound } from "../../utils/audio.js";
 import { renderStatsPanel, renderEquipmentComparison, renderPendingArtifactChoice } from "../components.js";
 import { renderTextWithRarity, renderItemLabelChildren, renderRarityTag } from "../rarity.js";
+import { MAP_ROOM_TYPES } from "./map.js";
 
 const FOUNTAIN_OMENS = [
     "Нечто проклятое теперь следует за вами по пятам.",
@@ -658,5 +659,167 @@ function renderShopEquipmentComparison(offer, offerIndex, render) {
                 },
             }),
         ]),
+    ]);
+}
+
+const SCOUT_TONE_STYLES = {
+    positive: { bg: "#162816", border: "#4caf50", color: "#81c784" },
+    negative: { bg: "#2d1616", border: "#e53e3e", color: "#fc8181" },
+    neutral: { bg: "#1f1f1f", border: "#444444", color: "#e0e0e0" },
+};
+
+export function renderScoutScreen(render) {
+    const session = game.scoutSession;
+    if (!session) {
+        return el("div", {}, [
+            el("h3", { text: "🔍 Разведка окружения" }),
+            renderStatsPanel(),
+            el("button", {
+                className: "btn-center btn-primary",
+                text: "🗺️ Вернуться на карту",
+                onClick: () => {
+                    game.state = "MAP";
+                    render();
+                },
+            }),
+        ]);
+    }
+
+    const revealedBadges = (session.revealedRooms || []).map(item => {
+        const info = MAP_ROOM_TYPES[item.type] || { icon: "❓", name: item.type };
+        return el("span", {
+            style: {
+                display: "inline-block",
+                padding: "3px 8px",
+                margin: "2px 4px 2px 0",
+                borderRadius: "4px",
+                background: "#252525",
+                border: "1px solid #3d3d3d",
+                fontSize: "12px",
+                color: "#dddddd",
+            },
+            text: `${info.icon} ${info.name}`,
+        });
+    });
+
+    const summaryPanel = el("div", {
+        className: "panel",
+        style: { marginBottom: "10px" },
+    }, [
+        el("div", {
+            style: { fontSize: "12px", color: "#aaaaaa", marginBottom: "6px" },
+            text: "Открытые комнаты поблизости:",
+        }),
+        el("div", {}, revealedBadges),
+    ]);
+
+    if (session.result) {
+        const res = session.result;
+        const tone = SCOUT_TONE_STYLES[res.tone] || SCOUT_TONE_STYLES.neutral;
+        return el("div", {}, [
+            el("h3", { text: "🔍 Разведка окружения" }),
+            renderStatsPanel(),
+            summaryPanel,
+            el("div", {
+                className: "panel",
+                style: {
+                    background: tone.bg,
+                    borderColor: tone.border,
+                    marginBottom: "12px",
+                },
+            }, [
+                el("div", {
+                    style: {
+                        fontWeight: "bold",
+                        color: tone.color,
+                        fontSize: "14px",
+                        marginBottom: "6px",
+                    },
+                    text: res.title,
+                }),
+                el("div", {
+                    style: { fontSize: "14px", lineHeight: "1.4", color: "#e8e8e8" },
+                    text: res.text,
+                }),
+            ]),
+            el("button", {
+                className: "btn-center btn-primary",
+                text: "Продолжить ➡️",
+                onClick: () => {
+                    game.finishScoutSession();
+                    render();
+                },
+            }),
+        ]);
+    }
+
+    const makeScoutActionBtn = (titleChildren, sub, actionId) => el("button", {
+        className: "btn-center",
+        style: { marginBottom: "6px" },
+        onClick: () => {
+            game.resolveScoutAction(actionId);
+            render();
+        },
+    }, [
+        el("span", { style: { display: "block" } }, titleChildren),
+        el("span", {
+            style: {
+                display: "block",
+                fontSize: "11px",
+                color: "#999999",
+                opacity: 0.85,
+                marginTop: "2px",
+            },
+            text: sub,
+        }),
+    ]);
+
+    const actionButtons = (session.actions || []).map(action => {
+        const roomInfo = MAP_ROOM_TYPES[action.type] || { icon: action.icon || "❓", name: action.type };
+        const roomBadge = el("span", {
+            style: {
+                display: "inline-block",
+                padding: "1px 6px",
+                marginRight: "6px",
+                borderRadius: "4px",
+                background: "transparent",
+                border: "1px solid #4a4a4a",
+                fontSize: "11px",
+                color: "#cccccc",
+                verticalAlign: "middle",
+            },
+            text: `${roomInfo.icon} ${roomInfo.name}`,
+        });
+        return makeScoutActionBtn(
+            [roomBadge, action.label],
+            "[+1 к перезарядке разведки]",
+            action.id,
+        );
+    });
+
+    actionButtons.push(makeScoutActionBtn(
+        ["👣 Осмотреть дальний проход"],
+        "[+1 к перезарядке разведки]",
+        "far_passage",
+    ));
+
+    actionButtons.push(el("button", {
+        className: "btn-center btn-primary",
+        text: "🚪 Тихий осмотр (ничего не делать)",
+        onClick: () => {
+            game.resolveScoutAction("quiet");
+            render();
+        },
+    }));
+
+    return el("div", {}, [
+        el("h3", { text: "🔍 Разведка окружения" }),
+        renderStatsPanel(),
+        summaryPanel,
+        el("div", {
+            style: { fontSize: "13px", color: "#cccccc", marginBottom: "8px" },
+            text: "Выберите одно действие вылазки или уйдите тихо:",
+        }),
+        ...actionButtons,
     ]);
 }
