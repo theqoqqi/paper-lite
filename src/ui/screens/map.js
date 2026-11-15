@@ -407,26 +407,43 @@ export function renderMapScreen(render) {
 
     const actionButtons = [];
 
-    if (currentRoom.type === "boss" && currentRoom.cleared && game.floor !== ABYSS_START_FLOOR - 1) {
-        const isDeepAbyss = game.floor >= ABYSS_START_FLOOR;
-        actionButtons.push(el("button", {
-            className: "btn-center",
-            style: {
-                marginBottom: "6px",
-                background: "#2e4c38",
-                borderColor: "#4caf50",
-                fontWeight: "bold",
-            },
-            text: `⬇️ Спуститься на Этаж ${game.floor + 2}${isDeepAbyss ? " (Без восстановления)" : ""}`,
-            onClick: () => {
-                game.floor++;
-                game.recordProgress(game.floor + 1);
-                game.generateFloorMap();
-                game.state = "MAP";
-                game.saveGame("autosave");
-                render();
-            },
-        }));
+    if (currentRoom.type === "boss" && currentRoom.cleared) {
+        if (game.floor === ABYSS_START_FLOOR - 1) {
+            actionButtons.push(el("button", {
+                className: "btn-center",
+                style: {
+                    marginBottom: "6px",
+                    background: "#3a1f36",
+                    borderColor: "#b84dff",
+                    fontWeight: "bold",
+                },
+                text: "🕳️ Разлом под троном (Спуск в Бездну / Победа)",
+                onClick: () => {
+                    game.state = "ABYSS_CHOICE";
+                    render();
+                },
+            }));
+        } else {
+            const isDeepAbyss = game.floor >= ABYSS_START_FLOOR;
+            actionButtons.push(el("button", {
+                className: "btn-center",
+                style: {
+                    marginBottom: "6px",
+                    background: "#2e4c38",
+                    borderColor: "#4caf50",
+                    fontWeight: "bold",
+                },
+                text: `⬇️ Спуститься на Этаж ${game.floor + 2}${isDeepAbyss ? " (Без восстановления)" : ""}`,
+                onClick: () => {
+                    game.floor++;
+                    game.recordProgress(game.floor + 1);
+                    game.generateFloorMap();
+                    game.state = "MAP";
+                    game.saveGame("autosave");
+                    render();
+                },
+            }));
+        }
     }
 
     if (currentRoom.type === "shop" && currentRoom.cleared) {

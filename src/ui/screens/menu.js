@@ -188,6 +188,17 @@ export function renderAbyssChoiceScreen(render) {
                 render();
             },
         }),
+        el("button", {
+            className: "btn-center",
+            style: { marginTop: "8px" },
+            text: "🗺️ Продолжить исследование 4 этажа",
+            onClick: () => {
+                game._abyssChoiceSoundPlayed = false;
+                game.state = "MAP";
+                game.saveGame("autosave");
+                render();
+            },
+        }),
     ]);
 }
 
