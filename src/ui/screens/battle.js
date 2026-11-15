@@ -123,7 +123,6 @@ export function renderBattleScreen(render) {
             if (en.currentHp <= 0 && (!en.isDying || en.deathAnimRendered)) return;
             const isSelected = idx === game.selectedTargetIndex && !en.isDying;
             const nextPat = en.pattern ? en.pattern[(en.patternIndex || 0) % en.pattern.length] : { text: "...", val: 0 };
-            const previewVal = nextPat.val ? nextPat.val + (en.atkBonus || 0) + enrageBonus : 0;
 
             const extraStats = [];
             if (en.def > 0) extraStats.push(`🛡️ ${en.def}`);
@@ -215,8 +214,7 @@ export function renderBattleScreen(render) {
             } else {
                 infoChildren.push(el("div", {
                     className: "enemy-intent",
-                    text: `${nextPat.text}${previewVal > 0 ? ` (~${previewVal} ур.)` : ""}`,
-                }));
+                }, renderEnemyIntentChildren(en, nextPat, enrageBonus)));
             }
 
             const infoEl = el("div", { className: "enemy-info" }, infoChildren);
@@ -488,4 +486,48 @@ function playBattleFxSound(activeFx) {
         playSound("bleed");
         return;
     }
+}
+
+const INTENT_EXTRA_TAGS = {
+    defendAttack: pat => `🛡️ ${pat.shield || 4}`,
+    attackPoison: pat => `☠️ ${pat.poison || 1}`,
+    attackBleed: pat => `🩸 ${pat.bleed || 1}`,
+    vampire: () => "💚",
+    drainEn: () => "⚡ -1",
+};
+
+function renderEnemyIntentChildren(en, nextPat, enrageBonus) {
+    const cleanName = (nextPat.text || "...").replace(/\s*\([^)]*\)/g, "").trim();
+    const type = nextPat.type || "attack";
+
+    if (type === "charge") {
+        return [`⚠️ ${cleanName}`];
+    }
+
+    const parts = [cleanName];
+    if (type === "heal" || type === "shieldHeal") {
+        if (nextPat.val > 0) parts.push(`💚 ${nextPat.val}`);
+        if (nextPat.shield > 0) parts.push(`🛡️ ${nextPat.shield}`);
+    } else {
+        const atkVal = nextPat.val ? nextPat.val + (en.atkBonus || 0) + enrageBonus : 0;
+        if (atkVal > 0) {
+            const delta = Math.max(1, Math.round(atkVal * 0.15));
+            const dmgIcon = type === "pierce" ? "🗡️" : "⚔️";
+            parts.push(`${dmgIcon} ${atkVal - delta}-${atkVal + delta}`);
+        }
+
+        const extraTag = INTENT_EXTRA_TAGS[type];
+        if (extraTag) {
+            parts.push(extraTag(nextPat));
+        }
+    }
+
+    const children = [];
+    parts.forEach((part, idx) => {
+        if (idx > 0) {
+            children.push(el("span", { className: "stat-divider" }));
+        }
+        children.push(part);
+    });
+    return children;
 }
