@@ -427,13 +427,28 @@ export function resolveCampfire(game, choice) {
             healAmt = Math.max(1, Math.floor(healAmt * 0.25));
         }
         game.player.heal(healAmt);
-    } else if (choice === "sharpen") {
-        game.player.weaponUpgradeLvl += 1;
+    } else if (choice === "prepare") {
+        game.player.en = game.player.getTotalMaxEn();
+        game.player.concentrateBonus += 5;
+    } else if (choice === "brew") {
+        if (game.player.inventory.potions.length >= game.player.potionSlots) return;
+        const items = [];
+        const notes = [];
+        collectRandomPotions(game, 1, items, notes);
+        openEventRewards(game, {
+            title: "🔥 Костёр Отдыха",
+            header: "🧪 ОТВАР СВАРЕН!",
+            items,
+            notes,
+        });
+        return;
     } else if (choice === "meditate") {
         game.player.baseMaxHp += 4;
         game.player.heal(4);
+        game.player.xp += 4;
+        game.player.totalRunXp += 4;
     }
-    finishRoom(game);
+    checkLevelUpOrFinishRoom(game);
 }
 
 export function resolveFountainChoice(game, drink) {
@@ -607,8 +622,10 @@ export function pickItemByRarity(items, floor = 0, minRarity = null) {
     return RNG.choice(items);
 }
 
-function openEventRewards(game, { gold = 0, effects = [], items = [], notes = [] }) {
+function openEventRewards(game, { title = null, header = null, gold = 0, effects = [], items = [], notes = [] }) {
     game.eventRewards = {
+        title,
+        header,
         gold,
         effects,
         items,

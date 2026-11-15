@@ -118,7 +118,7 @@ export function renderEventRewardsScreen(render) {
         || effects.some(ef => !ef.startsWith("💔"))
         || Boolean(game.pendingEquipment || game.pendingArtifact);
     const wrap = el("div", {}, [
-        el("h3", { text: "❓ Награда за событие" }),
+        el("h3", { text: rewards.title || "❓ Награда за событие" }),
         renderStatsPanel(),
         el("div", {
             className: "panel",
@@ -126,7 +126,7 @@ export function renderEventRewardsScreen(render) {
         }, [
             el("h3", {
                 style: { color: "#81c784" },
-                text: hasAnyReward ? "🎁 НАЙДЕНЫ ТРОФЕИ!" : "❓ Итог события",
+                text: rewards.header || (hasAnyReward ? "🎁 НАЙДЕНЫ ТРОФЕИ!" : "❓ Итог события"),
             }),
             rewards.gold > 0 ? el("p", {
                 className: "text-center",
@@ -195,6 +195,16 @@ export function renderCampfireScreen(render) {
     if (game.player.hasArtifact("art39")) {
         healAmt = Math.max(1, Math.floor(healAmt * 0.25));
     }
+    const potionsFull = game.player.inventory.potions.length >= game.player.potionSlots;
+    const brewChildren = [
+        el("div", { text: "🧪 Сварить отвар в котелке (Случайное зелье)" }),
+    ];
+    if (potionsFull) {
+        brewChildren.push(el("div", {
+            style: { fontSize: "11px", color: "#ff8a65", marginTop: "3px" },
+            text: "Пояс зелий полон",
+        }));
+    }
     return el("div", {}, [
         el("h3", { text: "🔥 Костёр Отдыха" }),
         renderStatsPanel(),
@@ -207,15 +217,23 @@ export function renderCampfireScreen(render) {
             },
         }),
         el("button", {
-            text: "🔨 Заточить оружие (+1 ATK к заточке до конца забега)",
+            text: "⚔️ Подготовиться к бою (Полный EN и +5 к следующей атаке)",
             onClick: () => {
                 playSound("campfire");
-                game.resolveCampfire("sharpen");
+                game.resolveCampfire("prepare");
                 render();
             },
         }),
         el("button", {
-            text: "🧘 Медитировать (+4 MAX HP и +4 HP)",
+            disabled: potionsFull,
+            onClick: () => {
+                playSound("campfire");
+                game.resolveCampfire("brew");
+                render();
+            },
+        }, brewChildren),
+        el("button", {
+            text: "🧘 Медитировать у пламени (+4 MAX HP, +4 HP и +4 XP)",
             onClick: () => {
                 playSound("campfire");
                 game.resolveCampfire("meditate");
