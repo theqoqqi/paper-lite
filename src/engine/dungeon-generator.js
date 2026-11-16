@@ -2,7 +2,8 @@ import { RNG } from "../utils/rng.js";
 import { ABYSS_START_FLOOR } from "../data/index.js";
 
 export class DungeonGenerator {
-    static generate(floor = 0) {
+    static generate(floor = 0, seed = RNG.getSeed()) {
+        RNG.setScopedSeed(seed, floor, "floor_map");
         const dirs = [
             { name: "up", opp: "down", dx: 0, dy: -1 },
             { name: "down", opp: "up", dx: 0, dy: 1 },
@@ -110,6 +111,10 @@ export class DungeonGenerator {
                 }
             }
         }
+
+        roomList.forEach(r => {
+            r.distance = distances[r.id] !== undefined ? distances[r.id] : 1;
+        });
 
         const deadEnds = roomList.filter(r => {
             if (r.id === startKey) return false;

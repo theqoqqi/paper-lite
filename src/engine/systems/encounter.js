@@ -139,6 +139,7 @@ export function finishRoom(game) {
 }
 
 export function generatePerkChoices(game) {
+    RNG.setScopedSeed(game.seed, game.player.level, "levelup");
     let pool = GAME_DATA.perks.filter(p => !game.player.perks.includes(p.id));
     const choices = [];
     while (choices.length < 3 && pool.length > 0) {
@@ -164,6 +165,7 @@ export function choosePerk(game, perkId) {
 }
 
 export function resolveEventOption(game, optionId) {
+    game.setRoomSeed("event", optionId);
     if (optionId === "altar_hp") {
         if (game.player.hp <= 6) return;
         game.player.hp -= 6;
@@ -432,6 +434,7 @@ export function resolveCampfire(game, choice) {
         game.player.concentrateBonus += 5;
     } else if (choice === "brew") {
         if (game.player.inventory.potions.length >= game.player.potionSlots) return;
+        game.setRoomSeed("campfire_brew");
         const items = [];
         const notes = [];
         collectRandomPotions(game, 1, items, notes);
@@ -489,6 +492,7 @@ export function leaveFountainRoom(game) {
 }
 
 export function triggerCorridorRoom(game) {
+    game.setRoomSeed("corridor");
     const roomTemplate = RNG.choice(GAME_DATA.corridorRooms);
     const outcomeId = RNG.choice(roomTemplate.outcomeIds);
     const outcome = GAME_DATA.corridorOutcomes[outcomeId] || {

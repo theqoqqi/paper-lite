@@ -27,6 +27,7 @@ export function unlockClass(game, classKey) {
 }
 
 export function setupShop(game) {
+    game.setRoomSeed("shop", game.shopRerollCount || 0);
     const cfg = GAME_DATA.cursedConfig;
     const hasMerged = game.player.hasArtifact(cfg.mergedArtifactId);
     const curseChance = Math.min(12, (game.fountainCursesCount || 0) * cfg.fountainChanceStep);
@@ -136,6 +137,7 @@ export function rerollShop(game) {
     game.rerollCost += scaleShopCost(4, game.floor);
     game.previewShopOfferIndex = null;
     game.shopMergedNotice = null;
+    game.shopRerollCount = (game.shopRerollCount || 0) + 1;
     setupShop(game);
     game.saveGame("autosave");
 }

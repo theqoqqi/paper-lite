@@ -1,6 +1,6 @@
 # [Задача 018] Внедрение вычисляемых контекстных сидов в генерацию мира
 
-> **Статус:** Спроектировано (Ожидает реализации после [Задачи 017](017-seeded-rng.md))
+> **Статус:** Реализовано
 
 ## 1. Цели и контекст
 
@@ -118,12 +118,12 @@
 
 ## 4. Пошаговый план реализации
 
-1. [ ] **Шаг 1: Хеширование контекстных сидов в [`src/utils/rng.js`](../../src/utils/rng.js)**
+1. [x] **Шаг 1: Хеширование контекстных сидов в [`src/utils/rng.js`](../../src/utils/rng.js)**
    * Добавить функцию `mixSeed(...inputs)` и метод установки контекстного сида `RNG.setScopedSeed(baseSeed, ...scopeParts)`.
-2. [ ] **Шаг 2: Сохранение `distance` комнат в [`src/engine/dungeon-generator.js`](../../src/engine/dungeon-generator.js)**
+2. [x] **Шаг 2: Сохранение `distance` комнат в [`src/engine/dungeon-generator.js`](../../src/engine/dungeon-generator.js)**
    * Инициализировать генератор этажа через `RNG.setScopedSeed(game.seed, floor, "floor_map")`.
    * Записывать `room.distance = distances[room.id] || 1` в каждую сгенерированную комнату.
-3. [ ] **Шаг 3: Перевод комнат, лавки, событий и боёв на контекстные сиды ([`src/engine/game.js`](../../src/engine/game.js), [`src/engine/systems/battle.js`](../../src/engine/systems/battle.js), [`src/engine/systems/shop.js`](../../src/engine/systems/shop.js), [`src/engine/systems/encounter.js`](../../src/engine/systems/encounter.js), [`src/engine/systems/save.js`](../../src/engine/systems/save.js))**
+3. [x] **Шаг 3: Перевод комнат, лавки, событий и боёв на контекстные сиды ([`src/engine/game.js`](../../src/engine/game.js), [`src/engine/systems/battle.js`](../../src/engine/systems/battle.js), [`src/engine/systems/shop.js`](../../src/engine/systems/shop.js), [`src/engine/systems/encounter.js`](../../src/engine/systems/encounter.js), [`src/engine/systems/save.js`](../../src/engine/systems/save.js))**
    * Заменить в `setupBattle` использование `game.room` в формуле бюджета на `currentRoom.distance`.
    * Подключить контекстные сиды для спавна, боя, наград, лавки (с `shopRerollCount`), событий, коридоров, костра, разведки и выбора перков при повышении уровня.
    * Добавить `shopRerollCount` в `serializeState()` и `loadGame()`.

@@ -53,6 +53,7 @@ export function serializeState(game) {
         currentCorridorResult: game.currentCorridorResult,
         scoutCooldown: game.scoutCooldown || 0,
         scoutSession: game.scoutSession || null,
+        shopRerollCount: game.shopRerollCount || 0,
         seed: game.seed ?? RNG.getSeed(),
         rngState: RNG.getState(),
     });
@@ -124,6 +125,7 @@ export function loadGame(game, slotKeyOrJson = "autosave") {
         game.currentCorridorResult = data.currentCorridorResult || null;
         game.scoutCooldown = data.scoutCooldown || 0;
         game.scoutSession = data.scoutSession || null;
+        game.shopRerollCount = data.shopRerollCount || 0;
         return true;
     } catch (e) {
         console.error(e);

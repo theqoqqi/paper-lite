@@ -21,6 +21,41 @@ export function normalizeSeed(rawSeed) {
     return (hash >>> 0) || 1;
 }
 
+export function mixSeed(...inputs) {
+    let h = 0x811c9dc5;
+    for (const item of inputs) {
+        if (typeof item === "string") {
+            h ^= 0x1a;
+            h = Math.imul(h, 0x01000193);
+            for (let i = 0; i < item.length; i++) {
+                h ^= item.charCodeAt(i);
+                h = Math.imul(h, 0x01000193);
+            }
+        } else {
+            h ^= 0x2b;
+            h = Math.imul(h, 0x01000193);
+            const n = (Number(item) | 0);
+            h ^= n & 0xff;
+            h = Math.imul(h, 0x01000193);
+            h ^= (n >>> 8) & 0xff;
+            h = Math.imul(h, 0x01000193);
+            h ^= (n >>> 16) & 0xff;
+            h = Math.imul(h, 0x01000193);
+            h ^= (n >>> 24) & 0xff;
+            h = Math.imul(h, 0x01000193);
+        }
+        h ^= 0xff;
+        h = Math.imul(h, 0x01000193);
+    }
+    let res = h >>> 0;
+    res ^= res >>> 16;
+    res = Math.imul(res, 0x85ebca6b) >>> 0;
+    res ^= res >>> 13;
+    res = Math.imul(res, 0xc2b2ae35) >>> 0;
+    res ^= res >>> 16;
+    return (res >>> 0) || 1;
+}
+
 export class PRNG {
     constructor(seed = 1) {
         this.seed = normalizeSeed(seed);
@@ -76,23 +111,34 @@ export class PRNG {
 
 export class RNG {
     static _prng = new PRNG(Date.now());
+    static _baseSeed = RNG._prng.seed;
 
     static setSeed(seed) {
         this._prng = new PRNG(seed);
-        return this._prng.seed;
+        this._baseSeed = this._prng.seed;
+        return this._baseSeed;
     }
 
     static getSeed() {
-        return this._prng.seed;
+        return this._baseSeed;
     }
 
     static getState() {
         return this._prng.state >>> 0;
     }
 
-    static setState(state, seed = this._prng.seed) {
-        this._prng.seed = normalizeSeed(seed);
-        this._prng.state = (Number(state) >>> 0) || this._prng.seed;
+    static setState(state, seed = this._baseSeed) {
+        this._baseSeed = normalizeSeed(seed);
+        this._prng = new PRNG(this._baseSeed);
+        this._prng.state = (Number(state) >>> 0) || this._baseSeed;
+    }
+
+    static setScopedSeed(baseSeed, ...scopeParts) {
+        const seedToUse = (baseSeed !== undefined && baseSeed !== null) ? baseSeed : this._baseSeed;
+        const normalizedBase = normalizeSeed(seedToUse);
+        const scopedSeed = mixSeed(normalizedBase, ...scopeParts);
+        this._prng = new PRNG(scopedSeed);
+        return scopedSeed;
     }
 
     static next() {

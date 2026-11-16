@@ -99,6 +99,7 @@ export function setupBattle(game, mode = "normal") {
     const isAbyss = floor >= ABYSS_START_FLOOR;
     const floorIdx = Math.min(3, floor);
     const floorData = getFloorMeta(floor);
+    game.setRoomSeed("spawn", mode);
 
     if (mode === "boss") {
         playSound("bossEncounter");
@@ -127,9 +128,12 @@ export function setupBattle(game, mode = "normal") {
         playSound("battleStart");
         const mutChance = isAbyss ? 100 : MUTATION_CHANCE_NORMAL[floorIdx];
         const abyssDepth = isAbyss ? floor - (ABYSS_START_FLOOR - 1) : 0;
+        const currentRoomKey = game.playerPos ? `${game.playerPos.x},${game.playerPos.y}` : "0,0";
+        const currentRoomObj = game.dungeonRooms ? game.dungeonRooms[currentRoomKey] : null;
+        const roomDist = currentRoomObj?.distance || 1;
         let budget = isAbyss
-            ? Math.min(12, 7 + abyssDepth + Math.floor(game.room / 4))
-            : Math.min(7, 2 + Math.floor(game.room / 3) + floor);
+            ? Math.min(12, 7 + abyssDepth + Math.floor(roomDist / 3))
+            : Math.min(7, 2 + Math.floor(roomDist / 2) + floor);
         const maxEnemies = isAbyss ? 4 : 3;
         let attempts = 0;
         while (budget > 0 && game.enemies.length < maxEnemies && attempts < 24) {
@@ -149,6 +153,7 @@ export function setupBattle(game, mode = "normal") {
         game.battleLog = [`⚔️ Бой начался! Комната #${game.room}.`];
     }
 
+    game.setRoomSeed("combat");
     game.selectedTargetIndex = 0;
     game.battleTurn = 1;
     const startEnrage = getAbyssEnrageBonus(game);
@@ -1027,6 +1032,8 @@ export function checkBattleEnd(game) {
     if (game.player.hasArtifact("art9")) {
         game.player.heal(2);
     }
+
+    game.setRoomSeed("battle_loot");
 
     if (RNG.chance(45) && game.player.inventory.potions.length < game.player.potionSlots) {
         const droppedPot = pickItemByRarity(GAME_DATA.items.potions, game.floor);

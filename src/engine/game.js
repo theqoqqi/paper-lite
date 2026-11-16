@@ -151,6 +151,7 @@ export class Game {
         this.previewShopOfferIndex = null;
         this.scoutCooldown = 0;
         this.scoutSession = null;
+        this.shopRerollCount = 0;
     }
 
     init() {
@@ -261,16 +262,27 @@ export class Game {
         this.previewShopOfferIndex = null;
         this.scoutCooldown = 0;
         this.scoutSession = null;
+        this.shopRerollCount = 0;
         this.generateFloorMap();
         this.state = "MAP";
         this.saveGame("autosave");
+    }
+
+    setRoomSeed(...scopeParts) {
+        return RNG.setScopedSeed(
+            this.seed,
+            Math.max(0, this.floor || 0),
+            this.playerPos?.x || 0,
+            this.playerPos?.y || 0,
+            ...scopeParts,
+        );
     }
 
     generateFloorMap() {
         if (this.player) this.player.secondWindAvailable = true;
         this.scoutCooldown = 0;
         this.scoutSession = null;
-        const generated = DungeonGenerator.generate(this.floor);
+        const generated = DungeonGenerator.generate(this.floor, this.seed);
         this.dungeonRooms = generated.rooms;
         this.playerPos = { ...generated.startPos };
         this.bossRoomId = generated.bossRoomId;
@@ -438,6 +450,7 @@ export class Game {
         }
 
         if (actionId === "far_passage") {
+            this.setRoomSeed("scout", actionId);
             this.scoutCooldown = (this.scoutCooldown || 5) + 1;
             const candidates = [];
             const candidateIds = new Set();
@@ -480,6 +493,7 @@ export class Game {
         const cfg = SCOUT_ACTION_CONFIG[actionId];
         if (!hasAction || !cfg) return false;
 
+        this.setRoomSeed("scout", actionId);
         this.scoutCooldown = (this.scoutCooldown || 5) + 1;
         const matchingRooms = this.scoutSession.revealedRooms
             .filter(r => r.type === actionId)
@@ -571,6 +585,7 @@ export class Game {
             }
         } else if (roomObj.type === "event") {
             if (!roomObj.cleared) {
+                this.setRoomSeed("event", "init");
                 this.currentEventId = RNG.choice(GAME_DATA.events).id;
                 this.state = "EVENT";
             } else {
@@ -586,6 +601,7 @@ export class Game {
             if (!roomObj.cleared) {
                 this.rerollCost = ShopSystem.getBaseRerollCost(this.floor);
                 this.shopMergedNotice = null;
+                this.shopRerollCount = 0;
                 this.setupShop();
                 roomObj.cleared = true;
                 this.state = "SHOP";
