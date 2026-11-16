@@ -91,8 +91,10 @@ export function renderReplayFloatingBar(render) {
 
     const currentStep = replayPlayer.currentStep || 0;
     const totalSteps = Array.isArray(replayPlayer.replay.actions) ? replayPlayer.replay.actions.length : 0;
+    const validation = replayPlayer.checkCompletion();
 
     if (replayPlayer.isCollapsed) {
+        const badgeIcon = validation?.status === "valid" ? " ✅" : (validation?.status === "mismatch" ? " ⚠️" : "");
         bar.appendChild(el("div", {
             style: { display: "flex", justifyContent: "flex-end" },
         }, [
@@ -107,7 +109,7 @@ export function renderReplayFloatingBar(render) {
                     boxShadow: "0 2px 10px rgba(0, 0, 0, 0.75)",
                     pointerEvents: "auto",
                 },
-                text: `🎬 ${currentStep}/${totalSteps}`,
+                text: `🎬 ${currentStep}/${totalSteps}${badgeIcon}`,
                 onClick: () => replayPlayer.toggleCollapse(),
             }),
         ]));
@@ -258,6 +260,37 @@ export function renderReplayFloatingBar(render) {
             settingsAnchor,
         ]),
     ]);
+
+    if (validation && validation.status !== "skipped") {
+        const isOk = validation.status === "valid";
+        bar.appendChild(el("div", {
+            style: { display: "flex", justifyContent: "center", marginBottom: "4px" },
+        }, [
+            el("button", {
+                className: "btn-center",
+                style: {
+                    width: "auto",
+                    margin: "0",
+                    padding: "3px 8px",
+                    fontSize: "11px",
+                    background: isOk ? "#162419" : "#281618",
+                    borderColor: isOk ? "#2e5c38" : "#883333",
+                    color: isOk ? "#81c784" : "#ef9a9a",
+                    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.75)",
+                    pointerEvents: "auto",
+                    cursor: isOk ? "default" : "pointer",
+                },
+                text: isOk
+                    ? "✅ Валидация сейва прошла успешно"
+                    : `⚠️ Результат воспроизведения отличается от сейва. Расхождений: ${validation.diffs.length}. Подробнее в консоли.`,
+                onClick: isOk ? null : () => {
+                    const preview = validation.diffs.slice(0, 10).join("\n");
+                    const more = validation.diffs.length > 10 ? `\n...и ещё ${validation.diffs.length - 10}` : "";
+                    alert(`Итоговое состояние после воспроизведения отличается от финального сейва:\n\n${preview}${more}`);
+                },
+            }),
+        ]));
+    }
 
     bar.appendChild(panel);
 }

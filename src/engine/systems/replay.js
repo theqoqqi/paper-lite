@@ -321,6 +321,91 @@ export function applyReplayAction(game, action, render) {
     return true;
 }
 
+function normalizeStateForValidation(state) {
+    if (!state || typeof state !== "object") return state;
+    const copy = JSON.parse(JSON.stringify(state));
+    delete copy.timestamp;
+    if (copy.meta && typeof copy.meta === "object") {
+        copy.meta = { souls: copy.meta.souls ?? 0 };
+    }
+    if (Array.isArray(copy.enemies)) {
+        copy.enemies = copy.enemies.map(en => {
+            if (!en || typeof en !== "object") return en;
+            const enemyCopy = { ...en };
+            delete enemyCopy.isDying;
+            delete enemyCopy.deathAnimRendered;
+            return enemyCopy;
+        });
+    }
+    return sortJsonKeys(copy);
+}
+
+function sortJsonKeys(value) {
+    if (Array.isArray(value)) return value.map(sortJsonKeys);
+    if (value && typeof value === "object") {
+        const sorted = {};
+        for (const key of Object.keys(value).sort()) {
+            sorted[key] = sortJsonKeys(value[key]);
+        }
+        return sorted;
+    }
+    return value;
+}
+
+function formatDiffValue(val) {
+    if (val === undefined) return "undefined";
+    const json = JSON.stringify(val);
+    return json && json.length > 80 ? `${json.slice(0, 77)}...` : json;
+}
+
+function collectStateDiffs(expected, actual, path = "", diffs = [], maxDiffs = 30) {
+    if (diffs.length >= maxDiffs) return diffs;
+    if (Object.is(expected, actual)) return diffs;
+
+    if (
+        expected === null
+        || actual === null
+        || typeof expected !== "object"
+        || typeof actual !== "object"
+        || Array.isArray(expected) !== Array.isArray(actual)
+    ) {
+        diffs.push(`${path || "root"}: ожидалось ${formatDiffValue(expected)}, получено ${formatDiffValue(actual)}`);
+        return diffs;
+    }
+
+    if (Array.isArray(expected)) {
+        const len = Math.max(expected.length, actual.length);
+        for (let i = 0; i < len && diffs.length < maxDiffs; i++) {
+            collectStateDiffs(expected[i], actual[i], `${path}[${i}]`, diffs, maxDiffs);
+        }
+        return diffs;
+    }
+
+    const keys = Array.from(new Set([...Object.keys(expected), ...Object.keys(actual)])).sort();
+    for (const key of keys) {
+        if (diffs.length >= maxDiffs) break;
+        const nextPath = path ? `${path}.${key}` : key;
+        collectStateDiffs(expected[key], actual[key], nextPath, diffs, maxDiffs);
+    }
+    return diffs;
+}
+
+export function validateReplayFinalState(replay, actualState) {
+    if (!replay || !replay.finalState || typeof replay.finalState !== "object") {
+        return { status: "skipped", diffs: [] };
+    }
+    const expected = normalizeStateForValidation(replay.finalState);
+    const actual = normalizeStateForValidation(actualState);
+    if (JSON.stringify(expected) === JSON.stringify(actual)) {
+        return { status: "valid", diffs: [] };
+    }
+    const diffs = collectStateDiffs(expected, actual);
+    return {
+        status: diffs.length === 0 ? "valid" : "mismatch",
+        diffs,
+    };
+}
+
 export class ReplayPlayer {
     constructor() {
         this.game = null;
@@ -330,6 +415,7 @@ export class ReplayPlayer {
         this.isPlaying = false;
         this.isCollapsed = false;
         this.isSettingsOpen = false;
+        this.validationResult = null;
         this._sessionId = 0;
         this._timerId = null;
     }
@@ -371,6 +457,7 @@ export class ReplayPlayer {
         this.isPlaying = false;
         this.isCollapsed = false;
         this.isSettingsOpen = false;
+        this.validationResult = null;
 
         const loaded = game.loadGame(JSON.stringify(replay.initialState));
         if (!loaded) {
@@ -388,6 +475,7 @@ export class ReplayPlayer {
         this._sessionId++;
         this.isPlaying = false;
         this.currentStep = 0;
+        this.validationResult = null;
         this.game.loadGame(JSON.stringify(this.replay.initialState));
         this._resetSoundFlags(this.game);
         if (this.renderFn) this.renderFn();
@@ -440,14 +528,33 @@ export class ReplayPlayer {
         }
     }
 
+    checkCompletion() {
+        if (!this.game || !this.replay) return null;
+        const total = Array.isArray(this.replay.actions) ? this.replay.actions.length : 0;
+        if (this.currentStep < total || this.game.isProcessingTurn) {
+            return null;
+        }
+        if (this.isPlaying) {
+            this.isPlaying = false;
+        }
+        if (!this.validationResult) {
+            const actualState = JSON.parse(this.game.serializeState());
+            this.validationResult = validateReplayFinalState(this.replay, actualState);
+            if (this.validationResult.status === "valid") {
+                console.info("[ReplayPlayer] Валидация пройдена: финальное состояние полностью совпадает с сохранением.");
+            } else if (this.validationResult.status === "mismatch") {
+                console.warn("[ReplayPlayer] Обнаружены расхождения финального состояния:", this.validationResult.diffs);
+            }
+        }
+        return this.validationResult;
+    }
+
     _executeSingleStep() {
         if (!this.game || !this.replay || this.currentStep >= this.replay.actions.length) return;
         const action = this.replay.actions[this.currentStep];
         this.currentStep++;
         applyReplayAction(this.game, action, this.renderFn);
-        if (this.currentStep >= this.replay.actions.length && !this.game.isProcessingTurn) {
-            this.isPlaying = false;
-        }
+        this.checkCompletion();
         if (this.renderFn) this.renderFn();
     }
 
@@ -460,7 +567,7 @@ export class ReplayPlayer {
             return;
         }
         if (this.currentStep >= this.replay.actions.length) {
-            this.isPlaying = false;
+            this.checkCompletion();
             if (this.renderFn) this.renderFn();
             return;
         }
@@ -494,7 +601,7 @@ export class ReplayPlayer {
             return;
         }
         if (this.currentStep >= this.replay.actions.length) {
-            this.isPlaying = false;
+            this.checkCompletion();
             if (this.renderFn) this.renderFn();
             return;
         }
@@ -538,6 +645,7 @@ export class ReplayPlayer {
         this.isPlaying = false;
         this.isCollapsed = false;
         this.isSettingsOpen = false;
+        this.validationResult = null;
         this.game = null;
         this.renderFn = null;
 
