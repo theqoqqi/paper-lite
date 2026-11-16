@@ -106,7 +106,7 @@ function handlePopState() {
         if (game.previewShopOfferIndex !== null) {
             game.previewShopOfferIndex = null;
         } else {
-            game.finishRoom();
+            game.leaveShop();
         }
         render();
         return;
@@ -114,8 +114,7 @@ function handlePopState() {
 
     if (game.state === "EVENT_REWARDS") {
         if (!game.pendingEquipment && !game.pendingArtifact) {
-            game.eventRewards = null;
-            game.checkLevelUpOrFinishRoom();
+            game.proceedAfterEventRewards();
             render();
         }
         return;

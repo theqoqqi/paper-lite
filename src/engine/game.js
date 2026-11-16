@@ -1,5 +1,5 @@
 import { RNG } from "../utils/rng.js";
-import { GAME_DATA } from "../data/index.js";
+import { GAME_DATA, ABYSS_START_FLOOR } from "../data/index.js";
 import { playSound } from "../utils/audio.js";
 import { DungeonGenerator } from "./dungeon-generator.js";
 import { Player } from "./player.js";
@@ -7,6 +7,7 @@ import * as SaveSystem from "./systems/save.js";
 import * as ShopSystem from "./systems/shop.js";
 import * as EncounterSystem from "./systems/encounter.js";
 import * as BattleSystem from "./systems/battle.js";
+import * as ReplaySystem from "./systems/replay.js";
 
 const SCOUT_DIRS = [
     { name: "up", dx: 0, dy: -1 },
@@ -222,8 +223,88 @@ export class Game {
         this.saveMeta();
     }
 
+    recordAction(type, payload = null) {
+        return ReplaySystem.recordReplayAction(this, type, payload);
+    }
+
+    selectTarget(index) {
+        if (this.state !== "BATTLE" || this.isProcessingTurn || this.battleFinished) return false;
+        const enemy = this.enemies[index];
+        if (!enemy || enemy.isDying || enemy.currentHp <= 0) return false;
+        if (index === this.selectedTargetIndex) return false;
+        this.selectedTargetIndex = index;
+        this.recordAction("target", index);
+        return true;
+    }
+
+    proceedAfterEventRewards() {
+        if (this.state !== "EVENT_REWARDS" || this.pendingEquipment || this.pendingArtifact) return false;
+        this.recordAction("event_proceed", null);
+        this.eventRewards = null;
+        this.checkLevelUpOrFinishRoom();
+        return true;
+    }
+
+    leaveShop() {
+        if (this.state !== "SHOP") return false;
+        this.recordAction("shop_leave", null);
+        this.previewShopOfferIndex = null;
+        this.finishRoom();
+        return true;
+    }
+
+    reenterShop() {
+        if (this.state !== "MAP") return false;
+        const currentRoom = this.dungeonRooms[`${this.playerPos.x},${this.playerPos.y}`];
+        if (!currentRoom || currentRoom.type !== "shop" || !currentRoom.cleared) return false;
+        this.recordAction("shop_reenter", null);
+        this.state = "SHOP";
+        this.saveGame("autosave");
+        return true;
+    }
+
+    descendToNextFloor() {
+        if (this.state !== "MAP") return false;
+        const currentRoom = this.dungeonRooms[`${this.playerPos.x},${this.playerPos.y}`];
+        if (!currentRoom || currentRoom.type !== "boss" || !currentRoom.cleared) return false;
+        if (this.floor === ABYSS_START_FLOOR - 1) return false;
+        this.recordAction("descend_floor", null);
+        this.floor++;
+        this.recordProgress(this.floor + 1);
+        this.generateFloorMap();
+        this.state = "MAP";
+        this.saveGame("autosave");
+        return true;
+    }
+
+    openAbyssChoice() {
+        if (this.state !== "MAP") return false;
+        const currentRoom = this.dungeonRooms[`${this.playerPos.x},${this.playerPos.y}`];
+        if (!currentRoom || currentRoom.type !== "boss" || !currentRoom.cleared) return false;
+        if (this.floor !== ABYSS_START_FLOOR - 1) return false;
+        this.recordAction("abyss_open", null);
+        this.state = "ABYSS_CHOICE";
+        return true;
+    }
+
+    returnFromAbyssChoiceToMap() {
+        if (this.state !== "ABYSS_CHOICE") return false;
+        this.recordAction("abyss_map", null);
+        this.state = "MAP";
+        this.saveGame("autosave");
+        return true;
+    }
+
+    finishVictoryFromAbyssChoice() {
+        if (this.state !== "ABYSS_CHOICE") return false;
+        this.recordAction("abyss_victory", null);
+        this.finalizeRun("VICTORY");
+        return true;
+    }
+
     enterAbyssFromChoice() {
         if (this.state !== "ABYSS_CHOICE") return;
+        this.recordAction("abyss_enter", null);
         this.enteredAbyss = true;
         this.floor++;
         this.generateFloorMap();
@@ -239,6 +320,7 @@ export class Game {
             this.calculateSouls();
         }
         this.state = outcomeState;
+        ReplaySystem.finalizeReplay(this, outcomeState);
     }
 
     startRun(classKey, customSeed = null) {
@@ -266,6 +348,7 @@ export class Game {
         this.generateFloorMap();
         this.state = "MAP";
         this.saveGame("autosave");
+        ReplaySystem.startReplay(this);
     }
 
     setRoomSeed(...scopeParts) {
@@ -306,6 +389,7 @@ export class Game {
         if (dy === 1 && !currentRoom.doors.down) return false;
         if (dy === -1 && !currentRoom.doors.up) return false;
 
+        this.recordAction("move", { x: targetX, y: targetY });
         const isNewRoom = !targetRoom.visited;
         this.playerPos = { x: targetX, y: targetY };
         playSound("step");
@@ -388,6 +472,8 @@ export class Game {
         const status = this.getScoutStatus();
         if (!status.canScout) return false;
 
+        this.recordAction("scout_start", null);
+
         if (status.enSpent > 0) {
             this.player.en -= status.enSpent;
         }
@@ -443,6 +529,7 @@ export class Game {
         if (this.state !== "SCOUT" || !this.scoutSession || this.scoutSession.result) return false;
 
         if (actionId === "quiet") {
+            this.recordAction("scout_action", "quiet");
             this.scoutSession = null;
             this.state = "MAP";
             this.saveGame("autosave");
@@ -450,6 +537,7 @@ export class Game {
         }
 
         if (actionId === "far_passage") {
+            this.recordAction("scout_action", "far_passage");
             this.setRoomSeed("scout", actionId);
             this.scoutCooldown = (this.scoutCooldown || 5) + 1;
             const candidates = [];
@@ -493,6 +581,7 @@ export class Game {
         const cfg = SCOUT_ACTION_CONFIG[actionId];
         if (!hasAction || !cfg) return false;
 
+        this.recordAction("scout_action", actionId);
         this.setRoomSeed("scout", actionId);
         this.scoutCooldown = (this.scoutCooldown || 5) + 1;
         const matchingRooms = this.scoutSession.revealedRooms
@@ -525,6 +614,7 @@ export class Game {
 
     finishScoutSession() {
         if (this.state !== "SCOUT") return;
+        this.recordAction("scout_finish", null);
         this.scoutSession = null;
         this.checkLevelUpOrFinishRoom();
     }

@@ -1,7 +1,7 @@
 import { el } from "../utils/dom.js";
 import { game } from "../engine/game.js";
 import { isMuted, playSound, toggleMute } from "../utils/audio.js";
-import { openCharacterModal, openSaveManagerModal } from "./modals.js";
+import { openCharacterModal, openSaveManagerModal, openReplayManagerModal } from "./modals.js";
 import { renderItemLabelChildren } from "./rarity.js";
 
 let outsideSettingsClickHandler = null;
@@ -200,7 +200,14 @@ function createSettingsAnchor(render) {
             openSaveManagerModal(render);
         },
     });
-    const popover = el("div", { className: "settings-popover" }, [soundBtn, savesBtn]);
+    const replaysBtn = el("button", {
+        text: "🎬 Реплеи",
+        onClick: () => {
+            closeSettingsMenu();
+            openReplayManagerModal(render);
+        },
+    });
+    const popover = el("div", { className: "settings-popover" }, [soundBtn, savesBtn, replaysBtn]);
     popover.hidden = true;
 
     const anchor = el("div", { className: "settings-anchor" }, [

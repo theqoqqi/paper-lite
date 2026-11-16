@@ -3,6 +3,15 @@ import { game } from "../engine/game.js";
 import { GAME_DATA } from "../data/index.js";
 import { renderItemLabelChildren, renderTextWithRarity } from "./rarity.js";
 import { RNG } from "../utils/rng.js";
+import { Player } from "../engine/player.js";
+import {
+    getActiveReplay,
+    getReplayHistory,
+    deleteReplay,
+    clearReplayHistory,
+    importReplayJson,
+    exportReplayToFile,
+} from "../engine/systems/replay.js";
 
 const STATS_HELP = [
     {
@@ -367,6 +376,372 @@ export function openSaveManagerModal(render) {
                 style: { marginTop: "8px" },
                 text: "Закрыть окно",
                 onClick: () => modalOverlay.remove(),
+            }),
+        ]));
+    }
+
+    rebuildModalContent();
+    document.body.appendChild(modalOverlay);
+}
+
+const REPLAY_OUTCOME_LABELS = {
+    VICTORY: { text: "Победа", color: "#81c784", bg: "#162419", border: "#2e5c38" },
+    GAMEOVER: { text: "Поражение", color: "#ef9a9a", bg: "#281618", border: "#5c262a" },
+    INTERRUPTED: { text: "Прерван", color: "#ffd54f", bg: "#242014", border: "#574b24" },
+    IN_PROGRESS: { text: "В процессе", color: "#90caf9", bg: "#18242e", border: "#4a7a96" },
+};
+
+function formatReplayDate(ts) {
+    if (!ts) return "";
+    return new Date(ts).toLocaleString("ru-RU", {
+        hour: "2-digit",
+        minute: "2-digit",
+        day: "2-digit",
+        month: "2-digit",
+    });
+}
+
+function getReplayPlayer(rep) {
+    const playerData = rep?.finalState?.player;
+    if (!playerData) return null;
+    const p = Object.assign(new Player(playerData.classId || "wanderer"), playerData);
+    if (!p.inventory) p.inventory = { weapon: null, armor: null, potions: [], artifacts: [] };
+    if (!p.inventory.artifacts) p.inventory.artifacts = [];
+    if (!p.perks) p.perks = [];
+    return p;
+}
+
+function joinWithStatDividers(items) {
+    const out = [];
+    items.forEach((item, idx) => {
+        if (idx > 0) out.push(el("span", { className: "stat-divider" }));
+        out.push(item);
+    });
+    return out;
+}
+
+function renderReplaySummaryStats(p) {
+    if (!p) return null;
+    return el("div", {
+        style: {
+            marginTop: "4px",
+            fontSize: "11px",
+            color: "#cfd8dc",
+            lineHeight: "1.4",
+        },
+    }, [
+        el("div", {}, joinWithStatDividers([
+            `Ур. ${p.level}`,
+            `❤️ ${p.hp}/${p.getTotalMaxHp()}`,
+            `⚡ ${p.en}/${p.getTotalMaxEn()}`,
+            `💰 ${p.gold}G`,
+        ])),
+        el("div", {}, joinWithStatDividers([
+            `⚔️ ${p.getTotalAtk()}`,
+            `🛡️ ${p.getTotalDef()}`,
+            `🎯 ${p.getCritChance()}%`,
+        ])),
+    ]);
+}
+
+function renderReplayDetailsBlock(rep, p, actionsCount, badge, dateStr, actionsRow, deleteBtn) {
+    const weaponText = p
+        ? (p.inventory.weapon
+            ? `${p.inventory.weapon.name}${p.weaponUpgradeLvl > 0 ? ` (+${p.weaponUpgradeLvl})` : ""}`
+            : `Кулаки${p.weaponUpgradeLvl > 0 ? ` (+${p.weaponUpgradeLvl})` : ""}`)
+        : null;
+    const armorText = p
+        ? (p.inventory.armor
+            ? `${p.inventory.armor.name}${p.armorUpgradeLvl > 0 ? ` (+${p.armorUpgradeLvl})` : ""}`
+            : `Лохмотья${p.armorUpgradeLvl > 0 ? ` (+${p.armorUpgradeLvl})` : ""}`)
+        : null;
+    const artifactsText = p
+        ? (p.inventory.artifacts.length > 0
+            ? p.inventory.artifacts.map(a => a.name).join(", ")
+            : "нет")
+        : null;
+    const perksText = p
+        ? (p.perks.length > 0
+            ? p.perks.map(pid => GAME_DATA.perks.find(x => x.id === pid)?.name || pid).join(", ")
+            : "нет")
+        : null;
+
+    const makeRow = (label, value, valueColor = "#e0e0e0") => el("div", { style: { color: "#b0bec5" } }, [
+        `${label}: `,
+        el("span", { style: { color: valueColor }, text: String(value) }),
+    ]);
+
+    return el("div", {
+        style: {
+            marginTop: "8px",
+            paddingTop: "6px",
+            borderTop: "1px dashed #263238",
+            fontSize: "11px",
+            color: "#cfd8dc",
+            lineHeight: "1.45",
+        },
+    }, [
+        makeRow("Исход", badge.text, badge.color),
+        p ? makeRow("Уровень", `${p.level} (XP: ${p.xp}/${p.getRequiredXp()})`) : null,
+        p ? makeRow("Оружие", weaponText) : null,
+        p ? makeRow("Броня", armorText) : null,
+        p ? makeRow("Артефакты", p.inventory.artifacts.length) : null,
+        p ? makeRow("Перки", p.perks.length) : null,
+        actionsRow,
+        el("div", {
+            style: {
+                marginTop: "6px",
+                marginBottom: "6px",
+                borderBottom: "1px dashed #263238",
+            },
+        }),
+        dateStr ? makeRow("Дата", dateStr) : null,
+        el("div", { style: { color: "#b0bec5" } }, [
+            "Ходов: ",
+            el("span", { style: { color: "#e0e0e0" }, text: String(actionsCount) }),
+            el("span", { className: "stat-divider" }),
+            "Сид: ",
+            el("span", { style: { color: "#e0e0e0" }, text: String(rep.seed ?? "?") }),
+        ]),
+        el("div", {
+            className: "flex-row",
+            style: { marginTop: "6px", gap: "4px" },
+        }, [
+            rep.seed ? el("button", {
+                style: { padding: "4px 6px", margin: "0", fontSize: "11px" },
+                text: "📋 Копировать сид",
+                onClick: (e) => {
+                    if (navigator.clipboard) {
+                        navigator.clipboard.writeText(String(rep.seed));
+                        e.target.textContent = "✓ Сид скопирован";
+                    }
+                },
+            }) : null,
+            deleteBtn,
+        ]),
+    ]);
+}
+
+export function openReplayManagerModal(render) {
+    const modalOverlay = el("div", { className: "modal-overlay" });
+
+    function makeCopyJsonBtn(replay) {
+        return el("button", {
+            style: { padding: "6px", fontSize: "12px" },
+            text: "📋 Копировать JSON",
+            onClick: (e) => {
+                if (navigator.clipboard) {
+                    navigator.clipboard.writeText(JSON.stringify(replay));
+                    e.target.textContent = "✓ Скопировано";
+                }
+            },
+        });
+    }
+
+    function rebuildModalContent() {
+        modalOverlay.replaceChildren();
+        const scrollBox = el("div", { className: "modal-scroll" });
+        const active = getActiveReplay();
+        const history = getReplayHistory();
+
+        if (active) {
+            scrollBox.appendChild(el("div", {
+                className: "panel",
+                style: { borderColor: "#4a7a96", background: "#18242e" },
+            }, [
+                el("div", { style: { fontWeight: "bold", color: "#90caf9" }, text: "▶️ Текущий активный забег" }),
+                el("div", {
+                    style: { fontSize: "12px", margin: "4px 0", color: "#e0e0e0" },
+                    text: `${active.className} — Этаж ${active.reachedFloor || 1}`,
+                }),
+                el("div", {
+                    style: { fontSize: "11px", color: "#b0bec5", marginBottom: "6px" },
+                    text: `Ходов: ${active.actions.length} | Сид: ${active.seed ?? "?"}`,
+                }),
+                el("div", { className: "flex-row" }, [
+                    makeCopyJsonBtn(active),
+                    el("button", {
+                        style: { padding: "6px", fontSize: "12px", background: "#264653" },
+                        text: "⬇️ Скачать .json",
+                        onClick: () => exportReplayToFile(active),
+                    }),
+                ]),
+            ]));
+        }
+
+        const importTextarea = el("textarea", {
+            style: {
+                width: "100%",
+                minHeight: "64px",
+                boxSizing: "border-box",
+                margin: "6px 0",
+            },
+        });
+        importTextarea.placeholder = "Вставьте JSON реплея сюда...";
+
+        const fileInput = el("input", {
+            style: {
+                width: "100%",
+                boxSizing: "border-box",
+                marginBottom: "6px",
+                fontSize: "12px",
+                color: "#b0bec5",
+            },
+        });
+        fileInput.type = "file";
+        fileInput.accept = ".json,application/json";
+        fileInput.addEventListener("change", async () => {
+            const file = fileInput.files && fileInput.files[0];
+            if (!file) return;
+            try {
+                const text = await file.text();
+                const imported = importReplayJson(text);
+                if (!imported) {
+                    alert("Ошибка: файл не содержит корректный реплей!");
+                    return;
+                }
+                rebuildModalContent();
+            } catch (e) {
+                alert("Ошибка чтения JSON файла реплея!");
+            }
+        });
+
+        scrollBox.appendChild(el("div", { className: "panel" }, [
+            el("b", { text: "📥 Импорт реплея" }),
+            importTextarea,
+            fileInput,
+            el("button", {
+                className: "btn-center btn-primary",
+                style: { padding: "6px", fontSize: "12px" },
+                text: "Импортировать JSON",
+                onClick: () => {
+                    try {
+                        const imported = importReplayJson(importTextarea.value);
+                        if (!imported) {
+                            alert("Ошибка: некорректный формат реплея (нужны initialState и actions)!");
+                            return;
+                        }
+                        rebuildModalContent();
+                    } catch (e) {
+                        alert("Ошибка: некорректный JSON!");
+                    }
+                },
+            }),
+        ]));
+
+        scrollBox.appendChild(el("h4", { text: `История реплеев (${history.length}/100):` }));
+
+        if (history.length === 0) {
+            scrollBox.appendChild(el("div", {
+                className: "panel text-center",
+                style: { fontSize: "12px", color: "#777" },
+                text: "История реплеев пуста.",
+            }));
+        } else {
+            history.forEach(rep => {
+                const badge = REPLAY_OUTCOME_LABELS[rep.outcome] || REPLAY_OUTCOME_LABELS.INTERRUPTED;
+                const dateStr = formatReplayDate(rep.finishedAt || rep.updatedAt || rep.startedAt);
+                const actionsCount = Array.isArray(rep.actions) ? rep.actions.length : 0;
+                const replayPlayer = getReplayPlayer(rep);
+
+                const summaryDateEl = dateStr ? el("span", {
+                    style: {
+                        position: "absolute",
+                        right: "0",
+                        bottom: "0",
+                        fontSize: "10px",
+                        color: "#b0bec5",
+                        pointerEvents: "none",
+                    },
+                    text: dateStr,
+                }) : null;
+
+                const actionsRow = el("div", { className: "flex-row", style: { marginTop: "6px", gap: "4px" } }, [
+                    el("button", {
+                        style: { padding: "4px 6px", margin: "0", fontSize: "11px" },
+                        text: "📋 JSON",
+                        onClick: (e) => {
+                            if (navigator.clipboard) {
+                                navigator.clipboard.writeText(JSON.stringify(rep));
+                                e.target.textContent = "✓ Скопировано";
+                            }
+                        },
+                    }),
+                    el("button", {
+                        style: { padding: "4px 6px", margin: "0", fontSize: "11px", background: "#264653" },
+                        text: "⬇️ Скачать",
+                        onClick: () => exportReplayToFile(rep),
+                    }),
+                ]);
+
+                const deleteBtn = el("button", {
+                    style: { padding: "4px 6px", margin: "0", fontSize: "11px", background: "#4a2020" },
+                    text: "🗑️ Удалить",
+                    onClick: () => {
+                        if (confirm("Удалить этот реплей?")) {
+                            deleteReplay(rep.id);
+                            rebuildModalContent();
+                        }
+                    },
+                });
+
+                const detailsEl = el("details", {
+                    className: "panel",
+                    style: {
+                        cursor: "pointer",
+                        padding: "6px 10px",
+                        background: badge.bg,
+                        borderColor: badge.border,
+                    },
+                }, [
+                    el("summary", {
+                        style: {
+                            listStyle: "none",
+                            outline: "none",
+                            position: "relative",
+                        },
+                    }, [
+                        el("div", {
+                            style: { fontSize: "13px", fontWeight: "bold" },
+                            text: `${rep.className || "Герой"} — Этаж ${rep.reachedFloor || 1}`,
+                        }),
+                        renderReplaySummaryStats(replayPlayer),
+                        summaryDateEl,
+                    ]),
+                    renderReplayDetailsBlock(rep, replayPlayer, actionsCount, badge, dateStr, actionsRow, deleteBtn),
+                ]);
+                if (summaryDateEl) {
+                    detailsEl.addEventListener("toggle", () => {
+                        summaryDateEl.style.display = detailsEl.open ? "none" : "block";
+                    });
+                }
+                scrollBox.appendChild(detailsEl);
+            });
+
+            scrollBox.appendChild(el("button", {
+                className: "btn-center btn-danger",
+                style: { marginTop: "6px" },
+                text: "🗑️ Очистить всю историю реплеев",
+                onClick: () => {
+                    if (confirm("Удалить всю историю сохранённых реплеев?")) {
+                        clearReplayHistory();
+                        rebuildModalContent();
+                    }
+                },
+            }));
+        }
+
+        modalOverlay.appendChild(el("div", { className: "modal-box" }, [
+            el("h3", { text: "🎬 Реплеи забегов" }),
+            scrollBox,
+            el("button", {
+                className: "btn-center",
+                style: { marginTop: "8px" },
+                text: "Закрыть окно",
+                onClick: () => {
+                    modalOverlay.remove();
+                    if (render) render();
+                },
             }),
         ]));
     }

@@ -31,6 +31,7 @@ export function grantRandomEquipment(game, origin = "battle") {
 
 export function resolveEquipChoice(game) {
     if (!game.pendingEquipment) return null;
+    game.recordAction("equip_accept", null);
     const { type, item } = game.pendingEquipment;
     let refund = 0;
     if (type === "weapon") {
@@ -46,6 +47,7 @@ export function resolveEquipChoice(game) {
 
 export function resolveSalvageChoice(game) {
     if (!game.pendingEquipment) return null;
+    game.recordAction("equip_salvage", null);
     const { item } = game.pendingEquipment;
     const goldGain = (item && item.cost) ? Math.max(1, Math.floor(item.cost * 0.25)) : 0;
     game.player.gold += goldGain;
@@ -57,6 +59,7 @@ export function resolveSalvageChoice(game) {
 
 export function resolvePendingArtifact(game, accept) {
     if (!game.pendingArtifact) return null;
+    game.recordAction("artifact_choice", Boolean(accept));
     const art = game.pendingArtifact;
     game.pendingArtifact = null;
     let mergedArt = null;
@@ -152,6 +155,8 @@ export function generatePerkChoices(game) {
 }
 
 export function choosePerk(game, perkId) {
+    if (game.state !== "LEVELUP") return;
+    game.recordAction("perk", perkId);
     const req = game.player.getRequiredXp();
     game.player.xp = Math.max(0, game.player.xp - req);
     game.player.level++;
@@ -164,7 +169,20 @@ export function choosePerk(game, perkId) {
     checkLevelUpOrFinishRoom(game);
 }
 
+function canApplyEventOption(game, optionId) {
+    if (game.state !== "EVENT") return false;
+    const ev = GAME_DATA.events.find(e => e.id === game.currentEventId);
+    const opt = ev ? ev.options.find(o => o.id === optionId) : null;
+    if (!opt) return false;
+    if (opt.goldCost && game.player.gold < opt.goldCost) return false;
+    if (opt.hpCost && game.player.hp <= opt.hpCost) return false;
+    if (opt.maxHpCost && game.player.baseMaxHp <= opt.maxHpCost) return false;
+    return true;
+}
+
 export function resolveEventOption(game, optionId) {
+    if (!canApplyEventOption(game, optionId)) return false;
+    game.recordAction("event_option", optionId);
     game.setRoomSeed("event", optionId);
     if (optionId === "altar_hp") {
         if (game.player.hp <= 6) return;
@@ -421,6 +439,10 @@ export function resolveEventOption(game, optionId) {
 }
 
 export function resolveCampfire(game, choice) {
+    if (game.state !== "CAMPFIRE") return false;
+    if (!["heal", "prepare", "brew", "meditate"].includes(choice)) return false;
+    if (choice === "brew" && game.player.inventory.potions.length >= game.player.potionSlots) return false;
+    game.recordAction("campfire", choice);
     if (choice === "heal") {
         const mult = game.player.perks.includes("p28") ? 0.7 : 0.45;
         if (game.player.perks.includes("p28")) game.player.gold += 6;
@@ -433,7 +455,6 @@ export function resolveCampfire(game, choice) {
         game.player.en = game.player.getTotalMaxEn();
         game.player.concentrateBonus += 5;
     } else if (choice === "brew") {
-        if (game.player.inventory.potions.length >= game.player.potionSlots) return;
         game.setRoomSeed("campfire_brew");
         const items = [];
         const notes = [];
@@ -444,7 +465,7 @@ export function resolveCampfire(game, choice) {
             items,
             notes,
         });
-        return;
+        return true;
     } else if (choice === "meditate") {
         game.player.baseMaxHp += 4;
         game.player.heal(4);
@@ -452,9 +473,12 @@ export function resolveCampfire(game, choice) {
         game.player.totalRunXp += 4;
     }
     checkLevelUpOrFinishRoom(game);
+    return true;
 }
 
 export function resolveFountainChoice(game, drink) {
+    if (game.state !== "FOUNTAIN") return false;
+    game.recordAction("fountain_choice", Boolean(drink));
     const currentKey = `${game.playerPos.x},${game.playerPos.y}`;
     const roomObj = game.dungeonRooms[currentKey];
     if (roomObj) {
@@ -487,6 +511,8 @@ export function resolveFountainChoice(game, drink) {
 }
 
 export function leaveFountainRoom(game) {
+    if (game.state !== "FOUNTAIN") return;
+    game.recordAction("fountain_leave", null);
     game.fountainResult = null;
     checkLevelUpOrFinishRoom(game);
 }
@@ -555,6 +581,8 @@ export function triggerCorridorRoom(game) {
 }
 
 export function leaveCorridorRoom(game) {
+    if (game.state !== "CORRIDOR") return;
+    game.recordAction("corridor_leave", null);
     if (game.player.hp <= 0) {
         game.finalizeRun("GAMEOVER");
         return;

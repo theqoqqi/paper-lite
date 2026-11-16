@@ -3,6 +3,7 @@ import { game } from "../../engine/game.js";
 import { GAME_DATA, ABYSS_START_FLOOR, getMetaUpgradeCap } from "../../data/index.js";
 import { playSound } from "../../utils/audio.js";
 import { normalizeSeed, RNG } from "../../utils/rng.js";
+import { openReplayManagerModal } from "../modals.js";
 
 export function renderMenuScreen(render) {
     const autoSummary = game.getSlotSummary("autosave");
@@ -50,6 +51,11 @@ export function renderMenuScreen(render) {
                 game.state = "META_SHOP";
                 render();
             },
+        }),
+        el("button", {
+            className: "btn-center",
+            text: "🎬 Реплеи",
+            onClick: () => openReplayManagerModal(render),
         }),
     ]);
 }
@@ -197,7 +203,7 @@ export function renderAbyssChoiceScreen(render) {
             onClick: () => {
                 game._abyssChoiceSoundPlayed = false;
                 game._endSoundPlayed = false;
-                game.finalizeRun("VICTORY");
+                game.finishVictoryFromAbyssChoice();
                 render();
             },
         }),
@@ -217,8 +223,7 @@ export function renderAbyssChoiceScreen(render) {
             text: "🗺️ Продолжить исследование 4 этажа",
             onClick: () => {
                 game._abyssChoiceSoundPlayed = false;
-                game.state = "MAP";
-                game.saveGame("autosave");
+                game.returnFromAbyssChoiceToMap();
                 render();
             },
         }),

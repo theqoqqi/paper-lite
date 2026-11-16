@@ -419,7 +419,7 @@ export function renderMapScreen(render) {
                 },
                 text: "🕳️ Разлом под троном (Спуск в Бездну / Победа)",
                 onClick: () => {
-                    game.state = "ABYSS_CHOICE";
+                    game.openAbyssChoice();
                     render();
                 },
             }));
@@ -435,11 +435,7 @@ export function renderMapScreen(render) {
                 },
                 text: `⬇️ Спуститься на Этаж ${game.floor + 2}${isDeepAbyss ? " (Без восстановления)" : ""}`,
                 onClick: () => {
-                    game.floor++;
-                    game.recordProgress(game.floor + 1);
-                    game.generateFloorMap();
-                    game.state = "MAP";
-                    game.saveGame("autosave");
+                    game.descendToNextFloor();
                     render();
                 },
             }));
@@ -457,7 +453,7 @@ export function renderMapScreen(render) {
             },
             text: "⚖️ Войти в Лавку Торговца",
             onClick: () => {
-                game.state = "SHOP";
+                game.reenterShop();
                 render();
             },
         }));

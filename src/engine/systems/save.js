@@ -1,6 +1,7 @@
 import { Player } from "../player.js";
 import { ABYSS_START_FLOOR } from "../../data/index.js";
 import { RNG } from "../../utils/rng.js";
+import { onGameLoaded, clearActiveReplay, updateActiveReplaySnapshot } from "./replay.js";
 
 const META_STORAGE_KEY = "roguelite_meta_v4";
 const SLOT_PREFIX = "roguelite_slot_";
@@ -67,6 +68,9 @@ export function saveGame(game, slotKey = "autosave") {
     }
     const json = serializeState(game);
     localStorage.setItem(`${SLOT_PREFIX}${slotKey}`, json);
+    if (slotKey === "autosave") {
+        updateActiveReplaySnapshot(json);
+    }
     return json;
 }
 
@@ -126,6 +130,7 @@ export function loadGame(game, slotKeyOrJson = "autosave") {
         game.scoutCooldown = data.scoutCooldown || 0;
         game.scoutSession = data.scoutSession || null;
         game.shopRerollCount = data.shopRerollCount || 0;
+        onGameLoaded(game, slotKeyOrJson);
         return true;
     } catch (e) {
         console.error(e);
@@ -165,6 +170,7 @@ export function deleteSlot(slotKey) {
 export function hardResetAll(game) {
     localStorage.removeItem(META_STORAGE_KEY);
     ["autosave", "slot1", "slot2", "slot3"].forEach(k => localStorage.removeItem(`${SLOT_PREFIX}${k}`));
+    clearActiveReplay();
     game.meta = JSON.parse(JSON.stringify(game.defaultMeta));
     game.player = null;
     game.state = "MENU";

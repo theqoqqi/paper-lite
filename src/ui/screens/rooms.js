@@ -181,8 +181,7 @@ export function renderEventRewardsScreen(render) {
         style: { marginTop: "10px" },
         text: isChoicePending ? "Сначала сделайте выбор ☝️" : "Продолжить путь ➡️",
         onClick: () => {
-            game.eventRewards = null;
-            game.checkLevelUpOrFinishRoom();
+            game.proceedAfterEventRewards();
             render();
         },
     }));
@@ -611,8 +610,7 @@ export function renderShopScreen(render) {
         style: { marginTop: "8px" },
         text: "Покинуть лавку ➡️",
         onClick: () => {
-            game.previewShopOfferIndex = null;
-            game.finishRoom();
+            game.leaveShop();
             render();
         },
     }));

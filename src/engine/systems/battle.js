@@ -282,6 +282,8 @@ export function usePotion(game, potIndex, onStepRender) {
     if (!pot) return;
     if (game.state !== "BATTLE" && !pot.canUseOnMap) return;
 
+    game.recordAction("potion", potIndex);
+
     const alchBonus = (game.player.perks.includes("p21") && (pot.heal || 0) > 0) ? 8 : 0;
     const totalHeal = (pot.heal || 0) + alchBonus;
 
@@ -356,6 +358,9 @@ export function usePotion(game, potIndex, onStepRender) {
 }
 
 export function discardPotion(game, potIndex) {
+    if (game.isProcessingTurn || game.pendingArtifact) return;
+    if (potIndex < 0 || potIndex >= game.player.inventory.potions.length) return;
+    game.recordAction("potion_discard", potIndex);
     game.player.inventory.potions.splice(potIndex, 1);
     game.saveGame("autosave");
 }
@@ -572,6 +577,8 @@ export function playerAction(game, actionType, onStepRender) {
         game.player.cooldowns.concentrate = 4;
         game.battleLog.unshift(`🧘 Концентрация (+2 EN, +${healAmt} HP, -1 ход ко всем КД).`);
     }
+
+    game.recordAction("skill", actionType);
 
     if (["fast", "heavy", "pierce", "whirlwind"].includes(actionType) && game.player.bleed > 0) {
         game.player.hp = Math.max(0, game.player.hp - game.player.bleed);
@@ -1058,6 +1065,7 @@ export function checkBattleEnd(game) {
 
 export function proceedAfterBattle(game) {
     if (!game.battleFinished || game.pendingEquipment || game.pendingArtifact) return;
+    game.recordAction("battle_proceed", null);
     game.checkLevelUpOrFinishRoom();
 }
 

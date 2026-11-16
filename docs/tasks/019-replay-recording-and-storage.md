@@ -1,6 +1,6 @@
 # [Задача 019] Внедрение поддержки записи и хранения реплеев
 
-> **Статус:** Спроектировано (Ожидает реализации после [Задачи 018](018-scoped-world-generation-seeds.md))
+> **Статус:** Реализовано
 
 ## 1. Цели и контекст
 
@@ -139,13 +139,13 @@
 
 ## 4. Пошаговый план реализации
 
-1. [ ] **Шаг 1: Создание модуля [`src/engine/systems/replay.js`](../../src/engine/systems/replay.js)**
+1. [x] **Шаг 1: Создание модуля [`src/engine/systems/replay.js`](../../src/engine/systems/replay.js)**
    * Реализовать функции управления активным реплеем и историей (`startReplay`, `recordReplayAction`, `finalizeReplay`, `getReplayHistory`, `deleteReplay`, `clearReplayHistory`, `importReplayJson`, `exportReplayToFile`).
-2. [ ] **Шаг 2: Унификация методов действий в [`src/engine/game.js`](../../src/engine/game.js) и UI-экранах**
+2. [x] **Шаг 2: Унификация методов действий в [`src/engine/game.js`](../../src/engine/game.js) и UI-экранах**
    * Добавить методы `selectTarget`, `proceedAfterEventRewards`, `leaveShop`, `reenterShop`, `descendToNextFloor`, `openAbyssChoice`, `returnFromAbyssChoiceToMap`, `finishVictoryFromAbyssChoice`.
    * Встроить вызовы `this.recordAction(type, payload)` во все игровые методы `Game`.
    * Заменить прямые мутации `game.*` в [`src/ui/screens/battle.js`](../../src/ui/screens/battle.js), [`src/ui/screens/map.js`](../../src/ui/screens/map.js), [`src/ui/screens/rooms.js`](../../src/ui/screens/rooms.js), [`src/ui/screens/menu.js`](../../src/ui/screens/menu.js) и [`src/main.js`](../../src/main.js) на вызовы этих методов.
-3. [ ] **Шаг 3: Модальное окно «🎬 Реплеи» ([`src/ui/modals.js`](../../src/ui/modals.js), [`src/ui/screens/menu.js`](../../src/ui/screens/menu.js), [`src/ui/components.js`](../../src/ui/components.js))**
+3. [x] **Шаг 3: Модальное окно «🎬 Реплеи» ([`src/ui/modals.js`](../../src/ui/modals.js), [`src/ui/screens/menu.js`](../../src/ui/screens/menu.js), [`src/ui/components.js`](../../src/ui/components.js))**
    * Реализовать `openReplayManagerModal(render)` со списком истории (до 100 записей), экспортом в буфер/файл, импортом и удалением.
    * Подключить кнопки открытия окна в главном меню и в меню настроек.
 

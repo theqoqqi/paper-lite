@@ -133,6 +133,7 @@ export function getBaseRerollCost(floor = 0) {
 
 export function rerollShop(game) {
     if (game.player.gold < game.rerollCost) return;
+    game.recordAction("shop_reroll", null);
     game.player.gold -= game.rerollCost;
     game.rerollCost += scaleShopCost(4, game.floor);
     game.previewShopOfferIndex = null;
@@ -150,6 +151,7 @@ export function buyShopOffer(game, index) {
         return;
     }
 
+    game.recordAction("shop_buy", index);
     game.previewShopOfferIndex = null;
     game.player.gold -= offer.cost;
     offer.bought = true;

@@ -239,8 +239,7 @@ export function renderBattleScreen(render) {
             const cardEl = el("div", {
                 className: cardClasses.join(" "),
                 onClick: () => {
-                    if (!game.isProcessingTurn && !en.isDying) {
-                        game.selectedTargetIndex = idx;
+                    if (game.selectTarget(idx)) {
                         render();
                     }
                 },
