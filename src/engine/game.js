@@ -240,7 +240,10 @@ export class Game {
         this.state = outcomeState;
     }
 
-    startRun(classKey) {
+    startRun(classKey, customSeed = null) {
+        const normalizedSeed = RNG.setSeed(customSeed);
+        const rawSeed = customSeed !== null && customSeed !== undefined ? String(customSeed).trim() : "";
+        this.seed = rawSeed || normalizedSeed;
         this.player = new Player(classKey, this.meta);
         this.floor = 0;
         this.room = 1;

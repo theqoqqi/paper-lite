@@ -2,6 +2,7 @@ import { el } from "../../utils/dom.js";
 import { game } from "../../engine/game.js";
 import { GAME_DATA, ABYSS_START_FLOOR, getMetaUpgradeCap } from "../../data/index.js";
 import { playSound } from "../../utils/audio.js";
+import { normalizeSeed, RNG } from "../../utils/rng.js";
 
 export function renderMenuScreen(render) {
     const autoSummary = game.getSlotSummary("autosave");
@@ -120,13 +121,30 @@ export function renderMetaShopScreen(render) {
 
 export function renderClassSelectScreen(render) {
     const wrap = el("div", {}, [el("h2", { text: "Выберите Класс Героя" })]);
+    const seedInput = el("input", {
+        style: {
+            width: "100%",
+            boxSizing: "border-box",
+            background: "#12171d",
+            color: "#e0e0e0",
+            border: "1px solid #37474f",
+            borderRadius: "6px",
+            padding: "8px 10px",
+            fontSize: "13px",
+            outline: "none",
+        },
+    });
+    seedInput.type = "text";
+    seedInput.value = String(normalizeSeed(null));
+    seedInput.placeholder = "Сид забега (число или текст)";
 
     Object.values(GAME_DATA.classes).forEach(cls => {
         const unlocked = game.meta.unlockedClasses.includes(cls.id);
         wrap.appendChild(el("button", {
             disabled: !unlocked,
             onClick: () => {
-                game.startRun(cls.id);
+                const rawSeed = seedInput.value.trim();
+                game.startRun(cls.id, rawSeed || null);
                 render();
             },
         }, [
@@ -137,6 +155,11 @@ export function renderClassSelectScreen(render) {
             el("small", { text: cls.desc }),
         ]));
     });
+
+    wrap.appendChild(el("div", { className: "panel", style: { marginTop: "10px", marginBottom: "10px" } }, [
+        el("div", { style: { fontSize: "12px", color: "#b0bec5", marginBottom: "6px" }, text: "Сид забега:" }),
+        seedInput,
+    ]));
 
     wrap.appendChild(el("button", {
         className: "btn-center btn-danger",
@@ -224,6 +247,29 @@ export function renderEndScreen(render) {
                 style: { marginTop: "6px" },
                 text: `🏆 Лучший достигнутый этаж: ${game.meta.bestFloor}`,
             }) : null,
+            game.seed ? el("div", {
+                style: { marginTop: "10px", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" },
+            }, [
+                el("div", { style: { textAlign: "left", fontSize: "12px", color: "#b0bec5" } }, [
+                    el("div", {}, [
+                        "Сид забега: ",
+                        el("span", { style: { color: "#e0e0e0" }, text: String(RNG.getSeed()) }),
+                    ]),
+                    String(game.seed) !== String(RNG.getSeed())
+                        ? el("div", { style: { color: "#e0e0e0", wordBreak: "break-all" }, text: String(game.seed) })
+                        : null,
+                ]),
+                el("button", {
+                    text: "📋",
+                    style: { width: "auto", minWidth: "30px", padding: "4px 6px", margin: "0", fontSize: "14px", flexShrink: "0" },
+                    onClick: (e) => {
+                        if (navigator.clipboard) {
+                            navigator.clipboard.writeText(String(game.seed));
+                            e.target.textContent = "✓";
+                        }
+                    },
+                }),
+            ]) : null,
         ]),
         el("button", {
             className: "btn-center btn-primary",

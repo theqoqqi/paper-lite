@@ -1,6 +1,6 @@
 # [Задача 017] Переработка рандома для поддержки сидов (Seeded PRNG)
 
-> **Статус:** Спроектировано (Ожидает реализации)
+> **Статус:** Реализовано
 
 ## 1. Цели и контекст
 
@@ -145,13 +145,13 @@
 
 ## 4. Пошаговый план реализации
 
-1. [ ] **Шаг 1: Реализация `PRNG` и `normalizeSeed` в [`src/utils/rng.js`](../../src/utils/rng.js)**
+1. [x] **Шаг 1: Реализация `PRNG` и `normalizeSeed` в [`src/utils/rng.js`](../../src/utils/rng.js)**
    * Реализовать `normalizeSeed(input)` (числа, числовые строки, `FNV-1a` для текста, генерация случайного `uint32` при пустом входе).
    * Реализовать класс `PRNG` на алгоритме `Mulberry32` и обновить статический фасад `RNG` (`setSeed`, `getSeed`, `getState`, `setState`).
-2. [ ] **Шаг 2: Интеграция сида в [`src/engine/game.js`](../../src/engine/game.js) и [`src/engine/systems/save.js`](../../src/engine/systems/save.js)**
+2. [x] **Шаг 2: Интеграция сида в [`src/engine/game.js`](../../src/engine/game.js) и [`src/engine/systems/save.js`](../../src/engine/systems/save.js)**
    * Добавить `this.seed` в конструктор `Game` и параметр `customSeed = null` в `startRun(classKey, customSeed = null)`.
    * Сохранять и восстанавливать `seed` и `rngState` в `serializeState()` и `loadGame()`.
-3. [ ] **Шаг 3: Поле ввода и отображение сида в UI ([`src/ui/screens/menu.js`](../../src/ui/screens/menu.js), [`src/ui/modals.js`](../../src/ui/modals.js))**
+3. [x] **Шаг 3: Поле ввода и отображение сида в UI ([`src/ui/screens/menu.js`](../../src/ui/screens/menu.js), [`src/ui/modals.js`](../../src/ui/modals.js))**
    * Добавить поле ввода сида на экран выбора класса.
    * Отобразить `game.seed` и кнопку копирования в модальном окне «👤 Персонаж» и на экране итогов забега (`VICTORY` / `GAMEOVER`).
 

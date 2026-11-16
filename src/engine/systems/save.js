@@ -1,5 +1,6 @@
 import { Player } from "../player.js";
 import { ABYSS_START_FLOOR } from "../../data/index.js";
+import { RNG } from "../../utils/rng.js";
 
 const META_STORAGE_KEY = "roguelite_meta_v4";
 const SLOT_PREFIX = "roguelite_slot_";
@@ -52,6 +53,8 @@ export function serializeState(game) {
         currentCorridorResult: game.currentCorridorResult,
         scoutCooldown: game.scoutCooldown || 0,
         scoutSession: game.scoutSession || null,
+        seed: game.seed ?? RNG.getSeed(),
+        rngState: RNG.getState(),
     });
 }
 
@@ -77,6 +80,12 @@ export function loadGame(game, slotKeyOrJson = "autosave") {
         if (!data || !data.player) return false;
 
         loadMeta(game);
+        if (data.seed !== undefined && data.seed !== null) {
+            game.seed = data.seed;
+            RNG.setState(data.rngState ?? data.seed, data.seed);
+        } else {
+            game.seed = RNG.setSeed(null);
+        }
         game.player = Object.assign(new Player(data.player.classId || "wanderer"), data.player);
         if (!game.player.inventory.artifacts) game.player.inventory.artifacts = [];
         if (!game.player.cooldowns) {

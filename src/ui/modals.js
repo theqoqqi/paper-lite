@@ -2,6 +2,7 @@ import { el } from "../utils/dom.js";
 import { game } from "../engine/game.js";
 import { GAME_DATA } from "../data/index.js";
 import { renderItemLabelChildren, renderTextWithRarity } from "./rarity.js";
+import { RNG } from "../utils/rng.js";
 
 const STATS_HELP = [
     {
@@ -64,6 +65,29 @@ export function openCharacterModal(render) {
             style: { fontSize: "12px" },
             text: `Бонус Pity-Крита сейчас: +${p.pityCritBonus}% (Всего шанс: ${p.getCritChance()}%)`,
         }),
+        game.seed ? el("div", {
+            style: { marginTop: "8px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", fontSize: "12px", color: "#b0bec5" },
+        }, [
+            el("div", {}, [
+                el("div", {}, [
+                    "Сид забега: ",
+                    el("span", { style: { color: "#e0e0e0" }, text: String(RNG.getSeed()) }),
+                ]),
+                String(game.seed) !== String(RNG.getSeed())
+                    ? el("div", { style: { color: "#e0e0e0", wordBreak: "break-all" }, text: String(game.seed) })
+                    : null,
+            ]),
+            el("button", {
+                text: "📋",
+                style: { width: "auto", minWidth: "30px", padding: "4px 6px", margin: "0", fontSize: "14px", flexShrink: "0" },
+                onClick: (e) => {
+                    if (navigator.clipboard) {
+                        navigator.clipboard.writeText(String(game.seed));
+                        e.target.textContent = "✓";
+                    }
+                },
+            }),
+        ]) : null,
     ]));
 
     const statsHelpList = STATS_HELP.map(item => el("div", {
