@@ -692,8 +692,10 @@ export function runEnemyTurnSequence(game, onStepRender) {
         }
     });
 
+    const turnGen = game.sessionGeneration || 0;
     let idx = 0;
     const nextStep = () => {
+        if ((game.sessionGeneration || 0) !== turnGen) return;
         if (idx < steps.length) {
             steps[idx]();
             idx++;
@@ -710,7 +712,7 @@ export function runEnemyTurnSequence(game, onStepRender) {
             }
             if (onStepRender) onStepRender();
             const stepDelay = game.enemies.some(e => e.isDying) ? 550 : 420;
-            setTimeout(nextStep, stepDelay);
+            setTimeout(nextStep, game.scaleDelay(stepDelay));
         } else {
             game.isProcessingTurn = false;
             if (onStepRender) onStepRender();
@@ -719,7 +721,7 @@ export function runEnemyTurnSequence(game, onStepRender) {
     };
 
     const initialDelay = game.enemies.some(e => e.isDying) ? 550 : 380;
-    setTimeout(nextStep, initialDelay);
+    setTimeout(nextStep, game.scaleDelay(initialDelay));
 }
 
 export function executeSingleEnemyTurn(game, en) {
@@ -931,7 +933,7 @@ export function onEnemyKilled(game, enemy) {
     playSound("death");
     setTimeout(() => {
         enemy.isDying = false;
-    }, 550);
+    }, game.scaleDelay(550));
 
     let xpGain = enemy.xp;
     if (game.player.hasArtifact("art12")) xpGain = Math.ceil(xpGain * 3);
@@ -994,16 +996,18 @@ export function handlePotentialBattleEnd(game, onStepRender) {
 
     const hasDying = game.enemies.some(en => en.isDying && !en.deathAnimRendered);
     if (hasDying) {
+        const endGen = game.sessionGeneration || 0;
         game.isProcessingTurn = true;
         if (onStepRender) onStepRender();
         setTimeout(() => {
+            if ((game.sessionGeneration || 0) !== endGen) return;
             game.enemies.forEach(en => {
                 en.isDying = false;
             });
             checkBattleEnd(game);
             if (onStepRender) onStepRender();
             game.saveGame("autosave");
-        }, 550);
+        }, game.scaleDelay(550));
         return true;
     }
 

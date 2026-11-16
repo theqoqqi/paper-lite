@@ -24,4 +24,4 @@
 | Переработка рандома для поддержки сидов (Seeded PRNG) | Реализовано | [017-seeded-rng.md](tasks/017-seeded-rng.md) |
 | Внедрение вычисляемых контекстных сидов в генерацию мира | Реализовано | [018-scoped-world-generation-seeds.md](tasks/018-scoped-world-generation-seeds.md) |
 | Внедрение поддержки записи и хранения реплеев | Реализовано | [019-replay-recording-and-storage.md](tasks/019-replay-recording-and-storage.md) |
-| Внедрение воспроизведения реплеев и плавающего плеера | Спроектировано | [020-replay-player.md](tasks/020-replay-player.md) |
+| Внедрение воспроизведения реплеев и плавающего плеера | Реализовано | [020-replay-player.md](tasks/020-replay-player.md) |

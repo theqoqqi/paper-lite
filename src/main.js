@@ -6,7 +6,8 @@ import {
     ELITES_SPRITESHEET_PATH,
     enemySprites,
 } from "./data/enemy-sprites.js";
-import { renderGlobalNav, closeSettingsMenu } from "./ui/components.js";
+import { renderGlobalNav, renderReplayFloatingBar, closeSettingsMenu } from "./ui/components.js";
+import { replayPlayer } from "./engine/systems/replay.js";
 import {
     renderMenuScreen,
     renderMetaShopScreen,
@@ -28,6 +29,7 @@ import {
 } from "./ui/screens/rooms.js";
 
 export function render() {
+    renderReplayFloatingBar(render);
     const container = document.getElementById("screen-container");
     container.replaceChildren();
     if (game.state !== "BATTLE") {
@@ -78,6 +80,15 @@ document.addEventListener("DOMContentLoaded", () => {
             playSound("click");
         }
     });
+    const screenContainer = document.getElementById("screen-container");
+    if (screenContainer) {
+        screenContainer.addEventListener("click", (e) => {
+            if (game.isReplayMode) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+        }, true);
+    }
     render();
     setTimeout(warmImageCache, 800);
 });
@@ -93,6 +104,11 @@ function handlePopState() {
 
     if (document.querySelector(".settings-popover:not([hidden])")) {
         closeSettingsMenu();
+        return;
+    }
+
+    if (game.isReplayMode) {
+        replayPlayer.stopPlayback();
         return;
     }
 

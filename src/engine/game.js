@@ -153,6 +153,15 @@ export class Game {
         this.scoutCooldown = 0;
         this.scoutSession = null;
         this.shopRerollCount = 0;
+        this.isReplayMode = false;
+        this.replaySpeed = 1;
+        this.sessionGeneration = 0;
+        this._preReplayBackup = null;
+    }
+
+    scaleDelay(ms) {
+        if (!this.isReplayMode || (this.replaySpeed || 1) <= 1) return ms;
+        return Math.max(16, Math.round(ms / this.replaySpeed));
     }
 
     init() {
@@ -216,6 +225,7 @@ export class Game {
     }
 
     recordProgress(reachedFloor = this.floor + 1) {
+        if (this.isReplayMode) return;
         if (reachedFloor > (this.meta.bestFloor || 0)) {
             this.meta.bestFloor = reachedFloor;
             this.meta.bestClass = this.player ? this.player.className : (this.meta.bestClass || null);
@@ -224,6 +234,7 @@ export class Game {
     }
 
     recordAction(type, payload = null) {
+        if (this.isReplayMode) return null;
         return ReplaySystem.recordReplayAction(this, type, payload);
     }
 
@@ -324,6 +335,7 @@ export class Game {
     }
 
     startRun(classKey, customSeed = null) {
+        this.sessionGeneration = (this.sessionGeneration || 0) + 1;
         const normalizedSeed = RNG.setSeed(customSeed);
         const rawSeed = customSeed !== null && customSeed !== undefined ? String(customSeed).trim() : "";
         this.seed = rawSeed || normalizedSeed;

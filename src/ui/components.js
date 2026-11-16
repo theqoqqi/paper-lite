@@ -1,10 +1,12 @@
 import { el } from "../utils/dom.js";
 import { game } from "../engine/game.js";
 import { isMuted, playSound, toggleMute } from "../utils/audio.js";
+import { replayPlayer } from "../engine/systems/replay.js";
 import { openCharacterModal, openSaveManagerModal, openReplayManagerModal } from "./modals.js";
 import { renderItemLabelChildren } from "./rarity.js";
 
 let outsideSettingsClickHandler = null;
+let outsideReplaySettingsClickHandler = null;
 
 export function renderStatsPanel(playerFxList = []) {
     const p = game.player;
@@ -57,6 +59,207 @@ export function renderStatsPanel(playerFxList = []) {
     }
 
     return el("div", { className: panelClasses.join(" ") }, panelChildren);
+}
+
+function cleanupReplaySettingsOutsideHandler() {
+    if (outsideReplaySettingsClickHandler) {
+        document.removeEventListener("click", outsideReplaySettingsClickHandler);
+        outsideReplaySettingsClickHandler = null;
+    }
+}
+
+export function renderReplayFloatingBar(render) {
+    cleanupReplaySettingsOutsideHandler();
+    const bar = document.getElementById("replay-bar");
+    if (!bar) return;
+    bar.replaceChildren();
+
+    if (!game.isReplayMode || !replayPlayer.replay) {
+        bar.style.display = "none";
+        return;
+    }
+
+    bar.style.display = "block";
+    bar.style.position = "fixed";
+    bar.style.bottom = "8px";
+    bar.style.left = "50%";
+    bar.style.transform = "translateX(-50%)";
+    bar.style.width = "calc(100% - 16px)";
+    bar.style.maxWidth = "480px";
+    bar.style.zIndex = "200";
+    bar.style.pointerEvents = "none";
+
+    const currentStep = replayPlayer.currentStep || 0;
+    const totalSteps = Array.isArray(replayPlayer.replay.actions) ? replayPlayer.replay.actions.length : 0;
+
+    if (replayPlayer.isCollapsed) {
+        bar.appendChild(el("div", {
+            style: { display: "flex", justifyContent: "flex-end" },
+        }, [
+            el("button", {
+                style: {
+                    width: "auto",
+                    margin: "0",
+                    padding: "5px 10px",
+                    fontSize: "12px",
+                    background: "#18242e",
+                    borderColor: "#4a7a96",
+                    boxShadow: "0 2px 10px rgba(0, 0, 0, 0.75)",
+                    pointerEvents: "auto",
+                },
+                text: `🎬 ${currentStep}/${totalSteps}`,
+                onClick: () => replayPlayer.toggleCollapse(),
+            }),
+        ]));
+        return;
+    }
+
+    const isAtEnd = currentStep >= totalSteps;
+    let playBtnIcon = "▶️";
+    if (isAtEnd && totalSteps > 0) {
+        playBtnIcon = "🔄";
+    } else if (replayPlayer.isPlaying) {
+        playBtnIcon = "⏸️";
+    }
+
+    const currentSpeed = game.replaySpeed || 1;
+    const speedPopup = el("div", {
+        style: {
+            position: "absolute",
+            bottom: "100%",
+            right: "0",
+            marginBottom: "6px",
+            minWidth: "160px",
+            background: "#16202a",
+            border: "1px solid #4a7a96",
+            borderRadius: "6px",
+            padding: "8px",
+            boxShadow: "0 6px 16px rgba(0, 0, 0, 0.85)",
+            zIndex: "210",
+        },
+    }, [
+        el("div", {
+            style: { fontSize: "11px", color: "#90caf9", marginBottom: "6px", textAlign: "center" },
+            text: `Шаг ${currentStep} / ${totalSteps}`,
+        }),
+        el("div", {
+            style: { fontSize: "11px", color: "#b0bec5", marginBottom: "4px" },
+            text: "Скорость:",
+        }),
+        el("div", { className: "flex-row", style: { gap: "4px" } }, [1, 2, 4, 8].map(spd => el("button", {
+            className: `btn-center${currentSpeed === spd ? " btn-primary" : ""}`,
+            style: { padding: "4px 6px", margin: "0", fontSize: "11px" },
+            text: `${spd}x`,
+            onClick: () => replayPlayer.setSpeed(spd),
+        }))),
+    ]);
+    speedPopup.hidden = !replayPlayer.isSettingsOpen;
+
+    const iconBtnStyle = {
+        position: "relative",
+        width: "34px",
+        height: "34px",
+        padding: "0",
+        margin: "0",
+        fontSize: "14px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: "0",
+    };
+
+    const makeIconBtn = (icon, label, opts = {}) => el("button", {
+        className: opts.className || "btn-center",
+        style: iconBtnStyle,
+        disabled: Boolean(opts.disabled),
+        onClick: opts.onClick,
+    }, [
+        el("span", { style: { transform: "translateY(-2px)" }, text: icon }),
+        el("span", {
+            style: {
+                position: "absolute",
+                bottom: "0px",
+                left: "50%",
+                transform: "translateX(-50%)",
+                fontSize: "7px",
+                lineHeight: "1",
+                color: "#90a4ae",
+                pointerEvents: "none",
+                whiteSpace: "nowrap",
+            },
+            text: label,
+        }),
+    ]);
+
+    const settingsAnchor = el("div", {
+        style: { position: "relative", flexShrink: "0" },
+    }, [
+        makeIconBtn("⚙️", `${currentSpeed}x`, {
+            onClick: (e) => {
+                e.stopPropagation();
+                replayPlayer.isSettingsOpen = !replayPlayer.isSettingsOpen;
+                renderReplayFloatingBar(render);
+            },
+        }),
+        speedPopup,
+    ]);
+
+    if (replayPlayer.isSettingsOpen) {
+        outsideReplaySettingsClickHandler = (event) => {
+            if (!settingsAnchor.contains(event.target)) {
+                replayPlayer.isSettingsOpen = false;
+                renderReplayFloatingBar(render);
+            }
+        };
+        document.addEventListener("click", outsideReplaySettingsClickHandler);
+    }
+
+    const panel = el("div", {
+        style: {
+            width: "fit-content",
+            margin: "0 auto",
+            background: "rgba(22, 32, 42, 0.96)",
+            border: "1px solid #4a7a96",
+            borderRadius: "6px",
+            padding: "5px",
+            boxShadow: "0 4px 14px rgba(0, 0, 0, 0.8)",
+            pointerEvents: "auto",
+        },
+    }, [
+        el("div", { className: "flex-row", style: { gap: "5px", alignItems: "center" } }, [
+            makeIconBtn("✖", "Выход", {
+                className: "btn-center btn-danger",
+                onClick: () => replayPlayer.stopPlayback(),
+            }),
+            makeIconBtn("🔽", "Скрыть", {
+                onClick: () => replayPlayer.toggleCollapse(),
+            }),
+            makeIconBtn(
+                playBtnIcon,
+                isAtEnd && totalSteps > 0 ? "Заново" : (replayPlayer.isPlaying ? "Пауза" : "Старт"),
+                {
+                    className: "btn-center btn-primary",
+                    disabled: totalSteps === 0 && !isAtEnd,
+                    onClick: () => {
+                        if (isAtEnd) {
+                            replayPlayer.restartPlayback();
+                        } else if (replayPlayer.isPlaying) {
+                            replayPlayer.pausePlayback();
+                        } else {
+                            replayPlayer.resumePlayback();
+                        }
+                    },
+                },
+            ),
+            makeIconBtn("⏭️", "Шаг", {
+                disabled: isAtEnd || game.isProcessingTurn,
+                onClick: () => replayPlayer.stepForward(),
+            }),
+            settingsAnchor,
+        ]),
+    ]);
+
+    bar.appendChild(panel);
 }
 
 export function renderGlobalNav(render) {

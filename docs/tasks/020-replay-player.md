@@ -1,6 +1,6 @@
 # [Задача 020] Внедрение воспроизведения реплеев и плавающего плеера
 
-> **Статус:** Спроектировано (Ожидает реализации после [Задачи 019](019-replay-recording-and-storage.md))
+> **Статус:** Реализовано
 
 ## 1. Цели и контекст
 
@@ -101,17 +101,16 @@
 ### 2.4. Плавающая панель плеера и блокировка ручного ввода
 
 1. **Плавающая панель (`renderReplayFloatingBar(render)` в `src/ui/components.js`):**
-   * Размещается поверх верхней части контейнера игры (`position: sticky; top: 6px; z-index: 150`), не затрагивая нижнюю панель навигации.
-   * **В развёрнутом виде содержит:**
-     * Индикатор: `🎬 Реплей: шаг ${currentStep}/${totalSteps}` и кнопка `✖` (выйти из просмотра).
-     * Ряд кнопок управления:
-       * `[Скрыть]` — сворачивает панель в компактный бейдж в углу экрана (`🎬 ${currentStep}/${totalSteps}`), по клику на который панель разворачивается обратно.
-       * `[▶️ Старт / ⏸️ Пауза / ▶️ Продолжить]` (или `🔄 Сначала`, если дошли до конца).
-       * `[⏭️ Шаг вперед]` (активна, пока `currentStep < totalSteps` и `!game.isProcessingTurn`).
-       * `[⚙️ ${speed}x]` — переключает скорость по циклу `1x → 2x → 4x → 8x` (либо открывает мини-выбор скорости).
+   * Размещается поверх нижней части окна (`position: fixed; bottom: 8px; left: 50%; transform: translateX(-50%); max-width: 480px; z-index: 200`), не затрагивая нижнюю панель навигации.
+   * **В развёрнутом виде содержит один ряд кнопок:**
+     * `[Скрыть]` — сворачивает панель в правый нижний угол в компактный бейдж `[🎬 ${currentStep}/${totalSteps}]`.
+     * `[✖]` — выход из просмотра реплея.
+     * `[▶️ Старт / ⏸️ Пауза / ▶️ Продолжить]` (или `🔄 Сначала`, если дошли до конца).
+     * `[⏭️ Шаг вперед]` (активна, пока `currentStep < totalSteps` и `!game.isProcessingTurn`).
+     * `[⚙️${speed}x]` — открывает попап с прогрессом `Шаг N / M` и выбором скорости (`1x`, `2x`, `4x`, `8x`).
 2. **Блокировка кликов по игровому полю в режиме реплея:**
-   * В `render()` (`src/main.js`) при `game.isReplayMode === true` на `#screen-container` навешивается перехватчик кликов в фазе `capture` (или CSS-блокировка интерактивных кнопок внутри `#screen-container`), который блокирует нажатия на игровые кнопки, но разрешает скролл лога боя.
-   * В нижней панели навигации (`#global-nav`) остаются доступными кнопка «👤 Персонаж» (для просмотра инвентаря, перков и статов в любой момент реплея) и кнопка «✖ Выйти из реплея».
+   * В `DOMContentLoaded` (`src/main.js`) на `#screen-container` навешивается перехватчик кликов в фазе `capture`, который блокирует нажатия на игровые кнопки, но разрешает скролл лога боя.
+   * Нижняя панель навигации (`#global-nav`) остаётся нетронутой; в окне «👤 Персонаж» во время реплея кнопки употребления/выбрасывания зелий отключены.
 
 ---
 
@@ -128,14 +127,14 @@
 
 ## 4. Пошаговый план реализации
 
-1. [ ] **Шаг 1: Режим `isReplayMode` и масштабирование таймеров ([`src/engine/game.js`](../../src/engine/game.js), [`src/engine/systems/battle.js`](../../src/engine/systems/battle.js), [`src/engine/systems/save.js`](../../src/engine/systems/save.js))**
+1. [x] **Шаг 1: Режим `isReplayMode` и масштабирование таймеров ([`src/engine/game.js`](../../src/engine/game.js), [`src/engine/systems/battle.js`](../../src/engine/systems/battle.js), [`src/engine/systems/save.js`](../../src/engine/systems/save.js))**
    * Добавить `isReplayMode`, `replaySpeed` и `scaleDelay(ms)` в `Game`.
    * Заблокировать запись в `localStorage` (`saveGame`, `saveMeta`, `recordAction`) при `isReplayMode === true`.
    * Применить `game.scaleDelay(...)` к боевым таймерам в `battle.js`.
-2. [ ] **Шаг 2: Контроллер `ReplayPlayer` и `applyReplayAction` ([`src/engine/systems/replay.js`](../../src/engine/systems/replay.js))**
+2. [x] **Шаг 2: Контроллер `ReplayPlayer` и `applyReplayAction` ([`src/engine/systems/replay.js`](../../src/engine/systems/replay.js))**
    * Реализовать диспетчер `applyReplayAction(game, action, render)` для всех типов действий.
    * Реализовать контроллер управления воспроизведением (`startPlayback`, `pausePlayback`, `resumePlayback`, `stepForward`, `setSpeed`, `stopPlayback`).
-3. [ ] **Шаг 3: Плавающая панель плеера и интеграция в UI ([`src/ui/components.js`](../../src/ui/components.js), [`src/ui/modals.js`](../../src/ui/modals.js), [`src/main.js`](../../src/main.js), [`src/index.html`](../../src/index.html))**
+3. [x] **Шаг 3: Плавающая панель плеера и интеграция в UI ([`src/ui/components.js`](../../src/ui/components.js), [`src/ui/modals.js`](../../src/ui/modals.js), [`src/main.js`](../../src/main.js), [`src/index.html`](../../src/index.html))**
    * Добавить плавающую панель с кнопками `[Скрыть]`, `[Старт/Пауза/Продолжить]`, `[Шаг вперед]`, `[Скорость]` и выходом.
    * В окне «🎬 Реплеи» (`openReplayManagerModal`) добавить кнопку «▶️ Смотреть» для каждого реплея.
    * Заблокировать клики по игровым кнопкам внутри `#screen-container` при активном `isReplayMode`.

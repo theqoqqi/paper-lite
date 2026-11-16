@@ -11,6 +11,7 @@ import {
     clearReplayHistory,
     importReplayJson,
     exportReplayToFile,
+    replayPlayer,
 } from "../engine/systems/replay.js";
 
 const STATS_HELP = [
@@ -213,6 +214,7 @@ export function openCharacterModal(render) {
                 el("div", { className: "flex-row" }, [
                     canDrinkHere ? el("button", {
                         style: { padding: "4px", fontSize: "11px", background: "#243b24" },
+                        disabled: game.isReplayMode,
                         text: "Выпить",
                         onClick: () => {
                             game.usePotion(idx);
@@ -222,6 +224,7 @@ export function openCharacterModal(render) {
                     }) : null,
                     el("button", {
                         style: { padding: "4px", fontSize: "11px", background: "#4a2020" },
+                        disabled: game.isReplayMode,
                         text: "Выбросить",
                         onClick: () => {
                             game.discardPotion(idx);
@@ -289,6 +292,7 @@ export function openSaveManagerModal(render) {
                 el("div", { className: "flex-row" }, [
                     game.player ? el("button", {
                         style: { padding: "6px", fontSize: "12px", background: "#264653" },
+                        disabled: game.isReplayMode,
                         text: "Сохранить сюда",
                         onClick: () => {
                             game.saveGame(slotKey);
@@ -297,6 +301,7 @@ export function openSaveManagerModal(render) {
                     }) : null,
                     summary ? el("button", {
                         style: { padding: "6px", fontSize: "12px" },
+                        disabled: game.isReplayMode,
                         text: "Загрузить",
                         onClick: () => {
                             if (game.loadGame(slotKey)) {
@@ -307,6 +312,7 @@ export function openSaveManagerModal(render) {
                     }) : null,
                     summary ? el("button", {
                         style: { padding: "6px", fontSize: "12px", background: "#4a2020" },
+                        disabled: game.isReplayMode,
                         text: "Удалить",
                         onClick: () => {
                             game.deleteSlot(slotKey);
@@ -342,6 +348,7 @@ export function openSaveManagerModal(render) {
                 el("button", {
                     className: "btn-center btn-primary",
                     style: { padding: "6px", fontSize: "12px" },
+                    disabled: game.isReplayMode,
                     text: "Загрузить из JSON",
                     onClick: () => {
                         if (game.loadGame(textarea.value)) {
@@ -358,6 +365,7 @@ export function openSaveManagerModal(render) {
         scrollBox.appendChild(el("button", {
             className: "btn-center btn-danger",
             style: { marginTop: "6px" },
+            disabled: game.isReplayMode,
             text: "⚠️ ПОЛНЫЙ СБРОС ПРОГРЕССА (Начать с нуля)",
             onClick: () => {
                 if (confirm("Вы уверены? Это удалит все Очки Душ, открытые классы и все слоты сохранений!")) {
@@ -565,6 +573,15 @@ export function openReplayManagerModal(render) {
                         text: "⬇️ Скачать .json",
                         onClick: () => exportReplayToFile(active),
                     }),
+                    el("button", {
+                        className: "btn-primary",
+                        style: { padding: "6px", fontSize: "12px" },
+                        text: "▶️ Смотреть",
+                        onClick: () => {
+                            modalOverlay.remove();
+                            replayPlayer.startPlayback(game, active, render);
+                        },
+                    }),
                 ]),
             ]));
         }
@@ -642,7 +659,7 @@ export function openReplayManagerModal(render) {
                 const badge = REPLAY_OUTCOME_LABELS[rep.outcome] || REPLAY_OUTCOME_LABELS.INTERRUPTED;
                 const dateStr = formatReplayDate(rep.finishedAt || rep.updatedAt || rep.startedAt);
                 const actionsCount = Array.isArray(rep.actions) ? rep.actions.length : 0;
-                const replayPlayer = getReplayPlayer(rep);
+                const repPlayer = getReplayPlayer(rep);
 
                 const summaryDateEl = dateStr ? el("span", {
                     style: {
@@ -671,6 +688,15 @@ export function openReplayManagerModal(render) {
                         style: { padding: "4px 6px", margin: "0", fontSize: "11px", background: "#264653" },
                         text: "⬇️ Скачать",
                         onClick: () => exportReplayToFile(rep),
+                    }),
+                    el("button", {
+                        className: "btn-primary",
+                        style: { padding: "4px 6px", margin: "0", fontSize: "11px" },
+                        text: "▶️ Смотреть",
+                        onClick: () => {
+                            modalOverlay.remove();
+                            replayPlayer.startPlayback(game, rep, render);
+                        },
                     }),
                 ]);
 
@@ -705,10 +731,10 @@ export function openReplayManagerModal(render) {
                             style: { fontSize: "13px", fontWeight: "bold" },
                             text: `${rep.className || "Герой"} — Этаж ${rep.reachedFloor || 1}`,
                         }),
-                        renderReplaySummaryStats(replayPlayer),
+                        renderReplaySummaryStats(repPlayer),
                         summaryDateEl,
                     ]),
-                    renderReplayDetailsBlock(rep, replayPlayer, actionsCount, badge, dateStr, actionsRow, deleteBtn),
+                    renderReplayDetailsBlock(rep, repPlayer, actionsCount, badge, dateStr, actionsRow, deleteBtn),
                 ]);
                 if (summaryDateEl) {
                     detailsEl.addEventListener("toggle", () => {

@@ -19,6 +19,7 @@ export function loadMeta(game) {
 }
 
 export function saveMeta(game) {
+    if (game.isReplayMode) return;
     localStorage.setItem(META_STORAGE_KEY, JSON.stringify(game.meta));
 }
 
@@ -61,6 +62,7 @@ export function serializeState(game) {
 }
 
 export function saveGame(game, slotKey = "autosave") {
+    if (game.isReplayMode) return null;
     if (!game.player) return serializeState(game);
     if (slotKey === "autosave" && (game.state === "VICTORY" || game.state === "GAMEOVER")) {
         localStorage.removeItem(`${SLOT_PREFIX}autosave`);
@@ -84,7 +86,12 @@ export function loadGame(game, slotKeyOrJson = "autosave") {
         const data = JSON.parse(raw);
         if (!data || !data.player) return false;
 
-        loadMeta(game);
+        game.sessionGeneration = (game.sessionGeneration || 0) + 1;
+        if (!game.isReplayMode) {
+            loadMeta(game);
+        } else if (data.meta) {
+            game.meta = Object.assign(JSON.parse(JSON.stringify(game.defaultMeta)), data.meta);
+        }
         if (data.seed !== undefined && data.seed !== null) {
             game.seed = data.seed;
             RNG.setState(data.rngState ?? data.seed, data.seed);
@@ -130,7 +137,9 @@ export function loadGame(game, slotKeyOrJson = "autosave") {
         game.scoutCooldown = data.scoutCooldown || 0;
         game.scoutSession = data.scoutSession || null;
         game.shopRerollCount = data.shopRerollCount || 0;
-        onGameLoaded(game, slotKeyOrJson);
+        if (!game.isReplayMode) {
+            onGameLoaded(game, slotKeyOrJson);
+        }
         return true;
     } catch (e) {
         console.error(e);

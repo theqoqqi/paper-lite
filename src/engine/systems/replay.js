@@ -275,3 +275,290 @@ export function exportReplayToFile(replay) {
     link.remove();
     URL.revokeObjectURL(url);
 }
+
+const BASE_STEP_DELAY = 700;
+const REPLAY_SPEEDS = [1, 2, 4, 8];
+
+const REPLAY_ACTION_HANDLERS = {
+    move: (game, p) => game.moveToRoom(p.x, p.y),
+    scout_start: (game) => game.scoutSurroundings(),
+    scout_action: (game, p) => game.resolveScoutAction(p),
+    scout_finish: (game) => game.finishScoutSession(),
+    target: (game, p) => game.selectTarget(p),
+    skill: (game, p, render) => game.playerAction(p, render),
+    potion: (game, p, render) => game.usePotion(p, render),
+    potion_discard: (game, p) => game.discardPotion(p),
+    equip_accept: (game) => game.resolveEquipChoice(),
+    equip_salvage: (game) => game.resolveSalvageChoice(),
+    artifact_choice: (game, p) => game.resolvePendingArtifact(p),
+    battle_proceed: (game) => game.proceedAfterBattle(),
+    perk: (game, p) => game.choosePerk(p),
+    event_option: (game, p) => game.resolveEventOption(p),
+    event_proceed: (game) => game.proceedAfterEventRewards(),
+    campfire: (game, p) => game.resolveCampfire(p),
+    corridor_leave: (game) => game.leaveCorridorRoom(),
+    fountain_choice: (game, p) => game.resolveFountainChoice(p),
+    fountain_leave: (game) => game.leaveFountainRoom(),
+    shop_buy: (game, p) => game.buyShopOffer(p),
+    shop_reroll: (game) => game.rerollShop(),
+    shop_leave: (game) => game.leaveShop(),
+    shop_reenter: (game) => game.reenterShop(),
+    descend_floor: (game) => game.descendToNextFloor(),
+    abyss_open: (game) => game.openAbyssChoice(),
+    abyss_enter: (game) => game.enterAbyssFromChoice(),
+    abyss_map: (game) => game.returnFromAbyssChoiceToMap(),
+    abyss_victory: (game) => game.finishVictoryFromAbyssChoice(),
+};
+
+export function applyReplayAction(game, action, render) {
+    if (!game || !action) return false;
+    const handler = REPLAY_ACTION_HANDLERS[action.t];
+    if (!handler) {
+        console.warn("Unknown replay action:", action);
+        return false;
+    }
+    handler(game, action.p, render);
+    return true;
+}
+
+export class ReplayPlayer {
+    constructor() {
+        this.game = null;
+        this.renderFn = null;
+        this.replay = null;
+        this.currentStep = 0;
+        this.isPlaying = false;
+        this.isCollapsed = false;
+        this.isSettingsOpen = false;
+        this._sessionId = 0;
+        this._timerId = null;
+    }
+
+    _clearTimer() {
+        if (this._timerId !== null) {
+            clearTimeout(this._timerId);
+            this._timerId = null;
+        }
+    }
+
+    _resetSoundFlags(game) {
+        game._victorySoundPlayed = false;
+        game._endSoundPlayed = false;
+        game._abyssChoiceSoundPlayed = false;
+        game._levelUpSoundPlayed = false;
+    }
+
+    startPlayback(game, replay, renderFn) {
+        if (!game || !replay || !replay.initialState || !Array.isArray(replay.actions)) {
+            return false;
+        }
+        this._clearTimer();
+        this._sessionId++;
+
+        if (!game.isReplayMode) {
+            game._preReplayBackup = {
+                state: game.state,
+                hasPlayer: Boolean(game.player),
+                snapshot: game.player ? game.serializeState() : null,
+            };
+        }
+
+        game.isReplayMode = true;
+        this.game = game;
+        this.renderFn = renderFn;
+        this.replay = replay;
+        this.currentStep = 0;
+        this.isPlaying = false;
+        this.isCollapsed = false;
+        this.isSettingsOpen = false;
+
+        const loaded = game.loadGame(JSON.stringify(replay.initialState));
+        if (!loaded) {
+            this.stopPlayback();
+            return false;
+        }
+        this._resetSoundFlags(game);
+        if (this.renderFn) this.renderFn();
+        return true;
+    }
+
+    restartPlayback() {
+        if (!this.game || !this.replay) return;
+        this._clearTimer();
+        this._sessionId++;
+        this.isPlaying = false;
+        this.currentStep = 0;
+        this.game.loadGame(JSON.stringify(this.replay.initialState));
+        this._resetSoundFlags(this.game);
+        if (this.renderFn) this.renderFn();
+    }
+
+    resumePlayback() {
+        if (!this.game || !this.replay) return;
+        if (this.currentStep >= this.replay.actions.length) {
+            this.restartPlayback();
+        }
+        if (this.replay.actions.length === 0) return;
+        this._clearTimer();
+        const sid = ++this._sessionId;
+        this.isPlaying = true;
+        if (this.renderFn) this.renderFn();
+        this._scheduleNextStep(sid, true);
+    }
+
+    pausePlayback() {
+        this._clearTimer();
+        this._sessionId++;
+        this.isPlaying = false;
+        if (this.renderFn) this.renderFn();
+    }
+
+    stepForward() {
+        if (!this.game || !this.replay) return;
+        if (this.isPlaying) {
+            this.pausePlayback();
+        }
+        if (this.currentStep >= this.replay.actions.length) return;
+        if (this.game.isProcessingTurn) {
+            const sid = ++this._sessionId;
+            this._waitAndSingleStep(sid);
+            return;
+        }
+        this._executeSingleStep();
+    }
+
+    _waitAndSingleStep(sessionId) {
+        if (sessionId !== this._sessionId || !this.game || !this.replay) return;
+        if (this.game.isProcessingTurn) {
+            this._timerId = setTimeout(() => {
+                this._waitAndSingleStep(sessionId);
+            }, 40);
+            return;
+        }
+        if (this.currentStep < this.replay.actions.length) {
+            this._executeSingleStep();
+        }
+    }
+
+    _executeSingleStep() {
+        if (!this.game || !this.replay || this.currentStep >= this.replay.actions.length) return;
+        const action = this.replay.actions[this.currentStep];
+        this.currentStep++;
+        applyReplayAction(this.game, action, this.renderFn);
+        if (this.currentStep >= this.replay.actions.length && !this.game.isProcessingTurn) {
+            this.isPlaying = false;
+        }
+        if (this.renderFn) this.renderFn();
+    }
+
+    _scheduleNextStep(sessionId, immediate = false) {
+        if (sessionId !== this._sessionId || !this.isPlaying || !this.game || !this.replay) return;
+        if (this.game.isProcessingTurn) {
+            this._timerId = setTimeout(() => {
+                this._scheduleNextStep(sessionId, false);
+            }, Math.min(50, this.game.scaleDelay(100)));
+            return;
+        }
+        if (this.currentStep >= this.replay.actions.length) {
+            this.isPlaying = false;
+            if (this.renderFn) this.renderFn();
+            return;
+        }
+        if (immediate) {
+            this._executeSingleStep();
+            this._waitIdleAndSchedule(sessionId);
+            return;
+        }
+        this._timerId = setTimeout(() => {
+            if (sessionId !== this._sessionId || !this.isPlaying) return;
+            if (this.game.isProcessingTurn) {
+                this._scheduleNextStep(sessionId, false);
+                return;
+            }
+            if (this.currentStep >= this.replay.actions.length) {
+                this.isPlaying = false;
+                if (this.renderFn) this.renderFn();
+                return;
+            }
+            this._executeSingleStep();
+            this._waitIdleAndSchedule(sessionId);
+        }, this.game.scaleDelay(BASE_STEP_DELAY));
+    }
+
+    _waitIdleAndSchedule(sessionId) {
+        if (sessionId !== this._sessionId || !this.isPlaying || !this.game || !this.replay) return;
+        if (this.game.isProcessingTurn) {
+            this._timerId = setTimeout(() => {
+                this._waitIdleAndSchedule(sessionId);
+            }, Math.min(50, this.game.scaleDelay(100)));
+            return;
+        }
+        if (this.currentStep >= this.replay.actions.length) {
+            this.isPlaying = false;
+            if (this.renderFn) this.renderFn();
+            return;
+        }
+        this._scheduleNextStep(sessionId, false);
+    }
+
+    setSpeed(speed) {
+        if (!REPLAY_SPEEDS.includes(speed)) return;
+        if (this.game) {
+            this.game.replaySpeed = speed;
+        }
+        if (this.isPlaying && !this.game?.isProcessingTurn) {
+            this._clearTimer();
+            const sid = ++this._sessionId;
+            this._scheduleNextStep(sid, false);
+        }
+        if (this.renderFn) this.renderFn();
+    }
+
+    cycleSpeed() {
+        const cur = this.game ? (this.game.replaySpeed || 1) : 1;
+        const nextIdx = (REPLAY_SPEEDS.indexOf(cur) + 1) % REPLAY_SPEEDS.length;
+        this.setSpeed(REPLAY_SPEEDS[nextIdx]);
+    }
+
+    toggleCollapse() {
+        this.isCollapsed = !this.isCollapsed;
+        if (this.isCollapsed) {
+            this.isSettingsOpen = false;
+        }
+        if (this.renderFn) this.renderFn();
+    }
+
+    stopPlayback() {
+        this._clearTimer();
+        this._sessionId++;
+        const game = this.game;
+        const renderFn = this.renderFn;
+        this.replay = null;
+        this.currentStep = 0;
+        this.isPlaying = false;
+        this.isCollapsed = false;
+        this.isSettingsOpen = false;
+        this.game = null;
+        this.renderFn = null;
+
+        if (!game) return;
+        game.sessionGeneration = (game.sessionGeneration || 0) + 1;
+        game.isProcessingTurn = false;
+        const backup = game._preReplayBackup;
+        game._preReplayBackup = null;
+
+        if (backup && backup.hasPlayer && backup.snapshot) {
+            game.loadGame(backup.snapshot);
+            if (backup.state) game.state = backup.state;
+        } else {
+            game.player = null;
+            game.state = (backup && backup.state) || "MENU";
+        }
+        game.isReplayMode = false;
+        game.loadMeta();
+        this._resetSoundFlags(game);
+        if (renderFn) renderFn();
+    }
+}
+
+export const replayPlayer = new ReplayPlayer();
