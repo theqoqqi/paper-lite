@@ -8,6 +8,7 @@ import {
 } from "./data/enemy-sprites.js";
 import { renderGlobalNav, renderReplayFloatingBar, closeSettingsMenu } from "./ui/components.js";
 import { replayPlayer } from "./engine/systems/replay.js";
+import { initTelemetry } from "./engine/systems/telemetry.js";
 import {
     renderMenuScreen,
     renderMetaShopScreen,
@@ -90,6 +91,9 @@ document.addEventListener("DOMContentLoaded", () => {
         }, true);
     }
     render();
+    initTelemetry({
+        isReplayMode: () => Boolean(game.isReplayMode),
+    });
     setTimeout(warmImageCache, 800);
 });
 

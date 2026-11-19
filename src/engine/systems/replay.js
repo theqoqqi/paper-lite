@@ -1,4 +1,9 @@
 import { RNG } from "../../utils/rng.js";
+import {
+    notifyReplayStarted,
+    notifyReplayActionRecorded,
+    notifyReplayArchived,
+} from "./telemetry.js";
 
 export const ACTIVE_REPLAY_KEY = "roguelite_active_replay";
 export const REPLAY_HISTORY_KEY = "roguelite_replay_history";
@@ -95,6 +100,7 @@ export function archiveActiveReplay(outcome = "INTERRUPTED") {
     history.unshift(active);
     saveReplayHistory(history);
     localStorage.removeItem(ACTIVE_REPLAY_KEY);
+    notifyReplayArchived();
     return active;
 }
 
@@ -119,6 +125,9 @@ export function startReplay(game) {
         actions: [],
     };
     saveActiveReplay(replay);
+    if (!game.isReplayMode) {
+        notifyReplayStarted(replay);
+    }
     return replay;
 }
 
@@ -159,6 +168,9 @@ export function recordReplayAction(game, type, payload = null) {
     active.updatedAt = Date.now();
     active.reachedFloor = Math.max(active.reachedFloor || 1, (game.floor || 0) + 1);
     saveActiveReplay(active);
+    if (!game.isReplayMode) {
+        notifyReplayActionRecorded(active);
+    }
     return active;
 }
 
@@ -193,6 +205,9 @@ export function finalizeReplay(game, outcomeState = "GAMEOVER") {
     history.unshift(active);
     saveReplayHistory(history);
     localStorage.removeItem(ACTIVE_REPLAY_KEY);
+    if (!game?.isReplayMode) {
+        notifyReplayArchived();
+    }
     return active;
 }
 
