@@ -8,5 +8,3 @@ dist/
 
 # Other
 __local/*
-node_modules/
-dist/
