@@ -5,6 +5,7 @@ import { onGameLoaded, clearActiveReplay, updateActiveReplaySnapshot } from "./r
 
 const META_STORAGE_KEY = "roguelite_meta_v4";
 const SLOT_PREFIX = "roguelite_slot_";
+const UID_VALID_REGEX = /^[a-zA-Z0-9_-]{1,80}$/;
 
 export function loadMeta(game) {
     const saved = localStorage.getItem(META_STORAGE_KEY);
@@ -16,10 +17,14 @@ export function loadMeta(game) {
             console.error(e);
         }
     }
+    if (ensurePlayerUid(game)) {
+        saveMeta(game);
+    }
 }
 
 export function saveMeta(game) {
     if (game.isReplayMode) return;
+    ensurePlayerUid(game);
     localStorage.setItem(META_STORAGE_KEY, JSON.stringify(game.meta));
 }
 
@@ -177,10 +182,36 @@ export function deleteSlot(slotKey) {
 }
 
 export function hardResetAll(game) {
+    const preservedUid = isValidPlayerUid(game.meta?.uid) ? game.meta.uid : generatePlayerUid();
     localStorage.removeItem(META_STORAGE_KEY);
     ["autosave", "slot1", "slot2", "slot3"].forEach(k => localStorage.removeItem(`${SLOT_PREFIX}${k}`));
     clearActiveReplay();
     game.meta = JSON.parse(JSON.stringify(game.defaultMeta));
+    game.meta.uid = preservedUid;
+    saveMeta(game);
     game.player = null;
     game.state = "MENU";
+}
+
+function ensurePlayerUid(game) {
+    if (!game.meta || typeof game.meta !== "object") return false;
+    if (isValidPlayerUid(game.meta.uid)) return false;
+    game.meta.uid = generatePlayerUid();
+    return true;
+}
+
+function isValidPlayerUid(value) {
+    return typeof value === "string" && UID_VALID_REGEX.test(value);
+}
+
+function generatePlayerUid() {
+    let randomPart = "";
+    if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") {
+        const bytes = new Uint8Array(6);
+        crypto.getRandomValues(bytes);
+        randomPart = Array.from(bytes, b => b.toString(16).padStart(2, "0")).join("");
+    } else {
+        randomPart = Math.random().toString(16).slice(2, 14).padEnd(12, "0");
+    }
+    return `plr_${Date.now()}_${randomPart}`;
 }

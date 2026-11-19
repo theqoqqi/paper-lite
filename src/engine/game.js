@@ -104,6 +104,7 @@ const SCOUT_ACTION_CONFIG = {
 export class Game {
     constructor() {
         this.defaultMeta = {
+            uid: null,
             souls: 0,
             hp: 0,
             atk: 0,
