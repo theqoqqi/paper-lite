@@ -3,7 +3,7 @@ const isLocal = typeof window !== "undefined"
 
 export const TELEMETRY_API_URL = isLocal
     ? "http://localhost:3100/api/telemetry"
-    : "http://95.56.251.112:3715/api/telemetry";
+    : "https://95-56-251-112.sslip.io/api/telemetry";
 
 const META_STORAGE_KEY = "roguelite_meta_v4";
 const ACTIVE_REPLAY_KEY = "roguelite_active_replay";
